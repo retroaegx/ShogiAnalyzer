@@ -6,6 +6,9 @@ __pycache__/
 # C extensions
 *.so
 
+./shogi_kifu_analyzer_design.md
+./Sample
+
 # Distribution / packaging
 .Python
 build/

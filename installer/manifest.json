@@ -1,0 +1,69 @@
+{
+  "cloudflared": {
+    "windows_amd64_url": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe",
+    "linux_amd64_url": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
+  },
+  "engines": [
+    {
+      "id": "yaneuraou_v830git",
+      "name": "YaneuraOu v8.30 (NNUE) — auto-select by CPU",
+      "license_url": "https://github.com/yaneurao/YaneuraOu",
+      "license_note": "Engine source/binaries are distributed from the official repository (license/terms are on the linked page).",
+      "eval": {
+        "id": "suisho5_nnue",
+        "name": "Suisho5 NNUE (nn.bin)",
+        "license_url": "https://github.com/yaneurao/YaneuraOu/releases/tag/suisho5",
+        "license_note": "Evaluation files are downloaded from the official release assets. Please review the linked terms before downloading."
+      },
+      "platforms": [
+        {
+          "os": "windows",
+          "arch": "amd64",
+          "url": "https://github.com/yaneurao/YaneuraOu/releases/download/v8.30git/yaneuraou-V830-git-win64-all.7z",
+          "sha256": "",
+          "extract_dir_hint": "yaneuraou-v830git",
+          "engine_type_hint": "NNUE_halfKP256"
+        },
+        {
+          "os": "darwin",
+          "arch": "amd64",
+          "url": "https://github.com/yaneurao/YaneuraOu/releases/download/v8.30git/yaneuraou-V830-git-mac-all.7z",
+          "sha256": "",
+          "extract_dir_hint": "yaneuraou-v830git",
+          "engine_type_hint": "NNUE_halfKP256"
+        },
+        {
+          "os": "darwin",
+          "arch": "arm64",
+          "url": "https://github.com/yaneurao/YaneuraOu/releases/download/v8.30git/yaneuraou-V830-git-mac-all.7z",
+          "sha256": "",
+          "extract_dir_hint": "yaneuraou-v830git",
+          "engine_type_hint": "NNUE_halfKP256"
+        },
+        {
+          "os": "linux",
+          "arch": "amd64",
+          "url": "",
+          "sha256": "",
+          "extract_dir_hint": "yaneuraou-v830git",
+          "engine_type_hint": "NNUE_halfKP256",
+          "build": {
+            "git": "https://github.com/yaneurao/YaneuraOu.git",
+            "tag": "v8.30git"
+          }
+        }
+      ]
+    }
+  ],
+  "evals": [
+    {
+      "id": "suisho5_nnue",
+      "name": "Suisho5 NNUE (nn.bin)",
+      "url": "https://github.com/yaneurao/YaneuraOu/releases/download/suisho5/Suisho5.7z",
+      "sha256": "",
+      "extract_dir_hint": "suisho5",
+      "license_url": "https://github.com/yaneurao/YaneuraOu/releases/tag/suisho5",
+      "license_note": "Downloaded from the official release assets."
+    }
+  ]
+}

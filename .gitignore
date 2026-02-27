@@ -7,7 +7,7 @@ __pycache__/
 *.so
 
 shogi_kifu_analyzer_design.md
-Sample
+Sample/
 
 # Distribution / packaging
 .Python
@@ -208,3 +208,27 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# --- ShogiAnalyzer local/runtime artifacts (generated or downloaded) ---
+
+# Engine downloads / extracts / eval files (installer-managed)
+/engines/
+
+# cloudflared binary (installer-managed)
+/tools/cloudflared/
+
+# Runtime state (local DB, tunnel logs, per-machine engine config)
+/server/data/app.db*
+/server/data/*.log
+/server/data/engine_config.json
+
+# Local installer logs (CI/dev)
+/tmp_logs/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vs/

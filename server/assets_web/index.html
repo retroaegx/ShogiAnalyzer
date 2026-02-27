@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shogi Kifu Analyzer</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div id="app" class="app">
+    <div id="toastHost" class="toast-host" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Modal host (takeover / promote / dialogs) -->
+    <div id="modalHost" class="modal-host" hidden></div>
+
+    <div class="layout">
+      <section class="board-col" aria-label="Board">
+        <div class="board-head">
+          <div class="status">
+            <span id="wsStatus" class="status-pill">connecting…</span>
+            <span id="engineStatus" class="engine-pill">engine: -</span>
+          </div>
+          <div class="head-actions">
+            <button id="menuBtn" class="icon-btn" type="button" title="メニュー">≡</button>
+          </div>
+        </div>
+
+        <div class="board-stage">
+          <div id="goteHand" class="hand hand-gote" aria-label="Gote hand"></div>
+
+          <div class="board-wrap" id="boardWrap" aria-label="Shogi board">
+            <div id="boardGrid" class="board-grid"></div>
+            <img id="dragGhost" class="drag-ghost" alt="" />
+          </div>
+
+          <div id="senteHand" class="hand hand-sente" aria-label="Sente hand"></div>
+        </div>
+
+        <div class="controls" aria-label="Controls">
+          <div class="nav">
+            <button id="btnStart" type="button">|◀</button>
+            <button id="btnPrev" type="button">◀</button>
+            <button id="btnNext" type="button">▶</button>
+            <button id="btnEnd" type="button">▶|</button>
+          </div>
+
+          <div class="analysis-ctl">
+            <button id="analysisToggle" type="button">解析: OFF</button>
+            <label class="mini" for="analysisMultipv">候補</label>
+            <select id="analysisMultipv">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+            <button id="flipBtn" type="button" title="盤の向き">↻</button>
+          </div>
+        </div>
+
+        <div class="mini-meta">
+          <div class="mono" id="currentSfen"></div>
+        </div>
+      </section>
+
+      <section class="side-col" aria-label="Kifu and analysis">
+        <div class="side-top">
+          <input id="titleInput" class="title-input" type="text" placeholder="タイトル" />
+          <button id="saveBtn" type="button">保存</button>
+        </div>
+
+        <div class="panels">
+          <div class="panel" aria-label="Kifu">
+            <div class="panel-head">
+              <div class="panel-title">棋譜</div>
+              <div class="panel-sub" id="turnText">-</div>
+            </div>
+            <div class="panel-body split-2">
+              <div class="subpanel">
+                <div class="subhead">本道</div>
+                <ol id="moveList" class="move-list"></ol>
+              </div>
+              <div class="subpanel">
+                <div class="subhead">ツリー</div>
+                <div id="treeList" class="tree-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel" aria-label="Analysis">
+            <div class="panel-head">
+              <div class="panel-title">解析</div>
+              <div class="panel-sub" id="analysisStatus">stopped</div>
+            </div>
+            <div class="panel-body">
+              <canvas id="analysisGraph" class="graph" width="800" height="180" aria-label="Analysis graph"></canvas>
+              <ol id="analysisLines" class="analysis-lines"></ol>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Drawer (menu / import / export / server list / theme) -->
+    <div id="drawer" class="drawer" hidden>
+      <div class="drawer-backdrop" id="drawerBackdrop"></div>
+      <div class="drawer-panel" role="dialog" aria-modal="true" aria-label="Menu">
+        <div class="drawer-head">
+          <div class="drawer-title">メニュー</div>
+          <button id="drawerClose" class="icon-btn" type="button" title="閉じる">✕</button>
+        </div>
+
+        <div class="drawer-body">
+          <div class="drawer-section">
+            <div class="sec-title">棋譜</div>
+            <div class="sec-row">
+              <button id="newGameBtn" type="button">新規</button>
+              <button id="importFileBtn" type="button">読み込み(ローカル)</button>
+              <button id="importPasteBtn" type="button">貼り付け</button>
+              <input id="importFile" type="file" accept=".kif,.ki2,.usi,.txt" hidden>
+            </div>
+            <div class="sec-row">
+              <label class="mini" for="exportFormat">保存形式</label>
+              <select id="exportFormat">
+                <option value="usi">USI</option>
+                <option value="kif">KIF</option>
+                <option value="kif2">KIF2(KI2)</option>
+              </select>
+              <a id="exportLink" class="btn" href="#" target="_blank" rel="noopener">ダウンロード</a>
+            </div>
+          </div>
+
+          <div class="drawer-section">
+            <div class="sec-title">サーバー保存</div>
+            <div class="sec-row">
+              <select id="gameList" class="grow"></select>
+              <button id="loadSelectedBtn" type="button">開く</button>
+              <button id="refreshListBtn" type="button">更新</button>
+            </div>
+          </div>
+
+          <div class="drawer-section">
+            <div class="sec-title">テーマ</div>
+            <div class="sec-row">
+              <label class="mini" for="bgSet">盤</label>
+              <select id="bgSet" class="grow"></select>
+            </div>
+            <div class="sec-row">
+              <label class="mini" for="pieceSet">駒</label>
+              <select id="pieceSet" class="grow"></select>
+            </div>
+          </div>
+
+          <div class="drawer-section">
+            <div class="sec-title">テキスト貼り付け</div>
+            <textarea id="importText" class="import-text" rows="8" placeholder="KIF / KI2 / USI を貼り付け"></textarea>
+            <div class="sec-row">
+              <button id="importBtn" type="button">インポート</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

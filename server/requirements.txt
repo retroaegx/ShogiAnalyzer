@@ -1,0 +1,14 @@
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+
+# Uvicorn may already be installed without extras; keep websocket libs explicit.
+websockets>=12.0
+wsproto>=1.2.0
+
+# Installer/runtime helpers
+py7zr>=0.21.0
+py-cpuinfo>=9.0.0
+
+# KIF/KI2 parsing (move resolution)
+python-shogi>=1.1.1
+

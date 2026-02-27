@@ -1,4 +1,6 @@
 :root{
+  color-scheme: dark;
+
   --bg: #0f0f10;
   --panel: #151517;
   --panel2: #1b1b1f;
@@ -221,7 +223,7 @@ body{
   background: rgba(0,0,0,.16);
 }
 
-.controls button, .controls select, .drawer .btn, .drawer button{
+.controls button, .controls select, .drawer .btn, .drawer button, .drawer select{
   border:1px solid var(--border);
   background: rgba(255,255,255,.06);
   color: var(--text);
@@ -231,6 +233,14 @@ body{
 }
 
 .controls button:hover, .drawer .btn:hover, .drawer button:hover{background: rgba(255,255,255,.10);}
+
+.controls select, .drawer select{
+  appearance: none;
+}
+.controls select option, .drawer select option{
+  background: var(--panel);
+  color: var(--text);
+}
 .controls button:disabled{opacity:.45; cursor:not-allowed;}
 
 .analysis-ctl{display:flex; gap:8px; align-items:center;}

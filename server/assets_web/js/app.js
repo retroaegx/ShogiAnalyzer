@@ -1,5 +1,5 @@
 import { parseSfen } from "/js/vendor/sfen.js";
-import { buildUsiDrop, buildUsiMove, normalizeDropPieceType } from "/js/vendor/usi.js";
+import { buildUsiDrop, buildUsiMove, normalizeDropPieceType, parseUsi } from "/js/vendor/usi.js";
 import { loadBoardTheme, loadBoardThemeConfig, THEME_LS_KEYS } from "/js/vendor/themeLoader.js";
 
 /**
@@ -25,6 +25,135 @@ const PIECE_LABEL = {
   promoted_lance: "+L",
   promoted_pawn: "+P",
 };
+
+// ---------- KIF notation helpers ----------
+const FILE_ZENKAKU = { 1: "１", 2: "２", 3: "３", 4: "４", 5: "５", 6: "６", 7: "７", 8: "８", 9: "９" };
+const RANK_KANJI = { 1: "一", 2: "二", 3: "三", 4: "四", 5: "五", 6: "六", 7: "七", 8: "八", 9: "九" };
+
+const PIECE_JA_BY_TYPE = {
+  pawn: "歩",
+  lance: "香",
+  knight: "桂",
+  silver: "銀",
+  gold: "金",
+  bishop: "角",
+  rook: "飛",
+  king: "玉",
+  promoted_pawn: "と",
+  promoted_lance: "成香",
+  promoted_knight: "成桂",
+  promoted_silver: "成銀",
+  horse: "馬",
+  dragon: "龍",
+};
+
+const PROMOTE_TYPE = {
+  pawn: "promoted_pawn",
+  lance: "promoted_lance",
+  knight: "promoted_knight",
+  silver: "promoted_silver",
+  bishop: "horse",
+  rook: "dragon",
+};
+
+function fileRankFromRc(row, col) {
+  const file = 9 - Number(col);
+  const rank = Number(row) + 1;
+  return { file, rank };
+}
+
+function formatKifSquare(row, col) {
+  const { file, rank } = fileRankFromRc(row, col);
+  return `${FILE_ZENKAKU[file] || file}${RANK_KANJI[rank] || rank}`;
+}
+
+function formatFromParen(row, col) {
+  const { file, rank } = fileRankFromRc(row, col);
+  return `(${file}${rank})`;
+}
+
+function jaPieceFromType(pieceType) {
+  const t = String(pieceType || "");
+  return PIECE_JA_BY_TYPE[t] || PIECE_JA_BY_TYPE[normalizeDropPieceType(t)] || t || "?";
+}
+
+function prevToFromUsi(moveUsi) {
+  const mv = parseUsi(moveUsi);
+  if (!mv?.ok) return null;
+  return { row: mv.toRow, col: mv.toCol };
+}
+
+function usiToKifMoveTextFromParsed(parsed, moveUsi, prevToRc) {
+  const mv = parseUsi(moveUsi);
+  if (!mv?.ok) return moveUsi || "";
+
+  let toSq = formatKifSquare(mv.toRow, mv.toCol);
+  if (prevToRc && prevToRc.row === mv.toRow && prevToRc.col === mv.toCol) toSq = "同　";
+
+  if (mv.isDrop) {
+    const piece = jaPieceFromType(mv.pieceType);
+    return `${toSq}${piece}打`;
+  }
+
+  const p = parsed?.board?.[mv.fromRow]?.[mv.fromCol] || null;
+  const piece = jaPieceFromType(p?.piece || "?");
+  const suffix = mv.promote ? "成" : "";
+  return `${toSq}${piece}${suffix}${formatFromParen(mv.fromRow, mv.fromCol)}`;
+}
+
+function applyUsiToParsedPosition(parsed, moveUsi) {
+  const mv = parseUsi(moveUsi);
+  if (!mv?.ok || !parsed?.board) return;
+
+  if (mv.isDrop) {
+    parsed.board[mv.toRow][mv.toCol] = { owner: parsed.currentPlayer, piece: mv.pieceType, promoted: false };
+  } else {
+    const from = parsed.board?.[mv.fromRow]?.[mv.fromCol] || null;
+    parsed.board[mv.fromRow][mv.fromCol] = null;
+    const moved = from ? { ...from } : { owner: parsed.currentPlayer, piece: "pawn", promoted: false };
+    if (mv.promote) {
+      const next = PROMOTE_TYPE[moved.piece] || PROMOTE_TYPE[normalizeDropPieceType(moved.piece)];
+      if (next) {
+        moved.piece = next;
+        moved.promoted = true;
+      }
+    }
+    moved.owner = moved.owner || parsed.currentPlayer;
+    parsed.board[mv.toRow][mv.toCol] = moved;
+  }
+
+  parsed.currentPlayer = parsed.currentPlayer === "sente" ? "gote" : "sente";
+  parsed.turn = parsed.currentPlayer;
+}
+
+function usiToKifMoveText(parentSfen, moveUsi, prevToRc) {
+  const parsed = parseSfen(parentSfen);
+  if (!parsed) return moveUsi || "";
+  return usiToKifMoveTextFromParsed(parsed, moveUsi, prevToRc);
+}
+
+function usiPvToKif(pvUsiList, startSfen, prevToRc) {
+  const pv = Array.isArray(pvUsiList) ? pvUsiList : [];
+  if (!pv.length) return "";
+  const parsed0 = parseSfen(startSfen);
+  if (!parsed0) return pv.join(" ");
+
+  // clone board for safe simulation
+  const parsed = {
+    ...parsed0,
+    board: parsed0.board.map((row) => row.map((cell) => (cell ? { ...cell } : null))),
+  };
+
+  let prev = prevToRc || null;
+  const out = [];
+  for (const usi of pv) {
+    out.push(usiToKifMoveTextFromParsed(parsed, usi, prev));
+    prev = prevToFromUsi(usi);
+    applyUsiToParsedPosition(parsed, usi);
+  }
+  return out.join(" ");
+}
+
 
 // ---------- DOM ----------
 const $ = (id) => document.getElementById(id);
@@ -518,7 +647,7 @@ function waitImage(img) {
   });
 }
 
-function computeBoardLayout(edgeCap) {
+function computeBoardLayout(desiredBoardWidth, maxHeightPx, maxBgW, maxBgH) {
   const nat = state.themeMeta.bgNatural;
   const reg = state.themeMeta.region;
   if (!nat || !reg) return null;
@@ -526,21 +655,27 @@ function computeBoardLayout(edgeCap) {
   const regH = reg.endY - reg.startY;
   if (regW <= 0 || regH <= 0) return null;
 
-  // Make the board square using the smaller side of board_region, centered.
-  const s = Math.min(regW, regH);
-  const sx = reg.startX + (regW - s) / 2;
-  const sy = reg.startY + (regH - s) / 2;
+  // Scale based on board_region width, then clamp by height / background caps.
+  let scale = desiredBoardWidth / regW;
+  if (Number.isFinite(maxHeightPx) && maxHeightPx > 0) scale = Math.min(scale, maxHeightPx / regH);
+  if (Number.isFinite(maxBgW) && maxBgW > 0) scale = Math.min(scale, maxBgW / nat.w);
+  if (Number.isFinite(maxBgH) && maxBgH > 0) scale = Math.min(scale, maxBgH / nat.h);
+  if (!Number.isFinite(scale) || scale <= 0) return null;
 
-  // Fit full background within edgeCap.
-  const scaleMax = edgeCap / Math.max(nat.w, nat.h);
-  let boardPx = Math.floor((s * scaleMax) / 9) * 9;
-  boardPx = clamp(boardPx, 270, edgeCap);
-  const scale = boardPx / s;
+  const bgW = Math.round(nat.w * scale);
+  const bgH = Math.round(nat.h * scale);
 
-  const bgW = nat.w * scale;
-  const bgH = nat.h * scale;
-  const boardLeft = sx * scale;
-  const boardTop = sy * scale;
+  const boardW = regW * scale;
+  const boardH = regH * scale;
+  const cellPx = Math.max(1, Math.floor(Math.min(boardW / 9, boardH / 9)));
+  const boardPx = cellPx * 9;
+
+  const offX = Math.round(reg.startX * scale);
+  const offY = Math.round(reg.startY * scale);
+
+  // If region isn't perfectly square, center the 9x9 board within it.
+  const boardLeft = clamp(offX + Math.round((boardW - boardPx) / 2), 0, Math.max(0, bgW - boardPx));
+  const boardTop = clamp(offY + Math.round((boardH - boardPx) / 2), 0, Math.max(0, bgH - boardPx));
 
   return { bgW, bgH, boardLeft, boardTop, boardPx, scale };
 }
@@ -551,17 +686,20 @@ function applyBoardLayout() {
 
   // available: board-col inner width and height (avoid hands & controls)
   const col = wrap.closest(".board-col");
-  const colW = (col?.clientWidth || window.innerWidth) - 28;
-  const h = window.innerHeight;
-  const edgeCap = clamp(Math.floor(Math.min(colW, h - 290, 920)), 320, 920);
+  const colW = col?.clientWidth || window.innerWidth;
+  const availW = Math.max(280, colW - 28);
+  const availH = Math.max(280, window.innerHeight - 290);
 
-  const layout = computeBoardLayout(edgeCap);
+  // We treat this as the *board* width target (not the background size).
+  const desired = clamp(Math.floor(Math.min(availW, availH, 920)), 320, 920);
+
+  const layout = computeBoardLayout(desired, availH, availW, availH);
   state.themeMeta.layout = layout;
 
   if (!layout) {
     // fallback: keep a reasonable square so the game is still usable
-    wrap.style.width = `${edgeCap}px`;
-    wrap.style.height = `${edgeCap}px`;
+    wrap.style.width = `${desired}px`;
+    wrap.style.height = `${desired}px`;
     els.boardGrid.style.left = "0px";
     els.boardGrid.style.top = "0px";
     els.boardGrid.style.width = "100%";
@@ -754,16 +892,24 @@ function renderMoveList() {
   list.innerHTML = "";
   const ids = state.game?.current_path_node_ids || [];
   const curId = state.game?.current_node_id;
+
   // skip root
-  for (let i = 1; i < ids.length; i++) {
-    const id = ids[i];
+  let prevTo = null;
+  for (let ply = 1; ply < ids.length; ply++) {
+    const id = ids[ply];
     const node = nodeById(id);
-    if (!node) continue;
+    const parent = nodeById(ids[ply - 1]);
+    if (!node || !parent) continue;
+
+    const body = node.move_usi ? usiToKifMoveText(parent.position_sfen, node.move_usi, prevTo) : "";
+
     const li = document.createElement("li");
-    li.textContent = `${Math.ceil(i / 2)}${i % 2 ? "▲" : "△"} ${node.move_usi || ""}`;
+    li.textContent = `${ply} ${body}`.trim();
     if (id === curId) li.classList.add("current");
     li.addEventListener("click", () => sendWs("node:jump", { node_id: id }));
     list.appendChild(li);
+
+    prevTo = prevToFromUsi(node.move_usi);
   }
 }
 
@@ -773,6 +919,14 @@ function renderTree() {
   root.innerHTML = "";
   const curId = state.game?.current_node_id;
   if (!curId) return;
+
+  const labelForNode = (node) => {
+    if (!node?.move_usi) return "(?)";
+    const parent = node.parent_id ? nodeById(node.parent_id) : null;
+    if (!parent) return node.move_usi;
+    const prevTo = prevToFromUsi(parent.move_usi);
+    return usiToKifMoveText(parent.position_sfen, node.move_usi, prevTo);
+  };
 
   const addButton = (node, label, isCurrent) => {
     const btn = document.createElement("button");
@@ -793,7 +947,7 @@ function renderTree() {
       head.style.marginBottom = "6px";
       head.textContent = "分岐";
       root.appendChild(head);
-      for (const n of sibs) addButton(n, n.move_usi || "(?)", n.node_id === curId);
+      for (const n of sibs) addButton(n, labelForNode(n), n.node_id === curId);
       const hr = document.createElement("div");
       hr.style.height = "10px";
       root.appendChild(hr);
@@ -814,7 +968,7 @@ function renderTree() {
     root.appendChild(empty);
     return;
   }
-  for (const n of kids) addButton(n, n.move_usi || "(?)", false);
+  for (const n of kids) addButton(n, labelForNode(n), false);
 }
 
 function syncMeta(parsed) {
@@ -896,6 +1050,10 @@ function renderAnalysis() {
     return;
   }
 
+  const startSfenForPv = state.game?.current_position_sfen || "";
+  const curNodeForPv = state.game?.current_node_id ? nodeById(state.game.current_node_id) : null;
+  const prevToForPv = curNodeForPv ? prevToFromUsi(curNodeForPv.move_usi) : null;
+
   for (const line of a.lines) {
     const li = document.createElement("li");
 
@@ -907,15 +1065,15 @@ function renderAnalysis() {
     score.className = "score";
     score.textContent = formatScore(line);
     const depth = document.createElement("span");
-    depth.textContent = `d${line.depth ?? "-"}`;
+    depth.textContent = `d${line.depth ?? '-'} sd${line.seldepth ?? '-'}`;
     meta.appendChild(pvIndex);
     meta.appendChild(score);
     meta.appendChild(depth);
 
     const pv = document.createElement("div");
     pv.className = "pv";
-    const pvUsi = Array.isArray(line.pv_usi) ? line.pv_usi.join(" ") : "";
-    pv.textContent = pvUsi;
+    const pvUsiList = Array.isArray(line.pv_usi) ? line.pv_usi : [];
+    pv.textContent = usiPvToKif(pvUsiList, startSfenForPv, prevToForPv);
 
     const actRow = document.createElement("div");
     actRow.style.marginTop = "6px";
@@ -1274,9 +1432,20 @@ async function setupThemeSelects() {
 function syncAnalysisFromGame() {
   const ui = state.game?.ui_state || {};
   state.analysis.enabled = Boolean(ui.analysis_enabled);
+
+  const prevMultipv = state.analysis.multipv;
   const raw = Number(ui.analysis_multipv || 1);
   // UI requirement: 1..5 (step=1)
-  state.analysis.multipv = clamp(raw, 1, 5);
+  const nextMultipv = clamp(raw, 1, 5);
+  state.analysis.multipv = nextMultipv;
+
+  // If multipv changed, reset current PV list (engine will restart)
+  if (prevMultipv && prevMultipv !== nextMultipv) {
+    state.analysis.lines = [];
+    state.analysis.elapsedMs = 0;
+    state.analysis.history = [];
+    state.analysis.statusText = state.analysis.enabled ? "starting..." : "stopped";
+  }
 
   // when node changes, clear running history
   const curNode = state.game?.current_node_id || null;
@@ -1516,6 +1685,15 @@ function wireUi() {
     const v = clamp(Number(els.analysisMultipv.value || 1), 1, 5);
     // keep UI in sync even before server echo
     els.analysisMultipv.value = String(v);
+
+    // reflect immediately (server will restart analysis if needed)
+    state.analysis.multipv = v;
+    state.analysis.lines = [];
+    state.analysis.history = [];
+    state.analysis.elapsedMs = 0;
+    state.analysis.statusText = state.analysis.enabled ? "restarting..." : "stopped";
+    rerenderAnalysisOnly();
+
     sendWs("analysis:set_multipv", { multipv: v });
   });
 

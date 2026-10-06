@@ -7,7 +7,9 @@
     {
       "id": "yaneuraou_v830git",
       "name": "YaneuraOu v8.30 (NNUE) — auto-select by CPU",
-      "license_url": "https://github.com/yaneurao/YaneuraOu",
+      "license": "GPLv3",
+      "license_url": "https://github.com/yaneurao/YaneuraOu/blob/master/LICENSE",
+      "terms_url": "https://github.com/yaneurao/YaneuraOu",
       "license_note": "Engine source/binaries are distributed from the official repository (license/terms are on the linked page).",
       "eval": {
         "id": "suisho5_nnue",
@@ -59,9 +61,11 @@
     {
       "id": "suisho5_nnue",
       "name": "Suisho5 NNUE (nn.bin)",
+      "author": "tayayan",
       "url": "https://github.com/yaneurao/YaneuraOu/releases/download/suisho5/Suisho5.7z",
       "sha256": "",
       "extract_dir_hint": "suisho5",
+      "license": "",
       "license_url": "https://github.com/yaneurao/YaneuraOu/releases/tag/suisho5",
       "license_note": "Downloaded from the official release assets."
     }

@@ -221,6 +221,8 @@ __marimo__/
 /server/data/app.db*
 /server/data/*.log
 /server/data/engine_config.json
+/server/data/engine_options.json
+/server/data/auth.json
 
 # Local installer logs (CI/dev)
 /tmp_logs/

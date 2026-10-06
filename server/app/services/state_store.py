@@ -13,6 +13,11 @@ from ..core.import_usi import import_usi_game
 from ..db.session import connect_db, init_db
 
 
+def default_game_title() -> str:
+    """Title of a newly created game: kif_YYYYMMDD_hhmmss (local time)."""
+    return datetime.now().strftime("kif_%Y%m%d_%H%M%S")
+
+
 def _dumps(obj: Any) -> str:
     return json.dumps(obj or {}, ensure_ascii=False, separators=(",", ":"))
 
@@ -157,6 +162,11 @@ class StateStore:
 
     def delete_game(self, game_id: str) -> bool:
         with self._conn:
+            # analysis results of the game's positions go too (they reference node ids)
+            self._conn.execute(
+                "DELETE FROM analysis_snapshots WHERE node_id IN (SELECT node_id FROM nodes WHERE game_id = ?)",
+                (game_id,),
+            )
             self._conn.execute("DELETE FROM nodes WHERE game_id = ?", (game_id,))
             cur = self._conn.execute("DELETE FROM games WHERE game_id = ?", (game_id,))
         if self.get_last_game_id() == game_id:
@@ -187,7 +197,7 @@ class StateStore:
             )
 
     def create_game(self, title: str | None = None, initial_sfen: str | None = None) -> GameTree:
-        game = GameTree.new(title=title, initial_sfen=initial_sfen)
+        game = GameTree.new(title=(title or "").strip() or default_game_title(), initial_sfen=initial_sfen)
         self.save_game(game)
         self.set_last_game_id(game.game_id)
         return game
@@ -226,13 +236,51 @@ class StateStore:
             )
         return snapshot_id
 
+    def latest_evals(self, game_id: str) -> dict[str, dict[str, Any]]:
+        """Deepest snapshot per node: best score + all candidate lines (score is side-to-move perspective).
+
+        The lines let the client keep showing candidate moves / arrows for positions that
+        were analysed earlier, even when analysis is OFF.
+        """
+        rows = self._conn.execute(
+            """
+            SELECT s.node_id, s.lines_json
+            FROM analysis_snapshots s
+            JOIN nodes n ON n.node_id = s.node_id
+            WHERE n.game_id = ?
+            ORDER BY s.created_at
+            """,
+            (game_id,),
+        ).fetchall()
+        out: dict[str, dict[str, Any]] = {}
+        for r in rows:
+            try:
+                lines = json.loads(r["lines_json"] or "[]")
+            except json.JSONDecodeError:
+                continue
+            best = next((l for l in lines if isinstance(l, dict) and int(l.get("pv_index") or 1) == 1), None)
+            if not best or best.get("score_type") not in {"cp", "mate"}:
+                continue
+            depth = int(best.get("depth") or 0)
+            prev = out.get(r["node_id"])
+            # deeper wins; at equal depth prefer the snapshot with more candidate lines
+            if prev and (prev["depth"] > depth or (prev["depth"] == depth and len(prev["lines"]) > len(lines))):
+                continue
+            out[r["node_id"]] = {
+                "score_type": best["score_type"],
+                "score_value": int(best.get("score_value") or 0),
+                "depth": depth,
+                "lines": [l for l in lines if isinstance(l, dict)],
+            }
+        return out
+
     def ensure_last_or_create(self) -> GameTree:
         last_id = self.get_last_game_id()
         if last_id:
             loaded = self.load_game(last_id)
             if loaded:
                 return loaded
-        return self.create_game(title="Recovered game")
+        return self.create_game()
 
 
 class RuntimeState:
@@ -244,6 +292,12 @@ class RuntimeState:
     async def startup(self) -> None:
         async with self._lock:
             self._current_game = self.store.ensure_last_or_create()
+            # nobody is connected yet: analysis always starts OFF (also after a crash while ON)
+            ui = dict(self._current_game.ui_state or {})
+            if ui.get("analysis_enabled"):
+                ui["analysis_enabled"] = False
+                self._current_game.ui_state = ui
+                self.store.save_game(self._current_game)
 
     async def current_game(self) -> GameTree:
         async with self._lock:
@@ -287,6 +341,15 @@ class RuntimeState:
             game = self.store.create_game(title=title, initial_sfen=initial_sfen)
             self._current_game = game
             return game
+
+    async def delete_game(self, game_id: str) -> bool:
+        """Delete a saved game; if it is the one being shown, switch to a fresh game."""
+        async with self._lock:
+            deleted = self.store.delete_game(game_id)
+            if deleted and self._current_game is not None and self._current_game.game_id == game_id:
+                # otherwise the next save would write the deleted game back
+                self._current_game = self.store.create_game()
+            return deleted
 
     async def import_usi_text(self, text: str, title: str | None = None) -> GameTree:
         async with self._lock:

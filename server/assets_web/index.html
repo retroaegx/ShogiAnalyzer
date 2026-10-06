@@ -2,166 +2,345 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Shogi Kifu Analyzer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0e11">
+  <title>Shogi Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Shippori+Mincho+B1:wght@600;700;800&display=swap">
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
+  <!-- icon sprite -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="i-first" viewBox="0 0 24 24"><path d="M6 5v14M18 6l-8 6 8 6z"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-last" viewBox="0 0 24 24"><path d="M18 5v14M6 6l8 6-8 6z"/></symbol>
+    <symbol id="i-flip" viewBox="0 0 24 24"><path d="M7 4v13M3 13l4 4 4-4M17 20V7M13 11l4-4 4 4"/></symbol>
+    <symbol id="i-new" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-open" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 19h16"/></symbol>
+    <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M4 19h16"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8 3v5h7V3M8 21v-7h8v7"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></symbol>
+    <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="8" r="2"/><path d="M6 7v10M18 10c0 4-6 3-11 7"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <!-- flip: two pieces facing each other + rotation arrows -->
+    <symbol id="i-flipboard" viewBox="0 0 24 24"><path d="M3.5 21v-6.2L6.7 12l3.2 2.8V21z"/><path d="M20.5 3v6.2L17.3 12l-3.2-2.8V3z"/><path d="M13 21.5c3.6 0 6.4-2.1 7.2-5.3"/><path d="M18.3 17.4l1.9-1.6 1.6 1.9"/><path d="M11 2.5c-3.6 0-6.4 2.1-7.2 5.3"/><path d="M5.7 6.6L3.8 8.2 2.2 6.3"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5M15 8l4 4-4 4M19 12H9"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2"/><circle cx="4.5" cy="12" r="1.2"/><circle cx="4.5" cy="18" r="1.2"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></symbol>
+    <symbol id="i-paste" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 4.5V3.5h6v1M9 4.5h6v2.5H9z"/><path d="M9 12h6M9 16h4"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-4 3 3 6-6"/></symbol>
+    <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></symbol>
+  </svg>
+
   <div id="app" class="app">
-    <div id="toastHost" class="toast-host" aria-live="polite" aria-atomic="true"></div>
+    <!-- ===== Top bar ===== -->
+    <header class="topbar">
+      <div class="brand" aria-label="Shogi Analyzer">
+        <span class="brand-mark" aria-hidden="true">将</span>
+        <span class="brand-name">Shogi<b>Analyzer</b></span>
+      </div>
 
-    <!-- Modal host (takeover / promote / dialogs) -->
-    <div id="modalHost" class="modal-host" hidden></div>
+      <div class="title-field">
+        <button id="titleEditBtn" class="title-edit" type="button" title="棋譜名を変更" aria-label="棋譜名を変更"><svg class="ico"><use href="#i-edit"/></svg></button>
+        <span id="titleLabel" class="title-label">無題の棋譜</span>
+      </div>
 
-    <div class="layout">
-      <section class="board-col" aria-label="Board">
-        <div class="board-head">
-          <div class="status">
-            <span id="wsStatus" class="status-pill">connecting…</span>
-            <span id="engineStatus" class="engine-pill">engine: -</span>
+      <div class="status-group">
+        <span id="wsStatus" class="status" data-state="connecting"><i></i><span class="status-text">接続中</span></span>
+        <span id="engineStatus" class="status engine" data-state="idle" title=""><svg class="ico"><use href="#i-cpu"/></svg><span class="status-text">エンジン</span></span>
+      </div>
+
+      <nav class="actions" aria-label="棋譜操作">
+        <button id="newGameBtn" class="tb-btn" type="button" title="新規 (初期局面)"><svg class="ico"><use href="#i-new"/></svg><span>新規</span></button>
+        <button id="openBtn" class="tb-btn" type="button" title="サーバー保存から開く"><svg class="ico"><use href="#i-open"/></svg><span>開く</span></button>
+        <button id="importBtn" class="tb-btn" type="button" title="棋譜ファイル（KIF / KI2 / USI）を読み込み"><svg class="ico"><use href="#i-import"/></svg><span>読込</span></button>
+        <button id="pasteBtn" class="tb-btn" type="button" title="クリップボードの棋譜を新しい棋譜として貼り付け"><svg class="ico"><use href="#i-paste"/></svg><span>貼付</span></button>
+        <button id="exportBtn" class="tb-btn" type="button" title="KIF / KI2 / USI で書き出し"><svg class="ico"><use href="#i-export"/></svg><span>書出</span></button>
+        <button id="saveBtn" class="tb-btn primary" type="button" title="サーバーに保存 (Ctrl+S)"><svg class="ico"><use href="#i-save"/></svg><span>保存</span></button>
+        <button id="settingsBtn" class="tb-btn icon-only" type="button" title="表示設定" aria-label="表示設定"><svg class="ico"><use href="#i-settings"/></svg></button>
+        <button id="menuBtn" class="tb-btn icon-only menu-btn" type="button" title="メニュー" aria-label="メニュー"><svg class="ico"><use href="#i-more"/></svg></button>
+      </nav>
+    </header>
+
+    <!-- ===== Main ===== -->
+    <main class="main">
+      <section class="board-area" id="boardArea" aria-label="盤面">
+        <div class="board-stage" id="boardStage">
+          <div class="stand stand-top" id="standTop">
+            <div class="stand-label"><span class="mark" id="standTopMark">☖</span><span id="standTopName">後手</span></div>
+            <div class="stand-pieces" id="handTop"></div>
           </div>
-          <div class="head-actions">
-            <button id="menuBtn" class="icon-btn" type="button" title="メニュー">≡</button>
+
+          <div class="evalbar" id="evalBar" aria-label="評価値バー">
+            <div class="evalbar-fill" id="evalBarFill"></div>
+            <div class="evalbar-mid"></div>
+            <span class="evalbar-text" id="evalBarText">0</span>
+          </div>
+
+          <div class="board-frame" id="boardFrame">
+            <div class="coords coords-files" id="coordFiles"></div>
+            <div class="coords coords-ranks" id="coordRanks"></div>
+            <div class="board" id="board">
+              <img class="board-bg" id="boardBg" alt="" draggable="false">
+              <div class="board-grid" id="boardGrid"></div>
+              <svg class="board-overlay" id="boardOverlay" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <img id="dragGhost" class="drag-ghost" alt="" draggable="false">
+            </div>
+          </div>
+
+          <div class="stand stand-bottom" id="standBottom">
+            <div class="stand-label"><span class="mark" id="standBottomMark">☗</span><span id="standBottomName">先手</span></div>
+            <div class="stand-pieces" id="handBottom"></div>
           </div>
         </div>
 
-        <div class="board-stage">
-          <div id="goteHand" class="hand hand-gote" aria-label="Gote hand"></div>
-
-          <div class="board-wrap" id="boardWrap" aria-label="Shogi board">
-            <div id="boardGrid" class="board-grid"></div>
-            <img id="dragGhost" class="drag-ghost" alt="" />
+        <div class="navbar" aria-label="局面移動">
+          <div class="nav-group">
+            <button id="btnStart" class="nav-btn" type="button" title="最初へ (Home)" aria-label="最初へ"><svg class="ico"><use href="#i-first"/></svg></button>
+            <button id="btnPrev" class="nav-btn" type="button" title="1手戻る (←)" aria-label="1手戻る"><svg class="ico"><use href="#i-prev"/></svg></button>
           </div>
-
-          <div id="senteHand" class="hand hand-sente" aria-label="Sente hand"></div>
+          <div class="ply-display">
+            <input id="plySlider" class="ply-slider" type="range" min="0" max="0" value="0" aria-label="手数">
+            <div class="ply-text"><b id="plyNow">0</b><span>/</span><span id="plyMax">0</span><span class="ply-unit">手</span><span class="turn-chip" id="turnChip">▲先手番</span></div>
+          </div>
+          <div class="nav-group">
+            <button id="btnNext" class="nav-btn" type="button" title="1手進む (→)" aria-label="1手進む"><svg class="ico"><use href="#i-next"/></svg></button>
+            <button id="btnEnd" class="nav-btn" type="button" title="最後へ (End)" aria-label="最後へ"><svg class="ico"><use href="#i-last"/></svg></button>
+          </div>
+          <button id="kifuDrawerBtn" class="nav-btn kifu-btn" type="button" title="棋譜" aria-label="棋譜を開く"><svg class="ico"><use href="#i-list"/></svg><span>棋譜</span></button>
+          <button id="flipBtn" class="nav-btn flip-btn" type="button" title="盤を反転（先手・後手の向きを入れ替え） (F)" aria-label="盤を反転"><svg class="ico"><use href="#i-flipboard"/></svg><span>反転</span></button>
+          <!-- phone: always-visible analysis summary -->
+          <div class="mini-eval" id="miniEval">
+            <button id="miniOnOff" class="mini-onoff" type="button" aria-label="常時解析 ON/OFF"><i></i><span>解析</span><b>OFF</b></button>
+            <span class="mini-score" id="miniScore">±0</span>
+            <span class="mini-depth" id="miniDepth" title="深さ/選択的深さ"></span>
+            <span class="mini-verdict" id="miniVerdict"></span>
+            <span class="mini-best" id="miniBest"></span>
+          </div>
         </div>
+      </section>
 
-        <div class="controls" aria-label="Controls">
-          <div class="nav">
-            <button id="btnStart" type="button">|◀</button>
-            <button id="btnPrev" type="button">◀</button>
-            <button id="btnNext" type="button">▶</button>
-            <button id="btnEnd" type="button">▶|</button>
-          </div>
-
+      <aside class="side" id="side" aria-label="解析と棋譜">
+        <!-- Analysis -->
+        <section class="card analysis-card">
+          <header class="card-head">
+            <div class="head-title">
+              <h2>解析<span class="en">ANALYSIS</span></h2>
+              <button id="engineSettingsBtn" class="icon-btn gear" type="button" title="エンジン設定（スレッド数・ハッシュなど）" aria-label="エンジン設定"><svg class="ico"><use href="#i-gear"/></svg></button>
+            </div>
+            <div class="onoff-wrap">
+              <span class="onoff-label">常時解析</span>
+              <div class="onoff" id="analysisOnOff" role="group" aria-label="常時解析 ON/OFF (Space)">
+                <button type="button" data-v="on">ON</button><button type="button" data-v="off">OFF</button>
+              </div>
+            </div>
+          </header>
           <div class="analysis-ctl">
-            <button id="analysisToggle" type="button">解析: OFF</button>
-            <label class="mini" for="analysisMultipv">候補</label>
-            <select id="analysisMultipv">
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-            </select>
-            <button id="flipBtn" type="button" title="盤の向き">↻</button>
+            <span class="ctl-label">候補手</span>
+            <div class="seg" id="multipvSeg" role="radiogroup" aria-label="候補手数">
+              <button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button><button type="button" data-v="5">5</button>
+            </div>
+            <button id="analyzeAllBtn" class="btn-batch" type="button" title="棋譜の全局面を順に解析して評価値グラフを作ります"><svg class="ico"><use href="#i-chart"/></svg><span>全解析</span></button>
           </div>
-        </div>
-
-        <div class="mini-meta">
-          <div class="mono" id="currentSfen"></div>
-        </div>
-      </section>
-
-      <section class="side-col" aria-label="Kifu and analysis">
-        <div class="side-top">
-          <input id="titleInput" class="title-input" type="text" placeholder="タイトル" />
-          <button id="saveBtn" type="button">保存</button>
-        </div>
-
-        <div class="panels">
-          <div class="panel" aria-label="Kifu">
-            <div class="panel-head">
-              <div class="panel-title">棋譜</div>
-              <div class="panel-sub" id="turnText">-</div>
-            </div>
-            <div class="panel-body split-2">
-              <div class="subpanel">
-                <div class="subhead">本道</div>
-                <ol id="moveList" class="move-list"></ol>
-              </div>
-              <div class="subpanel">
-                <div class="subhead">ツリー</div>
-                <div id="treeList" class="tree-list"></div>
-              </div>
-            </div>
+          <div class="batch-progress" id="batchProgress" hidden>
+            <div class="batch-bar"><i id="batchBar"></i></div>
+            <span id="batchText">全解析中</span>
           </div>
-
-          <div class="panel" aria-label="Analysis">
-            <div class="panel-head">
-              <div class="panel-title">解析</div>
-              <div class="panel-sub" id="analysisStatus">stopped</div>
+          <div class="eval-summary">
+            <div class="eval-main">
+              <span class="eval-score" id="evalScore">—</span>
+              <span class="eval-verdict" id="evalVerdict">解析停止中</span>
             </div>
-            <div class="panel-body">
-              <canvas id="analysisGraph" class="graph" width="800" height="180" aria-label="Analysis graph"></canvas>
-              <ol id="analysisLines" class="analysis-lines"></ol>
-            </div>
+            <div class="eval-meta" id="evalMeta"></div>
           </div>
-        </div>
-      </section>
-    </div>
+          <ol class="pv-list" id="pvList"></ol>
+        </section>
 
-    <!-- Drawer (menu / import / export / server list / theme) -->
-    <div id="drawer" class="drawer" hidden>
-      <div class="drawer-backdrop" id="drawerBackdrop"></div>
-      <div class="drawer-panel" role="dialog" aria-modal="true" aria-label="Menu">
-        <div class="drawer-head">
-          <div class="drawer-title">メニュー</div>
-          <button id="drawerClose" class="icon-btn" type="button" title="閉じる">✕</button>
-        </div>
+        <!-- Eval graph -->
+        <section class="card graph-card">
+          <header class="card-head">
+            <h2>評価値グラフ</h2>
+            <span class="card-sub">先手から見た評価値 · ±3000 で頭打ち</span>
+          </header>
+          <div class="graph-wrap"><canvas id="evalGraph" class="graph"></canvas></div>
+        </section>
 
-        <div class="drawer-body">
-          <div class="drawer-section">
-            <div class="sec-title">棋譜</div>
-            <div class="sec-row">
-              <button id="newGameBtn" type="button">新規</button>
-              <button id="importFileBtn" type="button">読み込み(ローカル)</button>
-              <button id="importPasteBtn" type="button">貼り付け</button>
-              <input id="importFile" type="file" accept=".kif,.ki2,.usi,.txt" hidden>
-            </div>
-            <div class="sec-row">
-              <label class="mini" for="exportFormat">保存形式</label>
-              <select id="exportFormat">
-                <option value="usi">USI</option>
-                <option value="kif">KIF</option>
-                <option value="kif2">KIF2(KI2)</option>
-              </select>
-              <a id="exportLink" class="btn" href="#" target="_blank" rel="noopener">ダウンロード</a>
-            </div>
+        <!-- Kifu -->
+        <!-- phone: this card becomes a drawer that slides in from the right -->
+        <section class="card kifu-card" id="kifuCard" aria-label="棋譜">
+          <header class="card-head">
+            <h2>棋譜</h2>
+            <span class="card-sub" id="kifuSub"></span>
+            <button id="kifuDrawerClose" class="icon-btn drawer-close" type="button" aria-label="棋譜を閉じる"><svg class="ico"><use href="#i-close"/></svg></button>
+          </header>
+          <ol class="move-list" id="moveList"></ol>
+          <div class="variations" id="variations" hidden>
+            <div class="var-head"><svg class="ico"><use href="#i-branch"/></svg><span id="varTitle">変化</span></div>
+            <div class="var-chips" id="varChips"></div>
           </div>
-
-          <div class="drawer-section">
-            <div class="sec-title">サーバー保存</div>
-            <div class="sec-row">
-              <select id="gameList" class="grow"></select>
-              <button id="loadSelectedBtn" type="button">開く</button>
-              <button id="refreshListBtn" type="button">更新</button>
-            </div>
+          <div class="comment-box">
+            <textarea id="commentInput" rows="2" placeholder="この局面へのコメント…" aria-label="コメント"></textarea>
           </div>
+        </section>
+      </aside>
+    </main>
+  </div>
 
-          <div class="drawer-section">
-            <div class="sec-title">テーマ</div>
-            <div class="sec-row">
-              <label class="mini" for="bgSet">盤</label>
-              <select id="bgSet" class="grow"></select>
-            </div>
-            <div class="sec-row">
-              <label class="mini" for="pieceSet">駒</label>
-              <select id="pieceSet" class="grow"></select>
-            </div>
-          </div>
+  <!-- ===== Dialogs ===== -->
+  <div id="dialogHost" class="dialog-host" hidden>
+    <div class="dialog-backdrop" data-close></div>
 
-          <div class="drawer-section">
-            <div class="sec-title">テキスト貼り付け</div>
-            <textarea id="importText" class="import-text" rows="8" placeholder="KIF / KI2 / USI を貼り付け"></textarea>
-            <div class="sec-row">
-              <button id="importBtn" type="button">インポート</button>
-            </div>
-          </div>
-        </div>
+    <div class="dialog" id="dlgOpen" role="dialog" aria-modal="true" aria-labelledby="dlgOpenTitle" hidden>
+      <header class="dialog-head"><h3 id="dlgOpenTitle">保存した棋譜を開く</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <div class="dialog-body">
+        <input id="gameFilter" class="field" type="search" placeholder="タイトルで絞り込み">
+        <ul class="game-list" id="gameList"></ul>
       </div>
     </div>
+
+    <div class="dialog small" id="dlgTitle" role="dialog" aria-modal="true" aria-labelledby="dlgTitleTitle" hidden>
+      <header class="dialog-head"><h3 id="dlgTitleTitle">棋譜名を変更</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <div class="dialog-body">
+        <input id="titleInput" class="field" type="text" maxlength="120" placeholder="無題の棋譜" spellcheck="false" autocomplete="off" aria-label="棋譜名" />
+      </div>
+      <footer class="dialog-foot"><button class="btn" type="button" data-close>キャンセル</button><button class="btn primary" type="button" id="titleSave">変更</button></footer>
+    </div>
+
+    <div class="dialog" id="dlgImport" role="dialog" aria-modal="true" aria-labelledby="dlgImportTitle" hidden>
+      <header class="dialog-head"><h3 id="dlgImportTitle">棋譜ファイルを読み込む</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <div class="dialog-body">
+        <label class="dropzone" id="dropzone">
+          <input id="importFile" type="file" accept=".kif,.kifu,.ki2,.ki2u,.usi,.txt" hidden>
+          <svg class="ico big"><use href="#i-import"/></svg>
+          <span><b>ファイルを選択</b> またはここにドロップ</span>
+          <small>KIF / KI2 / USI ・ 新しい棋譜として開きます</small>
+        </label>
+      </div>
+    </div>
+
+    <!-- only when the browser does not let the 貼付 button read the clipboard (e.g. http on the LAN) -->
+    <div class="dialog small" id="dlgPaste" role="dialog" aria-modal="true" aria-labelledby="dlgPasteTitle" hidden>
+      <header class="dialog-head"><h3 id="dlgPasteTitle">棋譜を貼り付け</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <div class="dialog-body">
+        <p class="muted">このアドレスではボタンからクリップボードを読めません。下の枠を長押しして「貼り付け」（PC は Ctrl+V）してください。</p>
+        <div id="pasteTarget" class="paste-target" contenteditable="true" role="textbox" aria-label="ここに貼り付け">ここに貼り付け</div>
+      </div>
+    </div>
+
+    <div class="dialog" id="dlgExport" role="dialog" aria-modal="true" aria-labelledby="dlgExportTitle" hidden>
+      <header class="dialog-head"><h3 id="dlgExportTitle">棋譜を書き出す</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <div class="dialog-body">
+        <div class="seg wide" id="exportSeg" role="radiogroup" aria-label="形式">
+          <button type="button" data-v="kif" class="on">KIF</button><button type="button" data-v="kif2">KI2</button><button type="button" data-v="usi">USI</button>
+        </div>
+        <textarea id="exportPreview" class="field mono" rows="10" readonly></textarea>
+      </div>
+      <footer class="dialog-foot"><button class="btn" type="button" id="exportCopy">コピー</button><a class="btn primary" id="exportDownload" href="#" download>ダウンロード</a></footer>
+    </div>
+
+    <div class="dialog wide" id="dlgSettings" role="dialog" aria-modal="true" aria-labelledby="dlgSettingsTitle" hidden>
+      <header class="dialog-head"><h3 id="dlgSettingsTitle">表示設定</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <div class="dialog-body">
+        <div class="set-title">盤</div>
+        <div class="theme-grid" id="bgChoices"></div>
+        <div class="set-title">駒</div>
+        <div class="theme-grid pieces" id="pieceChoices"></div>
+        <div class="set-title">表示</div>
+        <label class="check"><input type="checkbox" id="optCoords" checked> 座標を表示</label>
+        <label class="check"><input type="checkbox" id="optEvalBar" checked> 評価値バーを表示</label>
+        <label class="check"><input type="checkbox" id="optLegal" checked> 移動可能マスを表示</label>
+        <label class="check"><input type="checkbox" id="optLastMove" checked> 最後に指した手を強調 <span class="legend red"></span></label>
+        <label class="check"><input type="checkbox" id="optBestMove" checked> コンピュータの手（最善手 / 候補手）を表示 <span class="legend green"></span></label>
+        <label class="check"><input type="checkbox" id="optNextMove" checked> 棋譜の次の手 / 分岐を表示 <span class="legend orange"></span></label>
+        <label class="check"><input type="checkbox" id="optArrowLabels" checked> 矢印の横に「候補手」「指し手」などの文字を表示（OFF のときは候補手の評価値だけ）</label>
+        <div class="set-title logout-item" hidden>アカウント</div>
+        <div class="logout-item" hidden><button class="btn" type="button" id="logoutBtn"><svg class="ico"><use href="#i-logout"/></svg>ログアウト</button></div>
+      </div>
+    </div>
+
+    <div class="dialog wide engine-dlg" id="dlgEngine" role="dialog" aria-modal="true" aria-labelledby="dlgEngineTitle" hidden>
+      <header class="dialog-head">
+        <div><h3 id="dlgEngineTitle">エンジン設定</h3><div class="dlg-sub" id="engineName">—</div></div>
+        <button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button>
+      </header>
+      <div class="dialog-body" id="engineBody">
+        <div class="eng-loading" id="engineLoading">エンジンから設定項目を読み込んでいます…</div>
+        <div id="engineForm" hidden>
+          <div class="set-title">基本</div>
+          <div class="eng-main">
+            <div class="eng-slider" id="threadsRow">
+              <div class="eng-slider-head"><span class="eng-name">スレッド数 <small>Threads</small></span><span class="eng-limit" id="threadsLimit"></span></div>
+              <div class="eng-slider-body">
+                <input type="range" id="threadsRange" min="1" step="1">
+                <input type="number" id="threadsNum" class="field num" min="1" step="1">
+              </div>
+              <div class="eng-default" id="threadsDefault"></div>
+            </div>
+            <div class="eng-slider" id="hashRow">
+              <div class="eng-slider-head"><span class="eng-name">置換表メモリ <small id="hashOptName">USI_Hash</small></span><span class="eng-limit" id="hashLimit"></span></div>
+              <div class="eng-slider-body">
+                <input type="range" id="hashRange" min="1" step="1">
+                <input type="number" id="hashNum" class="field num" min="1" step="1"><span class="unit">MB</span>
+              </div>
+              <div class="eng-default" id="hashDefault"></div>
+            </div>
+          </div>
+          <div class="set-title">全解析</div>
+          <label class="eng-inline">1局面あたりの思考時間
+            <input type="number" id="batchSeconds" class="field num" min="0.5" max="120" step="0.5"><span class="unit">秒</span>
+          </label>
+          <div class="set-title">詳細設定 <small class="muted">エンジンのオプション（既定値はエンジンが報告した値）</small></div>
+          <div class="eng-table" id="engineOptions"></div>
+        </div>
+      </div>
+      <footer class="dialog-foot">
+        <button class="btn ghost-left" type="button" id="engineResetAll">すべて既定値に戻す</button>
+        <button class="btn" type="button" data-close>キャンセル</button>
+        <button class="btn primary" type="button" id="engineSave">保存して再起動</button>
+      </footer>
+    </div>
+
+    <div class="dialog small sheet" id="dlgMenu" role="dialog" aria-modal="true" aria-label="メニュー" hidden>
+      <div class="sheet-grip" data-close></div>
+      <div class="menu-grid">
+        <button type="button" data-act="newGameBtn"><svg class="ico"><use href="#i-new"/></svg><span>新規</span></button>
+        <button type="button" data-act="openBtn"><svg class="ico"><use href="#i-open"/></svg><span>開く</span></button>
+        <button type="button" data-act="importBtn"><svg class="ico"><use href="#i-import"/></svg><span>読込</span></button>
+        <button type="button" data-act="pasteBtn"><svg class="ico"><use href="#i-paste"/></svg><span>貼付</span></button>
+        <button type="button" data-act="exportBtn"><svg class="ico"><use href="#i-export"/></svg><span>書出</span></button>
+        <button type="button" data-act="settingsBtn"><svg class="ico"><use href="#i-settings"/></svg><span>表示設定</span></button>
+        <button type="button" data-act="logoutBtn" class="logout-item" hidden><svg class="ico"><use href="#i-logout"/></svg><span>ログアウト</span></button>
+        <button type="button" data-act="engineSettingsBtn"><svg class="ico"><use href="#i-gear"/></svg><span>エンジン設定</span></button>
+      </div>
+    </div>
+
+    <div class="dialog small" id="dlgConfirm" role="alertdialog" aria-modal="true" aria-labelledby="dlgConfirmTitle" hidden>
+      <header class="dialog-head"><h3 id="dlgConfirmTitle"></h3></header>
+      <div class="dialog-body"><p id="dlgConfirmMsg" class="muted"></p></div>
+      <footer class="dialog-foot" id="dlgConfirmActions"></footer>
+    </div>
   </div>
+
+  <!-- phone: backdrop behind the kifu drawer -->
+  <div class="drawer-backdrop" id="kifuBackdrop" hidden></div>
+
+  <!-- shown while the WebSocket is down -->
+  <div class="conn-overlay" id="connOverlay" role="alertdialog" aria-live="assertive" hidden>
+    <div class="conn-card">
+      <div class="conn-anim" aria-hidden="true"><i></i><i></i><i></i></div>
+      <b id="connTitle">接続が切れました</b>
+      <span id="connMsg">再接続しています…</span>
+    </div>
+  </div>
+
+  <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
   <script type="module" src="/js/app.js"></script>
 </body>

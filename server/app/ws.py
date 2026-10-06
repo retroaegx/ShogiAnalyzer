@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from datetime import datetime, timezone
 import json
 import secrets
+from urllib.parse import urlsplit
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+from . import auth
 
 
 router = APIRouter()
@@ -164,6 +168,8 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
         payload = {}
 
     async def _sync_analysis_to_current_game() -> None:
+        if analysis.batch_running:
+            return  # 全解析 owns the engine; it resumes the current position when it ends
         game = await runtime.current_game()
         enabled = bool((game.ui_state or {}).get("analysis_enabled"))
         if enabled:
@@ -174,10 +180,25 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
         if analysis.status_wire().get("analysis_running"):
             await analysis.stop("analysis disabled")
 
+    # 全解析 drives the position itself; the kifu cannot be changed until it ends
+    if analysis.batch_running and msg_type in {
+        "game:new",
+        "game:load",
+        "game:delete",
+        "game:import_text",
+        "node:jump",
+        "node:play_move",
+        "node:reorder_children",
+        "analysis:set_multipv",
+    }:
+        await ws_send(ws, "toast", {"level": "warning", "message": "全解析中は棋譜を操作できません"})
+        await _send_state(ws)
+        return
+
     if msg_type == "game:new":
         await runtime.create_game(title=payload.get("title"), initial_sfen=payload.get("initial_sfen"))
         await _send_state(ws)
-        await _sync_analysis_to_current_game()
+        analysis.schedule_sync(_sync_analysis_to_current_game)
         return
 
     if msg_type == "game:load":
@@ -188,9 +209,25 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
         try:
             await runtime.load_game(game_id)
             await _send_state(ws)
-            await _sync_analysis_to_current_game()
+            analysis.schedule_sync(_sync_analysis_to_current_game)
         except KeyError:
             await ws_send(ws, "toast", {"level": "error", "message": "game not found"})
+        return
+
+    if msg_type == "game:delete":
+        game_id = str(payload.get("game_id") or "")
+        if not game_id:
+            await ws_send(ws, "toast", {"level": "error", "message": "game_id is required"})
+            return
+        was_current = (await runtime.current_game()).game_id == game_id
+        if not await runtime.delete_game(game_id):
+            await ws_send(ws, "toast", {"level": "error", "message": "棋譜が見つかりませんでした"})
+            return
+        await ws_send(ws, "game:deleted", {"game_id": game_id, "was_current": was_current})
+        if was_current:
+            # the deleted game was on screen: show the fresh game that replaced it
+            await _send_state(ws)
+            analysis.schedule_sync(_sync_analysis_to_current_game)
         return
 
     if msg_type == "game:save":
@@ -199,6 +236,8 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
                 title = str(payload.get("title") or "").strip()
                 if title:
                     g.title = title
+                    # the user chose this name (rename / first save): no save-name popup any more
+                    g.ui_state = {**(g.ui_state or {}), "named": True}
             if isinstance(payload.get("meta"), dict):
                 g.meta = payload["meta"]
             if isinstance(payload.get("ui_state"), dict):
@@ -210,7 +249,7 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
         try:
             await runtime.mutate(_save_fields)
             await _send_state(ws)
-            await _sync_analysis_to_current_game()
+            analysis.schedule_sync(_sync_analysis_to_current_game)
         except Exception as exc:
             await ws_send(ws, "toast", {"level": "error", "message": f"save failed: {exc}"})
         return
@@ -227,7 +266,7 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
         try:
             await runtime.mutate(_jump)
             await _send_state(ws)
-            await _sync_analysis_to_current_game()
+            analysis.schedule_sync(_sync_analysis_to_current_game)
         except Exception as exc:
             await ws_send(ws, "toast", {"level": "error", "message": f"jump failed: {exc}"})
         return
@@ -249,7 +288,7 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
         try:
             await runtime.mutate(_play)
             await _send_state(ws)
-            await _sync_analysis_to_current_game()
+            analysis.schedule_sync(_sync_analysis_to_current_game)
         except Exception as exc:
             await ws_send(ws, "toast", {"level": "error", "message": f"play_move failed: {exc}"})
         return
@@ -315,13 +354,55 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
 
         await runtime.mutate(_set_enabled)
         await _send_state(ws)
-        if enabled:
-            game = await runtime.current_game()
-            ok, reason = await analysis.start_for_game(game)
-            if not ok:
-                await ws_send(ws, "toast", {"level": "warning", "message": reason})
-        else:
-            await analysis.stop("disabled by user")
+        if enabled and analysis.batch_running:
+            # 常時解析 ON stops 全解析 (the client asked the user first); the batch's
+            # on_finish then starts analysis of the current position
+            analysis.cancel_batch()
+            return
+        # background start/stop so the socket stays responsive (engine boot / isready can take seconds)
+        analysis.schedule_sync(_sync_analysis_to_current_game)
+        return
+
+    if msg_type == "analysis:analyze_all":
+        try:
+            seconds = max(0.5, min(120.0, float(payload.get("seconds") or 3)))
+        except (TypeError, ValueError):
+            seconds = 3.0
+        if analysis.batch_running:
+            await ws_send(ws, "toast", {"level": "warning", "message": "全解析は実行中です"})
+            return
+
+        # 全解析 turns 常時解析 OFF
+        def _disable(g):
+            ui = dict(g.ui_state or {})
+            ui["analysis_enabled"] = False
+            g.ui_state = ui
+            g.touch()
+
+        game, _ = await runtime.mutate(_disable)
+        wire = game.to_wire()
+        # main line: path to the current position, then the first child onward
+        node_ids = list(wire["current_path_node_ids"])
+        children = wire["children_index"]
+        while children.get(node_ids[-1]):
+            node_ids.append(children[node_ids[-1]][0])
+
+        async def _show(node_id: str) -> None:
+            # the board starts from the initial position and follows the analysis
+            await runtime.mutate(lambda g: g.jump(node_id))
+            with contextlib.suppress(Exception):
+                await _send_state(ws)
+
+        ok, reason = analysis.start_batch(
+            game, node_ids, seconds, on_finish=lambda: _sync_analysis_to_current_game(), on_step=_show
+        )
+        await _send_state(ws)
+        if not ok:
+            await ws_send(ws, "toast", {"level": "warning", "message": reason})
+        return
+
+    if msg_type == "analysis:batch_cancel":
+        analysis.cancel_batch()
         return
 
     if msg_type == "analysis:set_multipv":
@@ -342,7 +423,7 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
 
         await runtime.mutate(_set_multipv)
         await _send_state(ws)
-        await _sync_analysis_to_current_game()
+        analysis.schedule_sync(_sync_analysis_to_current_game)
         return
 
     if msg_type == "analysis:start":
@@ -379,7 +460,7 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
             return
         await runtime.set_current_game(game_new)
         await _send_state(ws)
-        await _sync_analysis_to_current_game()
+        analysis.schedule_sync(_sync_analysis_to_current_game)
         return
 
     if msg_type in {"session:takeover", ""}:
@@ -388,9 +469,21 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
     await ws_send(ws, "toast", {"level": "warning", "message": f"unknown message type: {msg_type}"})
 
 
+def _analysis_off(g) -> None:
+    g.ui_state = {**(g.ui_state or {}), "analysis_enabled": False}
+    g.touch()
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
+    if auth.required():
+        # login cookie required (also while the password is not set yet), and only from this app's own pages (blocks cross-site sockets)
+        origin = ws.headers.get("origin") or ""
+        same_origin = not origin or urlsplit(origin).netloc == (ws.headers.get("host") or "")
+        if not same_origin or not auth.token_valid(ws.cookies.get(auth.COOKIE_NAME)):
+            await ws.close(code=4401)
+            return
     hub = _hub_from_ws(ws)
     runtime = _runtime_from_ws(ws)
     analysis = _analysis_from_ws(ws)
@@ -422,6 +515,8 @@ async def websocket_endpoint(ws: WebSocket):
                     await ws_send(ws, "session:busy", {"owner_hint": "send session:takeover to claim session"})
                     continue
                 old_owner, _ = await hub.takeover(ws)
+                # the previous session ends here: 常時解析 / 全解析 turn OFF (as on a disconnect)
+                await runtime.mutate(_analysis_off)
                 if old_owner and old_owner is not ws:
                     try:
                         await ws_send(old_owner, "session:kicked", {"reason": "session takeover"})
@@ -456,11 +551,7 @@ async def websocket_endpoint(ws: WebSocket):
     finally:
         released = await hub.release_if_owner(ws)
         if released:
+            # session closed: 常時解析 OFF first (so nothing restarts it), then stop the engine / 全解析
+            with contextlib.suppress(Exception):
+                await runtime.mutate(_analysis_off)
             await analysis.owner_disconnected()
-            try:
-                current = await runtime.current_game()
-                current.ui_state = {**(current.ui_state or {}), "analysis_enabled": False}
-                current.touch()
-                runtime.store.save_game(current)
-            except Exception:
-                pass

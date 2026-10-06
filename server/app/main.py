@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from . import auth
 from .api import router as api_router
 from .paths import data_dir as runtime_data_dir
+from .services.update_checker import start_update_checker, stop_update_checker
 from .services.analysis_service import AnalysisService
 from .services.state_store import RuntimeState, StateStore
 from .ws import SessionHub, router as ws_router
@@ -74,9 +75,11 @@ def create_app() -> FastAPI:
         if message:
             print(message, flush=True)
         await runtime.startup()
+        start_update_checker()
 
     @app.on_event("shutdown")
     async def _shutdown():
+        stop_update_checker()
         await analysis.shutdown()
         store.close()
 

@@ -2680,6 +2680,77 @@ function wire() {
 }
 
 // Logout buttons only when password protection is on (SHOGI_ANALYZER_PASSWORD=TRUE).
+// ---------- version / update notice (GitHub releases) ----------
+function renderUpdate(st) {
+  if (!st) return;
+  const cur = st.current_version ? `v${st.current_version}` : "—";
+  $("versionText").textContent = cur;
+  const status = $("versionStatus");
+  status.classList.toggle("new", Boolean(st.update_available));
+  const when = st.checked_at ? new Date(st.checked_at).toLocaleString("ja-JP", { dateStyle: "short", timeStyle: "short" }) : "";
+  if (!st.enabled) status.textContent = "更新の確認はオフです（.env の SHOGI_ANALYZER_UPDATE_CHECK）";
+  else if (st.update_available) status.textContent = `新しいバージョン ${st.latest_version} があります`;
+  else if (st.error) status.textContent = `確認できませんでした: ${st.error}`;
+  else if (st.latest_version) status.textContent = `最新です${when ? `（確認: ${when}）` : ""}`;
+  else status.textContent = "まだ確認していません";
+
+  $("updateNotice").hidden = !st.update_available;
+  if (st.update_available) {
+    $("updateBody").textContent = `${st.release_name || st.latest_version} が公開されています。`;
+    $("updateMeta").textContent = `現在 ${cur} → 最新 ${st.latest_version}${when ? ` ・ 確認 ${when}` : ""}`;
+    $("updateLink").href = st.release_url || st.release_page_url || "#";
+  }
+}
+
+async function setupUpdateNotice() {
+  const popup = $("updatePopup");
+  const badge = $("updateBadge");
+  // the top bar is its own stacking context (blur): keep the popup outside so it sits above the board
+  document.body.appendChild(popup);
+  const setOpen = (open) => {
+    popup.hidden = !open;
+    if (open) {
+      // under the badge, but always fully on screen (phones)
+      const r = badge.getBoundingClientRect();
+      const w = popup.offsetWidth;
+      const right = Math.round(window.innerWidth - r.right - 8);
+      popup.style.top = `${Math.round(r.bottom + 10)}px`;
+      popup.style.right = `${Math.max(12, Math.min(right, window.innerWidth - w - 12))}px`;
+    }
+    badge.setAttribute("aria-expanded", String(open));
+  };
+  badge.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setOpen(popup.hidden);
+  });
+  document.addEventListener("click", (e) => {
+    if (!popup.hidden && !e.target.closest("#updateNotice, #updatePopup")) setOpen(false);
+  });
+  $("updateCheckBtn").addEventListener("click", async () => {
+    const btn = $("updateCheckBtn");
+    btn.disabled = true;
+    try {
+      const st = await fetch("/api/app/update_check", { method: "POST" }).then((r) => r.json());
+      renderUpdate(st);
+      toast("info", st.update_available ? `新しいバージョン ${st.latest_version} があります` : st.error ? "更新を確認できませんでした" : "最新のバージョンです");
+    } catch {
+      toast("error", "更新を確認できませんでした");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  const load = async () => {
+    try {
+      renderUpdate(await fetch("/api/app/update_status", { cache: "no-store" }).then((r) => r.json()));
+    } catch {
+      // optional
+    }
+  };
+  await load();
+  setTimeout(load, 15000); // the server's first check runs in the background right after startup
+  setInterval(load, 60 * 60 * 1000);
+}
+
 async function setupLogout() {
   try {
     const st = await fetch("/api/auth/status", { cache: "no-store" }).then((r) => r.json());
@@ -2703,6 +2774,7 @@ async function main() {
   renderCoords();
   wire();
   setupLogout();
+  setupUpdateNotice();
   await loadTheme();
   setupThemeChoices();
   connectWs();

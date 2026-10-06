@@ -15,11 +15,6 @@ import time
 import urllib.request
 import zipfile
 
-try:
-    import cpuinfo  # type: ignore
-except Exception:
-    cpuinfo = None
-
 
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
@@ -553,14 +548,23 @@ def _extract_archive(archive: Path, dest_dir: Path) -> None:
 
 def _cpu_flags() -> set[str]:
     flags: set[str] = set()
+    # imported here, not at module load: on the first run py-cpuinfo is installed only after
+    # this module was imported, and a missing module meant "no AVX2" (slow SSE4.2 build/exe)
     try:
-        if cpuinfo is None:
-            return set()
-        info = cpuinfo.get_cpu_info()  # type: ignore
-        fl = info.get("flags") or []
-        flags = set([str(f).lower() for f in fl])
+        import cpuinfo as _cpuinfo  # type: ignore
+
+        info = _cpuinfo.get_cpu_info()
+        flags = {str(f).lower() for f in (info.get("flags") or [])}
     except Exception:
         flags = set()
+    if not flags and Path("/proc/cpuinfo").exists():
+        try:
+            for line in Path("/proc/cpuinfo").read_text(encoding="utf-8", errors="replace").splitlines():
+                if line.lower().startswith("flags"):
+                    flags = set(line.split(":", 1)[1].lower().split())
+                    break
+        except OSError:
+            pass
     return flags
 
 

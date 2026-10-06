@@ -129,7 +129,8 @@ def _setup_console_log() -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     fh = open(path, "w" if fresh else "a", encoding="utf-8", errors="replace")
     if fresh:
-        fh.write(f"===== ShogiAnalyzer run.bat {datetime.now():%Y-%m-%d %H:%M:%S} =====\n")
+        version = (repo_root() / "VERSION").read_text(encoding="utf-8").strip() if (repo_root() / "VERSION").exists() else "?"
+        fh.write(f"===== ShogiAnalyzer v{version}  {datetime.now():%Y-%m-%d %H:%M:%S} =====\n")
         fh.flush()
     os.environ["SHOGI_ANALYZER_CONSOLE_LOG"] = str(path)
     sys.stdout = _Tee(sys.stdout, fh)
@@ -272,6 +273,9 @@ def main() -> int:
     public_url = (os.environ.get("SHOGI_ANALYZER_PUBLIC_URL") or "").strip().rstrip("/")
 
     if _is_running_in_venv():
+        version_file = repo_root() / "VERSION"
+        version = version_file.read_text(encoding="utf-8").strip() if version_file.exists() else "?"
+        print(f"[installer] ShogiAnalyzer v{version}")
         print(tr(f"[installer] ログ  : {log_path}", f"[installer] Console log: {log_path}"))
         created = tr("  （新規作成）", "  (created)") if env_created else ""
         print(tr(f"[installer] 設定  : {env_path}{created}", f"[installer] Settings   : {env_path}{created}"))

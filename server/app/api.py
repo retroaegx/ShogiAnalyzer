@@ -16,6 +16,7 @@ from .core.import_kif import import_kif_game
 from .core.import_kif2 import import_kif2_game
 from .core.import_usi import detect_format, import_usi_game, normalize_usi_text
 from .services.state_store import RuntimeState, StateStore, default_game_title
+from .services.update_checker import check_update_now, get_update_status, read_current_version
 
 
 router = APIRouter()
@@ -146,6 +147,23 @@ async def logout():
     resp = JSONResponse({"ok": True})
     resp.delete_cookie(auth.COOKIE_NAME, path="/")
     return resp
+
+
+@router.get("/api/app/update_status")
+async def app_update_status():
+    """Current / latest version (GitHub release) for the update notice in the top bar."""
+    return get_update_status()
+
+
+@router.post("/api/app/update_check")
+async def app_update_check():
+    """「更新を確認」: ask GitHub now."""
+    return await asyncio.to_thread(check_update_now)
+
+
+@router.get("/api/app/version")
+async def app_version():
+    return {"version": read_current_version()}
 
 
 @router.get("/healthz")

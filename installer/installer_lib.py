@@ -103,6 +103,26 @@ def _server_data_dir(root: Path) -> Path:
 _ENV_PATH_KEYS = {"SHOGI_ANALYZER_ENGINE_PATH", "SHOGI_ANALYZER_ENGINE_EVAL_DIR"}
 
 
+def portable_path(path: str | Path, base: Path) -> str:
+    """Path to store in .env / engine_config.json: relative to base (with "/") when it lies
+    inside base, so the whole folder can be moved; otherwise absolute (with "/")."""
+    if not str(path).strip():
+        return ""
+    p = Path(path).expanduser()
+    try:
+        return p.resolve().relative_to(base.resolve()).as_posix()
+    except ValueError:
+        return p.resolve().as_posix()
+
+
+def resolve_portable(value: str, base: Path) -> str:
+    """Inverse of portable_path: relative values are taken from base."""
+    if not (value or "").strip():
+        return ""
+    p = Path(value).expanduser()
+    return str(p if p.is_absolute() else (base / p).resolve())
+
+
 def env_file_path() -> Path:
     """<repo>/.env (ignored by git)."""
     return runtime_home() / ".env"
@@ -455,20 +475,34 @@ def _engine_config_path(root: Path) -> Path:
     return _server_data_dir(root) / "engine_config.json"
 
 
+_CONFIG_PATH_KEYS = ("engine_path", "engine_eval_dir")
+
+
 def _load_engine_config(root: Path) -> dict:
+    """Saved engine choice; paths are stored relative to the app folder and returned absolute."""
     p = _engine_config_path(root)
     if not p.exists():
         return {}
     try:
-        return json.loads(p.read_text(encoding="utf-8"))
+        cfg = json.loads(p.read_text(encoding="utf-8-sig"))
     except Exception:
         return {}
+    if not isinstance(cfg, dict):
+        return {}
+    for key in _CONFIG_PATH_KEYS:
+        if cfg.get(key):
+            cfg[key] = resolve_portable(str(cfg[key]), root)
+    return cfg
 
 
 def _save_engine_config(root: Path, cfg: dict) -> None:
     p = _engine_config_path(root)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    out = dict(cfg)
+    for key in _CONFIG_PATH_KEYS:
+        if out.get(key):
+            out[key] = portable_path(str(out[key]), root)
+    p.write_text(json.dumps(out, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def _pick_engine_variant(engine: dict) -> dict | None:

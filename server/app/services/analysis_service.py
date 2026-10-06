@@ -261,6 +261,17 @@ class AnalysisService:
     def _overrides_path(self) -> Path:
         return Path(self.store.db_path).parent / "engine_options.json"
 
+    def _engine_label(self) -> str:
+        """Engine the saved options belong to (for reading the file); relative to the app folder when inside it."""
+        parts = list(self._cmd or [])
+        if parts:
+            app_dir = Path(__file__).resolve().parents[3]
+            try:
+                parts[0] = Path(parts[0]).resolve().relative_to(app_dir).as_posix()
+            except ValueError:
+                pass
+        return " ".join(parts)
+
     def _load_overrides(self) -> dict[str, Any]:
         try:
             raw = json.loads(self._overrides_path().read_text(encoding="utf-8"))
@@ -273,7 +284,7 @@ class AnalysisService:
         p = self._overrides_path()
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(
-            json.dumps({"engine": " ".join(self._cmd or []), "values": self._option_overrides}, ensure_ascii=False, indent=2)
+            json.dumps({"engine": self._engine_label(), "values": self._option_overrides}, ensure_ascii=False, indent=2)
             + "\n",
             encoding="utf-8",
         )

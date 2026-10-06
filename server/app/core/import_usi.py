@@ -4,15 +4,40 @@ from .gametree import GameTree
 from .sfen_ops import DEFAULT_START_SFEN, normalize_sfen, parse_usi_move
 
 
-def detect_format(text: str) -> str:
+def normalize_usi_text(text: str) -> str:
+    """Accept "sfen ..." / "startpos ..." without the leading "position" too."""
     s = (text or "").strip()
+    lower = s.lower()
+    if lower.startswith("sfen ") or lower.startswith("startpos"):
+        return "position " + s
+    return s
+
+
+def _is_bare_usi_moves(s: str) -> bool:
+    tokens = s.split()
+    if not tokens:
+        return False
+    try:
+        for t in tokens:
+            parse_usi_move(t)
+    except Exception:
+        return False
+    return True
+
+
+def detect_format(text: str) -> str:
+    s = normalize_usi_text(text)
     lower = s.lower()
     if lower.startswith("position "):
         return "usi"
-    if "手合割" in s or "手数----指手" in s:
+    if _is_bare_usi_moves(s):
+        return "usi"
+    if "手数----指手" in s:
         return "kif"
-    if "▲" in s or "△" in s:
+    if "▲" in s or "△" in s or "☗" in s or "☖" in s:
         return "kif2"
+    if "手合割" in s:
+        return "kif"
     return "unknown"
 
 

@@ -25,8 +25,172 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+# ---------- console language ----------
+def _ui_is_japanese() -> bool:
+    """Japanese Windows display language / ja locale -> Japanese console messages, else English."""
+    forced = (os.environ.get("SHOGI_ANALYZER_LANG") or "").strip().lower()
+    if forced:
+        return forced.startswith("ja")
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            return (ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF) == 0x11  # LANG_JAPANESE
+        except Exception:
+            pass
+    for key in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        value = os.environ.get(key)
+        if value:
+            return value.lower().startswith("ja")
+    try:
+        import locale
+
+        return (locale.getlocale()[0] or "").lower().startswith(("ja", "japanese"))
+    except Exception:
+        return False
+
+
+UI_JA = _ui_is_japanese()
+# the server (started from run.py) prints in the same language
+os.environ.setdefault("SHOGI_ANALYZER_LANG", "ja" if UI_JA else "en")
+
+
+def tr(ja: str, en: str) -> str:
+    return ja if UI_JA else en
+
+
+def run_streamed(cmd: list[str], cwd: str | None = None, env: dict[str, str] | None = None) -> int:
+    """Run a command and forward its output line by line through sys.stdout.
+
+    Child processes write to the console directly, so without this their output
+    would bypass the console log (sys.stdout is tee'd to console.log by run.py).
+    """
+    if env is None:
+        env = dict(os.environ)
+    env.setdefault("PYTHONIOENCODING", "utf-8")  # read as UTF-8 below
+    proc = subprocess.Popen(
+        cmd,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+    )
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        sys.stdout.write(line)
+    return proc.wait()
+
+
+def runtime_home() -> Path:
+    """Folder the generated/downloaded files go under (.venv, engines/, tools/, server/data/, .env).
+
+    The repository folder itself, as in the original layout; everything generated is
+    listed in .gitignore.
+    """
+    return repo_root()
+
+
 def _server_data_dir(root: Path) -> Path:
     return root / "server" / "data"
+
+
+# ---------- settings file (.env) ----------
+# keys whose relative values are resolved against the folder of the .env file
+_ENV_PATH_KEYS = {"SHOGI_ANALYZER_ENGINE_PATH", "SHOGI_ANALYZER_ENGINE_EVAL_DIR"}
+
+
+def env_file_path() -> Path:
+    """<repo>/.env (ignored by git)."""
+    return runtime_home() / ".env"
+
+
+def ensure_env_file(root: Path) -> tuple[Path, bool]:
+    """Create <runtime>/.env from .env.template on first run. Returns (path, created)."""
+    path = env_file_path()
+    if path.exists():
+        return path, False
+    template = root / ".env.template"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if template.exists():
+        shutil.copyfile(template, path)
+    else:
+        path.write_text("# ShogiAnalyzer settings\n", encoding="utf-8")
+    return path, True
+
+
+def read_env_value(path: Path, key: str) -> str:
+    """Value of KEY in the settings file ("" when missing or empty)."""
+    try:
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+    except OSError:
+        return ""
+    for raw in lines:
+        line = raw.strip()
+        if line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        if k.strip() == key:
+            return v.strip().strip("'\"")
+    return ""
+
+
+def fill_env_value(path: Path, key: str, value: str) -> bool:
+    """Write KEY=value into the settings file if KEY is missing or empty there.
+
+    Values the user typed are never overwritten. Returns True when the file changed.
+    """
+    if not value or read_env_value(path, key):
+        return False
+    try:
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+    except OSError:
+        lines = []
+    for i, raw in enumerate(lines):
+        line = raw.strip()
+        if not line.startswith("#") and "=" in line and line.split("=", 1)[0].strip() == key:
+            lines[i] = f"{key}={value}"
+            break
+    else:
+        lines.append(f"{key}={value}")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return True
+
+
+def load_env_file(path: Path) -> dict[str, str]:
+    """Apply KEY=VALUE lines from the settings file to os.environ.
+
+    - variables already set in the real environment win
+    - empty values are ignored (= use the default / automatic setting)
+    - relative paths are taken from the folder of the .env file
+    """
+    applied: dict[str, str] = {}
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except OSError:
+        return applied
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        if not key or not value or key in os.environ:
+            continue
+        if key in _ENV_PATH_KEYS:
+            p = Path(value).expanduser()
+            if not p.is_absolute():
+                p = (path.parent / p).resolve()
+            value = str(p)
+        os.environ[key] = value
+        applied[key] = value
+    return applied
 
 
 def _db_path(root: Path) -> Path:
@@ -93,10 +257,10 @@ def ensure_requirements(root: Path) -> bool:
     """
     req = root / "server" / "requirements.txt"
     if not req.exists():
-        print(f"[installer] ERROR: requirements not found: {req}")
+        print(tr(f"[installer] エラー: requirements.txt が見つかりません: {req}", f"[installer] ERROR: requirements not found: {req}"))
         return False
 
-    marker_dir = root / ".venv"
+    marker_dir = Path(sys.prefix)
     marker_dir.mkdir(parents=True, exist_ok=True)
     marker = marker_dir / ".requirements_sha256"
     want = _sha256_file(req)
@@ -104,15 +268,15 @@ def ensure_requirements(root: Path) -> bool:
     if have == want:
         return True
 
-    print("[installer] Installing Python requirements into .venv ...")
-    rc = subprocess.call([sys.executable, "-m", "pip", "install", "-U", "pip"], cwd=str(root))
+    print(tr("[installer] Python のパッケージをインストールしています（.venv）...", "[installer] Installing Python requirements into .venv ..."))
+    rc = run_streamed([sys.executable, "-m", "pip", "install", "-U", "pip"], cwd=str(root))
     if rc != 0:
-        print("[installer] ERROR: pip upgrade failed")
+        print(tr("[installer] エラー: pip の更新に失敗しました", "[installer] ERROR: pip upgrade failed"))
         return False
     # Always upgrade to ensure extras/websocket deps are installed even if uvicorn was previously installed without extras.
-    rc = subprocess.call([sys.executable, "-m", "pip", "install", "--upgrade", "-r", str(req)], cwd=str(root))
+    rc = run_streamed([sys.executable, "-m", "pip", "install", "--upgrade", "-r", str(req)], cwd=str(root))
     if rc != 0:
-        print("[installer] ERROR: requirements install failed")
+        print(tr("[installer] エラー: Python パッケージのインストールに失敗しました", "[installer] ERROR: requirements install failed"))
         return False
     marker.write_text(want + "\n", encoding="utf-8")
     return True
@@ -124,17 +288,17 @@ def ensure_cloudflared(root: Path) -> Path | None:
     urls = manifest.get("cloudflared") or {}
     url = urls.get(f"{_platform_key()}_url")
     if not url:
-        print("[installer] cloudflared: manifest has no download url; Quick Tunnel disabled")
+        print(tr("[installer] cloudflared: この環境用のダウンロード先がないため Quick Tunnel は使えません", "[installer] cloudflared: manifest has no download url; Quick Tunnel disabled"))
         return None
 
-    bin_dir = root / "tools" / "cloudflared"
+    bin_dir = runtime_home() / "tools" / "cloudflared"
     bin_dir.mkdir(parents=True, exist_ok=True)
     exe_name = "cloudflared.exe" if os.name == "nt" else "cloudflared"
     dst = bin_dir / exe_name
     if dst.exists() and dst.stat().st_size > 0:
         return dst
 
-    print("[installer] Downloading cloudflared ...")
+    print(tr("[installer] cloudflared をダウンロードしています ...", "[installer] Downloading cloudflared ..."))
     try:
         _download(str(url), dst)
         if os.name != "nt":
@@ -142,7 +306,7 @@ def ensure_cloudflared(root: Path) -> Path | None:
         _log_installer_event(root, kind="download", payload={"asset": "cloudflared", "url": url, "path": str(dst)})
         return dst
     except Exception as exc:
-        print(f"[installer] cloudflared download failed: {exc}")
+        print(tr(f"[installer] cloudflared のダウンロードに失敗しました: {exc}", f"[installer] cloudflared download failed: {exc}"))
         _log_installer_event(root, kind="download_error", payload={"asset": "cloudflared", "url": url, "error": str(exc)})
         return None
 
@@ -165,11 +329,63 @@ def list_existing_tunnels(cloudflared: Path) -> str | None:
         return None
 
 
+def _print_license(license_name: str, links: list[tuple[str, str]]) -> None:
+    """License line + links (terms / license pages) of a third-party download."""
+    print(tr(f"  ライセンス: {license_name or '配布元に明記なし'}", f"  license: {license_name or 'not stated by the distributor'}"))
+    for label_ja_en, url in links:
+        if url:
+            ja, en = label_ja_en.split("|")
+            print(tr(f"  {ja}: {url}", f"  {en}: {url}"))
+
+
+def _prompt_consent(what_ja: str, what_en: str) -> bool:
+    """y only when the user agrees to the distributor's terms / license (default: no)."""
+    print(tr(
+        f"  ※ {what_ja}の利用の範囲は、配布元の規約・ライセンス条項に従います。\n"
+        "     上のリンク先の内容に同意する場合のみ y を入力してください（同意しない場合は Enter / n）。",
+        f"  * Use of this {what_en} is governed by the distributor's terms and license.\n"
+        "    Enter y only if you agree to them (see the links above); Enter / n to decline.",
+    ))
+    return _prompt_yes_no(tr(
+        f"配布元の規約・ライセンスに同意して{what_ja}をダウンロードしますか？",
+        f"Agree to the distributor's terms/license and download this {what_en}?",
+    ))
+
+
+def ask_password_protection(env_path: Path) -> None:
+    """First run: ask whether to turn password protection on; the answer goes into .env.
+
+    Only the ON/OFF choice is made here. The password itself is set on the first browser
+    screen that connects (see server/app/auth.py).
+    """
+    key = "SHOGI_ANALYZER_PASSWORD"
+    if read_env_value(env_path, key):
+        return  # already chosen (edit .env to change it)
+    if (os.environ.get(key) or "").strip():
+        return  # given as an OS environment variable
+    if not sys.stdin.isatty():
+        return  # cannot ask now: stays OFF and is asked on the next interactive start
+    print(tr(
+        "\n[installer] パスワード保護\n"
+        "  公開アドレス（Quick Tunnel / 固定アドレス）で使う場合は、有効にすることをおすすめします。\n"
+        "  有効にした場合、パスワードは最初にブラウザで接続した画面で設定します（ログインは 30 日間有効）。\n"
+        "  あとから .env の SHOGI_ANALYZER_PASSWORD（TRUE / FALSE）で変更できます。",
+        "\n[installer] Password protection\n"
+        "  Recommended when you use a public address (Quick Tunnel / fixed address).\n"
+        "  If enabled, you set the password on the first browser screen that connects (logins last 30 days).\n"
+        "  You can change it later with SHOGI_ANALYZER_PASSWORD (TRUE / FALSE) in .env.",
+    ))
+    value = "TRUE" if _prompt_yes_no(tr("パスワード保護を有効にしますか？", "Enable password protection?")) else "FALSE"
+    if fill_env_value(env_path, key, value):
+        print(tr(f"[installer] .env に保存: {key}={value}", f"[installer] Saved in .env: {key}={value}"))
+    os.environ[key] = value
+
+
 def _prompt_yes_no(msg: str, default_no: bool = True) -> bool:
     # NOTE: On some terminals (and on Windows in some launchers) isatty() can be false
     # even though input() works. Prefer to try prompting and gracefully fall back.
     if not sys.stdin.isatty():
-        print(f"{msg} {'[y/N]' if default_no else '[Y/n]'} (non-interactive detected)")
+        print(f"{msg} {'[y/N]' if default_no else '[Y/n]'} " + tr("（入力できない環境を検出）", "(non-interactive detected)"))
         # If stdin is truly non-interactive, input() will raise EOFError.
     suffix = "[y/N]" if default_no else "[Y/n]"
     try:
@@ -350,7 +566,7 @@ def _choose_best_engine_exe(engine_root: Path, type_hint: str = "") -> Path | No
     return candidates[0]
 
 
-def _guess_eval_dir_from_exe(exe_path: Path) -> Path | None:
+def guess_eval_dir_from_exe(exe_path: Path) -> Path | None:
     """Best-effort guess of eval directory for NNUE engines.
 
     This repo's installer extracts engine binaries under:
@@ -411,12 +627,16 @@ def _download_eval_if_needed(root: Path, engine: dict, engines_dir: Path) -> Pat
     if not url:
         return None
 
-    print("\n[installer] Evaluation download")
-    print(f"  name : {item.get('name') or eval_id}")
-    if item.get("license_url"):
-        print(f"  terms: {item.get('license_url')}")
-    print(f"  url  : {url}")
-    if not _prompt_yes_no("この評価関数をダウンロードしますか？"):
+    print(tr("\n[installer] 評価関数のダウンロード", "\n[installer] Evaluation download"))
+    print(tr(f"  名前      : {item.get('name') or eval_id}", f"  name   : {item.get('name') or eval_id}"))
+    if item.get("author"):
+        print(tr(f"  作者      : {item.get('author')}", f"  author : {item.get('author')}"))
+    _print_license(
+        str(item.get("license") or ""),
+        [("配布ページ|page", str(item.get("license_url") or "")), ("規約|terms", str(item.get("terms_url") or ""))],
+    )
+    print(tr(f"  ダウンロード元: {url}", f"  download: {url}"))
+    if not _prompt_consent("評価関数", "evaluation file"):
         return None
 
     eval_dir = engines_dir / "eval"
@@ -428,7 +648,7 @@ def _download_eval_if_needed(root: Path, engine: dict, engines_dir: Path) -> Pat
         _sha256_verify_if_present(dst, str(item.get("sha256") or ""))
         _log_installer_event(root, kind="download", payload={"asset": "eval", "eval_id": eval_id, "url": url, "path": str(dst)})
     except Exception as exc:
-        print(f"[installer] eval download failed: {exc}")
+        print(tr(f"[installer] 評価関数のダウンロードに失敗しました: {exc}", f"[installer] eval download failed: {exc}"))
         _log_installer_event(root, kind="download_error", payload={"asset": "eval", "eval_id": eval_id, "url": url, "error": str(exc)})
         return None
 
@@ -449,7 +669,7 @@ def _download_eval_if_needed(root: Path, engine: dict, engines_dir: Path) -> Pat
                 shutil.copy2(nn, eval_dir / "nn.bin")
             shutil.rmtree(tmp, ignore_errors=True)
         except Exception as exc:
-            print(f"[installer] eval extract failed: {exc}")
+            print(tr(f"[installer] 評価関数の展開に失敗しました: {exc}", f"[installer] eval extract failed: {exc}"))
             return None
     else:
         # direct file: if it is nn.bin, put it
@@ -471,27 +691,24 @@ def _download_engine_variant(root: Path, engine: dict) -> Path | None:
     lic = (engine.get("license_url") or "").strip()
     terms = (engine.get("terms_url") or "").strip()
 
-    print("\n[installer] Engine download")
-    print(f"  name : {name}")
-    if lic:
-        print(f"  license: {lic}")
-    if terms:
-        print(f"  terms : {terms}")
+    print(tr("\n[installer] エンジンのダウンロード", "\n[installer] Engine download"))
+    print(tr(f"  名前      : {name}", f"  name   : {name}"))
+    _print_license(str(engine.get("license") or ""), [("ライセンス条項|license text", lic), ("規約|terms", terms)])
     if url:
-        print(f"  url   : {url}")
-        if not _prompt_yes_no("このエンジンをダウンロードしますか？"):
+        print(tr(f"  ダウンロード元: {url}", f"  download: {url}"))
+        if not _prompt_consent("エンジン", "engine"):
             return None
     else:
         # build flow
-        print("  (no prebuilt binary for this platform)")
+        print(tr("  （この環境向けのビルド済みファイルはありません）", "  (no prebuilt binary for this platform)"))
         git_url = (build.get("git") or "").strip()
         tag = (build.get("tag") or "").strip()
         if git_url:
-            print(f"  source: {git_url} {tag or ''}")
-        if not _prompt_yes_no("この環境でエンジンをビルドしますか？"):
+            print(tr(f"  ソース   : {git_url} {tag or ''}", f"  source: {git_url} {tag or ''}"))
+        if not _prompt_consent("エンジン（ソースからビルド）", "engine (built from source)"):
             return None
 
-    engines_dir = root / "engines" / (engine.get("id") or "engine")
+    engines_dir = runtime_home() / "engines" / (engine.get("id") or "engine")
     engines_dir.mkdir(parents=True, exist_ok=True)
     # download/extract or build
     extracted_root = engines_dir / "_engine_extract"
@@ -506,7 +723,7 @@ def _download_engine_variant(root: Path, engine: dict) -> Path | None:
             _sha256_verify_if_present(dst, str(variant.get("sha256") or ""))
             _log_installer_event(root, kind="download", payload={"asset": "engine", "engine_id": engine.get("id"), "url": url, "path": str(dst)})
         except Exception as exc:
-            print(f"[installer] engine download failed: {exc}")
+            print(tr(f"[installer] エンジンのダウンロードに失敗しました: {exc}", f"[installer] engine download failed: {exc}"))
             _log_installer_event(root, kind="download_error", payload={"asset": "engine", "engine_id": engine.get("id"), "url": url, "error": str(exc)})
             return None
 
@@ -514,7 +731,7 @@ def _download_engine_variant(root: Path, engine: dict) -> Path | None:
             try:
                 _extract_archive(dst, extracted_root)
             except Exception as exc:
-                print(f"[installer] extract failed: {exc}")
+                print(tr(f"[installer] 展開に失敗しました: {exc}", f"[installer] extract failed: {exc}"))
                 return None
         else:
             # treat as direct binary
@@ -529,19 +746,19 @@ def _download_engine_variant(root: Path, engine: dict) -> Path | None:
         src_dir = engines_dir / "_src"
         if src_dir.exists():
             shutil.rmtree(src_dir, ignore_errors=True)
-        print("[installer] Cloning engine source...")
-        rc = subprocess.call(["git", "clone", "--depth", "1", "--branch", tag or "master", git_url, str(src_dir)])
+        print(tr("[installer] エンジンのソースを取得しています ...", "[installer] Cloning engine source..."))
+        rc = run_streamed(["git", "clone", "--depth", "1", "--branch", tag or "master", git_url, str(src_dir)])
         if rc != 0:
-            print("[installer] ERROR: git clone failed")
+            print(tr("[installer] エラー: git clone に失敗しました", "[installer] ERROR: git clone failed"))
             return None
         # Follow upstream build guidance; choose CPU based on flags.
         flags = _cpu_flags()
         target = "AVX2" if "avx2" in flags else "SSE42"
         make_cmd = ["make", "-C", str(src_dir / "source"), "clean", "tournament", f"TARGET_CPU={target}", "YANEURAOU_EDITION=YANEURAOU_ENGINE_NNUE"]
-        print("[installer] Building engine (this may take a while)...")
-        rc = subprocess.call(make_cmd)
+        print(tr("[installer] エンジンをビルドしています（時間がかかります）...", "[installer] Building engine (this may take a while)..."))
+        rc = run_streamed(make_cmd)
         if rc != 0:
-            print("[installer] ERROR: make failed")
+            print(tr("[installer] エラー: make に失敗しました", "[installer] ERROR: make failed"))
             return None
         extracted_root.mkdir(parents=True, exist_ok=True)
         # Try to locate built binary
@@ -590,7 +807,7 @@ def ensure_engine_config(root: Path) -> dict[str, str]:
         if eval_dir and Path(eval_dir).exists():
             env["SHOGI_ANALYZER_ENGINE_EVAL_DIR"] = eval_dir
         else:
-            guessed = _guess_eval_dir_from_exe(Path(path))
+            guessed = guess_eval_dir_from_exe(Path(path))
             if guessed and guessed.exists():
                 env["SHOGI_ANALYZER_ENGINE_EVAL_DIR"] = str(guessed)
                 # Repair persisted config so subsequent runs work without guessing.
@@ -607,18 +824,20 @@ def ensure_engine_config(root: Path) -> dict[str, str]:
     if not sys.stdin.isatty():
         # 要件上、初回でエンジン/評価関数の同意とDLが必要。
         # 対話入力ができない場合は黙って解析無効にせず止める。
-        raise RuntimeError(
+        raise RuntimeError(tr(
             "USIエンジン未設定です。対話入力ができない環境で起動されました。\n"
-            "ターミナル/コンソールから run.bat / run.sh を実行して、エンジンDLの同意を行ってください。"
-        )
+            "ターミナル/コンソールから run.bat / run.sh を実行して、エンジンDLの同意を行ってください。",
+            "No USI engine is configured and this console cannot take input.\n"
+            "Run run.bat / run.sh from a terminal and agree to the engine download.",
+        ))
 
-    print("\n[installer] USI engine is not configured.")
+    print(tr("\n[installer] 解析エンジン（USI）が設定されていません。", "\n[installer] USI engine is not configured."))
     if engines:
-        print("[installer] Download candidates (installer/manifest.json):")
+        print(tr("[installer] ダウンロードできるエンジン（installer/manifest.json）:", "[installer] Download candidates (installer/manifest.json):"))
         for i, e in enumerate(engines, 1):
             print(f"  {i}) {e.get('name') or e.get('id')}")
-        print("  m) manual path")
-        print("  s) skip")
+        print(tr("  m) パスを入力して手持ちのエンジンを使う", "  m) manual path"))
+        print(tr("  s) スキップ（解析なしで起動）", "  s) skip"))
         try:
             choice = input("> ").strip().lower()
         except (EOFError, KeyboardInterrupt):
@@ -637,7 +856,7 @@ def ensure_engine_config(root: Path) -> dict[str, str]:
                     exe = _download_engine_variant(root, engines[idx - 1])
                     if exe and exe.exists():
                         # Prefer eval dir under the engine folder if present.
-                        eval_dir = _guess_eval_dir_from_exe(exe)
+                        eval_dir = guess_eval_dir_from_exe(exe)
                         cfg = {"engine_path": str(exe)}
                         if eval_dir and eval_dir.exists():
                             cfg["engine_eval_dir"] = str(eval_dir)
@@ -651,11 +870,14 @@ def ensure_engine_config(root: Path) -> dict[str, str]:
 
     # Manual path flow.
     try:
-        manual = input("USIエンジン実行ファイルのパスを入力してください（例: C:\\path\\engine.exe）\n> ").strip().strip('"')
+        manual = input(tr(
+            "USIエンジン実行ファイルのパスを入力してください（例: C:\\path\\engine.exe）\n> ",
+            "Path to the USI engine executable (e.g. C:\\path\\engine.exe)\n> ",
+        )).strip().strip('"')
     except (EOFError, KeyboardInterrupt):
         manual = ""
     if manual and Path(manual).exists():
-        eval_dir = _guess_eval_dir_from_exe(Path(manual))
+        eval_dir = guess_eval_dir_from_exe(Path(manual))
         cfg = {"engine_path": manual}
         if eval_dir and eval_dir.exists():
             cfg["engine_eval_dir"] = str(eval_dir)
@@ -665,7 +887,7 @@ def ensure_engine_config(root: Path) -> dict[str, str]:
             env["SHOGI_ANALYZER_ENGINE_EVAL_DIR"] = str(eval_dir)
         return env
 
-    print("[installer] Engine remains unconfigured. analysis disabled")
+    print(tr("[installer] エンジンは未設定のままです。解析は使えません", "[installer] Engine remains unconfigured. analysis disabled"))
     return {}
 
 
@@ -694,7 +916,7 @@ def run_quick_tunnel(cloudflared: Path, port: int) -> tuple[subprocess.Popen | N
 
     # Prefer 127.0.0.1 for Windows resolver edge cases.
     base_args = ["tunnel", "--no-autoupdate", "--url", f"http://127.0.0.1:{port}"]
-    log_dir = (repo_root() / "server" / "data")
+    log_dir = _server_data_dir(repo_root())
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / "cloudflared_quick_tunnel.log"
 

@@ -53,6 +53,17 @@
       </div>
 
       <div class="status-group">
+        <!-- shown only when a newer GitHub release exists -->
+        <div class="update-notice" id="updateNotice" hidden>
+          <button id="updateBadge" class="update-badge" type="button" title="新しいバージョンがあります" aria-label="新しいバージョンがあります" aria-expanded="false">!</button>
+          <div class="update-popup" id="updatePopup" role="dialog" aria-label="更新のお知らせ" hidden>
+            <div class="update-title">新しいバージョンがあります</div>
+            <div class="update-body" id="updateBody"></div>
+            <div class="update-howto">更新方法: アプリを止めて、フォルダで <code>git pull</code>（または リリースの zip を上書き）してから起動し直します。設定・棋譜・エンジンはそのまま残ります。</div>
+            <div class="update-meta" id="updateMeta"></div>
+            <a class="btn primary" id="updateLink" href="#" target="_blank" rel="noopener">リリースを見る</a>
+          </div>
+        </div>
         <span id="wsStatus" class="status" data-state="connecting"><i></i><span class="status-text">接続中</span></span>
         <span id="engineStatus" class="status engine" data-state="idle" title=""><svg class="ico"><use href="#i-cpu"/></svg><span class="status-text">エンジン</span></span>
       </div>
@@ -260,6 +271,12 @@
         <label class="check"><input type="checkbox" id="optBestMove" checked> コンピュータの手（最善手 / 候補手）を表示 <span class="legend green"></span></label>
         <label class="check"><input type="checkbox" id="optNextMove" checked> 棋譜の次の手 / 分岐を表示 <span class="legend orange"></span></label>
         <label class="check"><input type="checkbox" id="optArrowLabels" checked> 矢印の横に「候補手」「指し手」などの文字を表示（OFF のときは候補手の評価値だけ）</label>
+        <div class="set-title">バージョン</div>
+        <div class="version-row">
+          <b id="versionText">—</b>
+          <span class="version-status" id="versionStatus"></span>
+          <button class="btn" type="button" id="updateCheckBtn">更新を確認</button>
+        </div>
         <div class="set-title logout-item" hidden>アカウント</div>
         <div class="logout-item" hidden><button class="btn" type="button" id="logoutBtn"><svg class="ico"><use href="#i-logout"/></svg>ログアウト</button></div>
       </div>

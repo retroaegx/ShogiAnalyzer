@@ -58,6 +58,8 @@ PC で起動しておけば、同じ PC のブラウザやスマートフォン�
 | `SHOGI_ANALYZER_PUBLIC_URL` | 固定の公開アドレス。設定すると Quick Tunnel は使わず、このアドレスを表示します | 空（Quick Tunnel） |
 | `SHOGI_ANALYZER_TUNNEL` | 公開アドレスが空のとき Quick Tunnel を使うか（`TRUE` / `FALSE`） | `TRUE` |
 | `SHOGI_ANALYZER_PASSWORD` | パスワード保護（`TRUE` / `FALSE`）。詳しくは「[パスワード保護](#パスワード保護)」 | **初回起動時に選択**（空欄なら `FALSE` 扱いで、次回また聞かれます） |
+| `SHOGI_ANALYZER_UPDATE_CHECK` | 新しいバージョンの確認（`TRUE` / `FALSE`）。詳しくは「[9. バージョンと更新](#9-バージョンと更新)」 | `TRUE` |
+| `SHOGI_ANALYZER_UPDATE_CHECK_INTERVAL_HOURS` | 確認する間隔（時間） | `24` |
 | `SHOGI_ANALYZER_PORT` | 待ち受けポート | `31145` |
 | `SHOGI_ANALYZER_HOST` | `127.0.0.1` = この PC からのみ / `0.0.0.0` = 同じ LAN の端末からも開ける | `127.0.0.1` |
 | `SHOGI_ANALYZER_ENGINE_PATH` | 解析エンジン（USI）の exe のパス | **自動設定**（初回起動時に、自動で入れたエンジンのパスが書き込まれます） |
@@ -204,3 +206,20 @@ Cloudflare ダッシュボード →「Zero Trust」→「Access」→「アプ�
 - 移動ボタンの左の「棋譜」ボタン、または画面の右端から左へスワイプすると棋譜が開きます。
 - 移動ボタンの右の「反転」ボタンで盤を上下反転します。
 - 新規・開く・読込・貼付・書出・表示設定・エンジン設定は右上の「⋯」にあります。
+
+## 9. バージョンと更新
+
+- 今のバージョンは、フォルダ直下の `VERSION` に書かれています。起動時のコンソールと、画面右上の「表示設定」の一番下にも表示されます。
+- アプリは起動時と 24 時間ごとに [GitHub のリリース](https://github.com/retroaegx/ShogiAnalyzer/releases) を確認します。新しいバージョンがあると、画面上部に **「!」** が出て（押すと内容とリリースページへのリンク）、コンソールにも `[update] 新しいバージョン … があります` と表示されます。
+- 「表示設定」→「バージョン」の **「更新を確認」** で、すぐに確認することもできます。
+- 確認しないようにするには `.env` で `SHOGI_ANALYZER_UPDATE_CHECK=FALSE` にします。
+
+### 更新のしかた
+
+1. アプリを止めます（コンソールで `Ctrl + C`、またはウィンドウを閉じる。Ubuntu などでサービスにしている場合は `sudo systemctl stop shogianalyzer`）。
+2. フォルダを新しいバージョンにします。
+   - `git clone` で取得した場合: フォルダで `git pull`
+   - zip で取得した場合: [リリースページ](https://github.com/retroaegx/ShogiAnalyzer/releases) から新しい zip をダウンロードし、今のフォルダに上書き
+3. もう一度起動します（`run.bat` / `run.sh`、サービスなら `sudo systemctl start shogianalyzer`）。必要な Python パッケージは起動時に自動で更新されます。
+
+設定（`.env`）・棋譜（`server/data`）・エンジン（`engines`）は git の管理外なので、更新しても消えません。

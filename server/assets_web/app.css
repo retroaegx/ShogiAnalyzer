@@ -114,7 +114,34 @@ button:disabled { cursor: not-allowed; opacity: 0.4; }
 .title-label { min-width: 0; font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #titleInput { width: 100%; font-size: 16px; }
 
-.status-group { display: flex; gap: 8px; margin-left: auto; flex: none; }
+.status-group { display: flex; align-items: center; gap: 8px; margin-left: auto; flex: none; }
+
+/* update notice (newer GitHub release) */
+.update-notice { position: relative; flex: none; }
+.update-notice[hidden] { display: none; }
+.update-badge {
+  width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+  background: var(--accent); color: var(--accent-ink); font: 800 15px/26px var(--font-num);
+  box-shadow: 0 0 0 0 rgba(227, 178, 90, .6); animation: update-pulse 2s ease-out infinite;
+}
+@keyframes update-pulse { 0% { box-shadow: 0 0 0 0 rgba(227, 178, 90, .55); } 70%, 100% { box-shadow: 0 0 0 9px rgba(227, 178, 90, 0); } }
+.update-popup {
+  /* fixed (placed under the badge by JS): above the board and inside the screen on phones */
+  position: fixed; top: 60px; right: 12px; z-index: 300; width: min(320px, calc(100vw - 24px));
+  display: flex; flex-direction: column; gap: 8px; padding: 14px 16px;
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: 14px; box-shadow: 0 24px 50px -12px rgba(0, 0, 0, .8);
+}
+.update-popup[hidden] { display: none; }
+.update-title { font-weight: 700; font-size: 14px; color: var(--accent); }
+.update-body { font-size: 13.5px; }
+.update-howto { font-size: 12px; line-height: 1.6; color: var(--muted); }
+.update-howto code { font-size: 11.5px; padding: 1px 5px; border-radius: 5px; background: var(--surface-2); }
+.update-meta { font-size: 11.5px; color: var(--faint); }
+.update-popup .btn { align-self: flex-start; }
+.version-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.version-row b { font-family: var(--font-num); font-size: 15px; }
+.version-status { font-size: 12.5px; color: var(--muted); flex: 1 1 auto; }
+.version-status.new { color: var(--accent); font-weight: 700; }
 .status {
   display: inline-flex; align-items: center; gap: 7px;
   height: 30px; padding: 0 11px;

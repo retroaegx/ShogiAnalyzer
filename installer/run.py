@@ -193,9 +193,11 @@ def _ensure_venv() -> Path:
 
 
 def _is_running_in_venv() -> bool:
-    py = _venv_python(_venv_dir())
+    # Compare the environment prefix, not the executable: on Linux .venv/bin/python is a
+    # symlink to the system python, so resolving both paths made the system python look
+    # like the venv (pip then hit "externally-managed-environment").
     try:
-        return Path(sys.executable).resolve() == py.resolve()
+        return Path(sys.prefix).resolve() == _venv_dir().resolve()
     except Exception:
         return False
 

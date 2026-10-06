@@ -22,6 +22,7 @@ from installer_lib import (
     find_existing_cloudflared_config,
     list_existing_tunnels,
     load_env_file,
+    portable_path,
     parse_cloudflared_config,
     repo_root,
     run_quick_tunnel,
@@ -346,7 +347,8 @@ def main() -> int:
     # empty engine entries in .env get the paths actually in use (visible and editable there);
     # values typed by the user or given as OS environment variables are left alone
     for key in _ENGINE_KEYS:
-        value = (effective.get(key) or "").replace("\\", "/")
+        # relative to the .env folder when inside it, so the folder can be moved as a whole
+        value = portable_path(effective.get(key) or "", env_path.parent)
         if key not in os_engine_keys and fill_env_value(env_path, key, value):
             print(tr(f"[installer] .env に自動設定: {key}={value}", f"[installer] Filled in .env: {key}={value}"))
 

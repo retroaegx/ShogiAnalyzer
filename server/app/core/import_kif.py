@@ -1,14 +1,23 @@
+"""KIF reader (柿木将棋 format).
+
+Supports: header lines (key：value), 手合割 incl. handicaps, board diagrams (BOD), comments
+("*" lines -> the comment of the move above, or of the start position before move 1),
+game end lines (投了 etc. -> meta["_result"]), times / variation markers on move lines and
+nested variations ("変化：N手").
+"""
+
 from __future__ import annotations
 
 import re
 
 from .gametree import GameTree
+from .kifu_common import end_term_in, parse_headers, start_position
 from .notation import parse_kif_move_text
-from .sfen_ops import DEFAULT_START_SFEN, parse_usi_move
-
+from .sfen_ops import parse_usi_move
 
 _MOVE_LINE_RE = re.compile(r"^\s*(\d+)\s+(.*)$")
-_HENKA_RE = re.compile(r"^\s*変化\s*：\s*(\d+)手")
+_HENKA_RE = re.compile(r"^\s*変化\s*[：:]\s*(\d+)手")
+_TIME_RE = re.compile(r"\(\s*\d+:\d+\s*/\s*(\d+:)?\d+:\d+\s*\)")
 
 
 def detect_kif(text: str) -> bool:
@@ -16,114 +25,96 @@ def detect_kif(text: str) -> bool:
     return "手数----指手" in s or "手合割" in s
 
 
-def _parse_header_meta(lines: list[str]) -> dict:
-    meta: dict[str, str] = {}
-    for line in lines:
-        if "手数----指手" in line:
-            break
-        if "：" in line:
-            k, v = line.split("：", 1)
-            k = k.strip()
-            v = v.strip()
-            if k and v:
-                meta[k] = v
-    return meta
-
-
-def _initial_sfen_from_meta(meta: dict) -> str:
-    # Minimal: only supports standard start (平手)
-    handicap = (meta.get("手合割") or "").strip()
-    if not handicap or handicap in {"平手", "平手　"}:
-        return DEFAULT_START_SFEN
-    raise ValueError(f"unsupported handicap: {handicap}")
+def _dest(move_usi: str | None):
+    if not move_usi:
+        return None
+    try:
+        mvu = parse_usi_move(move_usi)
+        return (mvu.to_row, mvu.to_col)
+    except Exception:
+        return None
 
 
 def import_kif_game(text: str, title: str | None = None) -> GameTree:
-    raw_lines = (text or "").replace("\r", "\n").split("\n")
-    lines = [ln.rstrip("\n") for ln in raw_lines]
-    meta = _parse_header_meta(lines)
-    initial_sfen = _initial_sfen_from_meta(meta)
+    lines = (text or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    meta = parse_headers(lines)
+    initial_sfen = start_position(meta, lines)
 
     game_title = (title or meta.get("棋戦") or meta.get("表題") or meta.get("タイトル") or "Imported KIF").strip()
     game = GameTree.new(title=game_title, initial_sfen=initial_sfen)
-    game.meta = meta
+    game.meta = dict(meta)
 
+    # segments: the main line, then each 「変化」 in file order
+    # move = [body, [comment lines]]
+    segments: list[dict] = [{"start": 1, "moves": [], "end": None, "lead": []}]
     in_moves = False
-    main_moves: list[str] = []
-    variations: list[tuple[int, list[str]]] = []
-    current_var: tuple[int, list[str]] | None = None
-
     for line in lines:
+        s = line.strip()
         if not in_moves:
-            if "手数----指手" in line:
+            if "手数----指手" in s:
                 in_moves = True
+            elif s.startswith("*") and not segments[0]["moves"]:
+                segments[0]["lead"].append(s[1:])  # comment of the start position
             continue
-
-        if line.strip().startswith("*"):
-            # KIF comments: ignore for now (could be mapped to node comments)
+        if not s or s.startswith(("#", "&")) or s.startswith("まで"):
             continue
-
+        seg = segments[-1]
+        if s.startswith("*"):
+            if seg["moves"]:
+                seg["moves"][-1][1].append(s[1:])
+            else:
+                seg["lead"].append(s[1:])
+            continue
         hm = _HENKA_RE.match(line)
         if hm:
-            start_n = int(hm.group(1))
-            current_var = (start_n, [])
-            variations.append(current_var)
+            segments.append({"start": int(hm.group(1)), "moves": [], "end": None, "lead": []})
             continue
-
         m = _MOVE_LINE_RE.match(line)
-        if not m:
+        if not m or seg["end"]:
             continue
-
-        body = (m.group(2) or "").strip()
+        body = _TIME_RE.sub("", m.group(2) or "").strip().rstrip("+").strip()
         if not body:
             continue
-
-        # Stop on resignation etc.
-        if any(term in body for term in ("投了", "中断", "持将棋", "千日手", "詰み")):
-            break
-
-        if current_var is None:
-            main_moves.append(body)
-        else:
-            current_var[1].append(body)
-
-    # Build mainline
-    cur = game.root_node_id
-    node_ids = [cur]
-    prev_to_rc = None
-    for mv_text in main_moves:
-        parsed, prev_to_rc = parse_kif_move_text(mv_text, prev_to_rc=prev_to_rc)
-        mv_usi = parsed.to_usi()
-        # Validate move format early.
-        parse_usi_move(mv_usi)
-        cur = game.play_move(cur, mv_usi).node_id
-        node_ids.append(cur)
-
-    # Build variations branching from mainline.
-    for start_n, moves in variations:
-        if start_n < 1:
+        term = end_term_in(body)
+        if term:
+            seg["end"] = term
             continue
-        base_index = min(start_n - 1, len(node_ids) - 1)
-        base_node_id = node_ids[base_index]
-        base_node = game.get_node(base_node_id)
-        prev_to = None
-        if base_node.move_usi:
-            try:
-                mvu = parse_usi_move(base_node.move_usi)
-                prev_to = (mvu.to_row, mvu.to_col)
-            except Exception:
-                prev_to = None
+        seg["moves"].append([body, []])
+
+    def play(base_node_id: str, moves: list, start_ply: int, line: dict[int, str]) -> None:
         cur = base_node_id
-        prev_to_rc = prev_to
-        for mv_text in moves:
-            try:
-                parsed, prev_to_rc = parse_kif_move_text(mv_text, prev_to_rc=prev_to_rc)
-            except ValueError as exc:
-                if str(exc) == "game end":
-                    break
-                raise
+        prev_to = _dest(game.get_node(base_node_id).move_usi)
+        for i, (body, comments) in enumerate(moves):
+            parsed, prev_to = parse_kif_move_text(body, prev_to_rc=prev_to)
             mv_usi = parsed.to_usi()
             parse_usi_move(mv_usi)
             cur = game.play_move(cur, mv_usi).node_id
+            line[start_ply + i] = cur
+            if comments:
+                game.set_comment(cur, "\n".join(comments))
+
+    main = segments[0]
+    if main["lead"]:
+        game.set_comment(game.root_node_id, "\n".join(main["lead"]))
+    main_line = {0: game.root_node_id}
+    play(game.root_node_id, main["moves"], 1, main_line)
+    if main["end"]:
+        game.meta["_result"] = {"term": main["end"], "ply": len(main["moves"])}
+
+    # 「変化：N手」 is another move N for the line written most recently that has a move N
+    # (variations can branch off earlier variations, not only the main line)
+    lines_seen = [main_line]
+    for seg in segments[1:]:
+        start_n = seg["start"]
+        if start_n < 1:
+            continue
+        parent = next((ln for ln in reversed(lines_seen) if start_n in ln), main_line)
+        base_ply = min(start_n - 1, max(parent))
+        line = {p: nid for p, nid in parent.items() if p <= base_ply}
+        lines_seen.append(line)
+        moves = seg["moves"]
+        if seg["lead"] and moves:
+            moves[0][1][:0] = seg["lead"]
+        play(parent[base_ply], moves, base_ply + 1, line)
 
     return game

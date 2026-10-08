@@ -51,7 +51,7 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def _require_login(request, call_next):
         path = request.url.path
-        if not auth.required() or path in open_paths or path.startswith("/icons/") or auth.token_valid(request.cookies.get(auth.COOKIE_NAME)):
+        if not auth.required() or path in open_paths or path.startswith(("/icons/", "/img/")) or auth.token_valid(request.cookies.get(auth.COOKIE_NAME)):
             return await call_next(request)
         if path.startswith("/api/"):
             return JSONResponse({"detail": "login required"}, status_code=401)
@@ -87,7 +87,7 @@ def create_app() -> FastAPI:
         response = await call_next(request)
         path = request.url.path
         if not path.startswith("/api/") and "cache-control" not in response.headers:
-            if path.startswith(("/board-theme/images/", "/icons/")):
+            if path.startswith(("/board-theme/images/", "/icons/", "/img/")):
                 response.headers["Cache-Control"] = "public, max-age=86400"
             elif path.endswith((".js", ".css", ".html", ".webmanifest")) or path == "/":
                 # scripts / styles must always match the page: not stored by browsers or CDNs

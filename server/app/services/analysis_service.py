@@ -18,6 +18,11 @@ from .state_store import StateStore
 
 SenderFn = Callable[[str, dict | None], Awaitable[None]]
 
+# 常時解析: stop searching a position nobody has moved away from after this many seconds
+# (0 = never). The analysis setting itself stays ON; the next position starts again.
+AUTO_STOP_CHOICES = (10, 20, 30, 60, 120, 180, 300, 600, 1200, 0)
+AUTO_STOP_DEFAULT = 60
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -191,6 +196,7 @@ class AnalysisService:
         self._env_hash_mb = _opt_int_env("SHOGI_ANALYZER_ENGINE_HASH_MB")
         self._option_specs: dict[str, dict[str, Any]] = {}
         self._option_overrides: dict[str, Any] = self._load_overrides()
+        self._auto_stop_sec = self._load_auto_stop()
 
         # Whole-game analysis ("全解析")
         self._batch_task: asyncio.Task | None = None
@@ -280,11 +286,23 @@ class AnalysisService:
         values = raw.get("values") if isinstance(raw, dict) else None
         return dict(values) if isinstance(values, dict) else {}
 
+    def _load_auto_stop(self) -> int:
+        try:
+            raw = json.loads(self._overrides_path().read_text(encoding="utf-8"))
+            v = int(raw.get("auto_stop_sec"))
+        except Exception:
+            return AUTO_STOP_DEFAULT
+        return v if v in AUTO_STOP_CHOICES else AUTO_STOP_DEFAULT
+
     def _save_overrides(self) -> None:
         p = self._overrides_path()
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(
-            json.dumps({"engine": self._engine_label(), "values": self._option_overrides}, ensure_ascii=False, indent=2)
+            json.dumps(
+                {"engine": self._engine_label(), "values": self._option_overrides, "auto_stop_sec": self._auto_stop_sec},
+                ensure_ascii=False,
+                indent=2,
+            )
             + "\n",
             encoding="utf-8",
         )
@@ -323,6 +341,8 @@ class AnalysisService:
         return {
             "engine_name": self._engine_name,
             "options": options,
+            "auto_stop_sec": self._auto_stop_sec,
+            "auto_stop_choices": list(AUTO_STOP_CHOICES),
             "system": {"memory_mb": system_memory_mb(), "hash_max_mb": self.hash_max_mb(), "cpus": os.cpu_count()},
         }
 
@@ -347,8 +367,13 @@ class AnalysisService:
             return v
         return str(value)
 
-    async def set_options(self, values: dict[str, Any]) -> None:
+    async def set_options(self, values: dict[str, Any], auto_stop_sec: Any = None) -> None:
         """Store changed options (values equal to the engine default are dropped) and restart the engine."""
+        if auto_stop_sec is not None:
+            v = int(auto_stop_sec)
+            if v not in AUTO_STOP_CHOICES:
+                raise ValueError(f"auto_stop_sec must be one of {list(AUTO_STOP_CHOICES)}")
+            self._auto_stop_sec = v
         if not self._option_specs:
             await self.options_wire()
         overrides: dict[str, Any] = {}
@@ -807,6 +832,11 @@ class AnalysisService:
 
                     now = asyncio.get_running_loop().time()
                     elapsed_ms = max(0, int((now - self._analysis_started_monotonic) * 1000))
+                    batch = self._batch_task is not None and not self._batch_task.done()
+                    if not batch and self._auto_stop_sec and elapsed_ms >= self._auto_stop_sec * 1000:
+                        idle_node = self._analysis_node_id
+                        idle_started = self._analysis_started_monotonic
+                        break
                     interval_s = 0.5 if elapsed_ms < 5000 else 1.0
                     if (now - self._last_sent_at_monotonic) < interval_s:
                         continue
@@ -865,6 +895,10 @@ class AnalysisService:
                             multipv=snapshot_multipv,
                             lines=snapshot_lines,
                         )
+            # no move for the auto-stop time: send + keep the final lines, then stop this position.
+            # The stop runs in its own task because stopping waits for this ticker to finish.
+            await self._flush_latest()
+            asyncio.create_task(self._auto_stop(idle_node, idle_started))
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -873,6 +907,13 @@ class AnalysisService:
                 if self._configured:
                     self._status = "error"
             await self._emit("analysis:stopped", {"reason": f"analysis ticker error: {exc}"})
+
+    async def _auto_stop(self, node_id: str | None, started: float) -> None:
+        async with self._lock:
+            # only if the same search is still running (no move / restart in between)
+            if self._analysis_running and self._analysis_node_id == node_id and self._analysis_started_monotonic == started:
+                await self._stop_locked("idle", emit=False)
+                await self._emit("analysis:stopped", {"reason": "idle", "node_id": node_id, "auto_stop_sec": self._auto_stop_sec})
 
     async def _reader_loop(self) -> None:
         try:

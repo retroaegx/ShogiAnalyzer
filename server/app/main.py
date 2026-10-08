@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import mimetypes
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import auth
@@ -60,7 +61,23 @@ def create_app() -> FastAPI:
 
     @app.get("/login", include_in_schema=False)
     async def _login_page():
-        return FileResponse(assets_dir / "login.html", headers={"Cache-Control": "no-cache"})
+        return FileResponse(assets_dir / "login.html", headers={"Cache-Control": "no-store"})
+
+    def _asset_token() -> str:
+        """Changes whenever a script or the stylesheet changes (cache busting for app.js / app.css)."""
+        files = [assets_dir / "app.css", *sorted((assets_dir / "js").rglob("*.js"))]
+        stamp = "|".join(f"{f.name}:{f.stat().st_mtime_ns}:{f.stat().st_size}" for f in files if f.exists())
+        return hashlib.sha1(stamp.encode()).hexdigest()[:10]
+
+    @app.get("/", include_in_schema=False)
+    @app.get("/index.html", include_in_schema=False)
+    async def _index_page():
+        # Proxies/CDNs in front (e.g. Cloudflare) may keep .js/.css for hours whatever we send;
+        # versioned URLs make every update load the matching script and stylesheet.
+        token = _asset_token()
+        html = (assets_dir / "index.html").read_text(encoding="utf-8")
+        html = html.replace('href="/app.css"', f'href="/app.css?v={token}"').replace('src="/js/app.js"', f'src="/js/app.js?v={token}"')
+        return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
     @app.middleware("http")
     async def _revalidate_assets(request, call_next):
@@ -70,9 +87,13 @@ def create_app() -> FastAPI:
         response = await call_next(request)
         path = request.url.path
         if not path.startswith("/api/") and "cache-control" not in response.headers:
-            response.headers["Cache-Control"] = (
-                "public, max-age=86400" if path.startswith(("/board-theme/images/", "/icons/")) else "no-cache"
-            )
+            if path.startswith(("/board-theme/images/", "/icons/")):
+                response.headers["Cache-Control"] = "public, max-age=86400"
+            elif path.endswith((".js", ".css", ".html", ".webmanifest")) or path == "/":
+                # scripts / styles must always match the page: not stored by browsers or CDNs
+                response.headers["Cache-Control"] = "no-store"
+            else:
+                response.headers["Cache-Control"] = "no-cache"
         return response
 
     @app.on_event("startup")

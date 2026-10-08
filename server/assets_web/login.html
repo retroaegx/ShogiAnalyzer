@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0d0e11">
   <title>ログイン — Shogi Analyzer</title>
+  <!-- app install (PWA) / icons -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="ShogiAnalyzer">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <style>
     :root { color-scheme: dark; --bg: #0b0c0f; --surface: #14161b; --line: rgba(255,255,255,.13); --text: #eceef2; --muted: #9aa1ad; --accent: #e3b25a; --accent-2: #f2cc85; --bad: #f2767a; }
     * { box-sizing: border-box; }
@@ -97,6 +106,7 @@
     });
 
     init().catch((x) => ($("err").textContent = String(x)));
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
   </script>
 </body>
 </html>

@@ -144,7 +144,7 @@ const els = {
   dlgSettings: $("dlgSettings"),
   bgChoices: $("bgChoices"),
   pieceChoices: $("pieceChoices"),
-  optCoords: $("optCoords"),
+  optCoordsSeg: $("optCoordsSeg"),
   optEvalBar: $("optEvalBar"),
   optLegal: $("optLegal"),
   dlgEngine: $("dlgEngine"),
@@ -180,7 +180,7 @@ const state = {
   sessionId: null,
   ownerToken: null,
   flip: false,
-  opts: { coords: true, evalBar: true, legal: true, lastMove: true, bestMove: true, nextMove: true, arrowLabels: true },
+  opts: { coords: "overlay", evalBar: true, legal: true, lastMove: true, bestMove: true, nextMove: true, arrowLabels: true },
 
   theme: null,
   geom: null, // {natW, natH, rx, ry, rw, rh} in image px
@@ -258,6 +258,10 @@ function loadOpts() {
   try {
     const raw = JSON.parse(lsGet(LS_OPTS) || "{}");
     Object.assign(state.opts, raw || {});
+    // coordinates used to be on/off: on -> the new default (on the board frame), off -> hidden
+    if (state.opts.coords === true) state.opts.coords = "overlay";
+    if (state.opts.coords === false) state.opts.coords = "off";
+    if (!["overlay", "outside", "off"].includes(state.opts.coords)) state.opts.coords = "overlay";
   } catch {
     // ignore
   }
@@ -686,7 +690,9 @@ function layoutBoard() {
   const coordRatio = mobile ? 0.34 : 0.42;
   const coordMin = mobile ? 11 : 14;
   const coordMax = mobile ? 16 : 26;
-  const coordK = state.opts.coords ? cellPerBs * coordRatio : 0;
+  // only "outside" reserves a band next to the board; "overlay" draws on the board frame
+  const coordsOutside = state.opts.coords === "outside";
+  const coordK = coordsOutside ? cellPerBs * coordRatio : 0;
 
   const area = els.boardArea.getBoundingClientRect();
   const nav = els.boardArea.querySelector(".navbar").getBoundingClientRect().height || 54;
@@ -703,7 +709,7 @@ function layoutBoard() {
     const graphMin = window.innerHeight < 640 ? 52 : 72;
     const availW = area.width;
     const availH = mainH - nav - 4 - (ctlH + gap + graphMin + gap);
-    const coordPx = state.opts.coords ? Math.max(coordMin, Math.min(coordMax, (availW * cellPerBs * coordRatio) / (1 + coordK))) : 0;
+    const coordPx = coordsOutside ? Math.max(coordMin, Math.min(coordMax, (availW * cellPerBs * coordRatio) / (1 + coordK))) : 0;
     // (a) stands above / below the board: rows fixed at 0.7 of a square (see app.css)
     const stacked = Math.min(availW - coordPx, (availH - 8 - coordPx) / (g.natH / g.natW + 2 * cellPerBs * 0.7));
     // (b) stands beside the board (short screens like iPhone SE): columns one square wide
@@ -722,7 +728,13 @@ function layoutBoard() {
   bs = Math.floor(clamp(bs, mobile ? 160 : 220, 1400)); // phones: never larger than the space left
   const scale = bs / g.natW;
   const cell = (g.rw * scale) / 9;
-  const coord = state.opts.coords ? Math.round(clamp(cell * coordRatio, coordMin, coordMax)) : 0;
+  const coord = coordsOutside ? Math.round(clamp(cell * coordRatio, coordMin, coordMax)) : 0;
+  // overlay: font from the square size; strips at least as wide as the text
+  const covFont = Math.round(clamp(cell * 0.24, 9, 15));
+  const rightMargin = bs - (g.rx + g.rw) * scale;
+  root.style.setProperty("--cov-font", `${covFont}px`);
+  root.style.setProperty("--cov-x", `${Math.max(rightMargin, covFont * 1.25)}px`);
+  root.style.setProperty("--cov-y", `${Math.max(g.ry * scale, covFont * 1.2)}px`);
   root.style.setProperty("--bs", `${bs}px`);
   root.style.setProperty("--cell", `${cell}px`);
   root.style.setProperty("--coord", `${coord}px`);
@@ -778,7 +790,8 @@ function makePieceEl(type, owner, cls) {
 }
 
 function renderCoords() {
-  els.boardFrame.classList.toggle("no-coords", !state.opts.coords);
+  els.boardFrame.classList.toggle("no-coords", state.opts.coords === "off");
+  els.boardFrame.classList.toggle("coords-overlay", state.opts.coords === "overlay");
   els.coordFiles.innerHTML = "";
   els.coordRanks.innerHTML = "";
   for (let i = 0; i < 9; i++) {
@@ -2572,11 +2585,20 @@ function wire() {
   });
 
   // view options
-  els.optCoords.checked = state.opts.coords;
+  const markCoords = () => {
+    for (const b of els.optCoordsSeg.querySelectorAll("button")) {
+      b.classList.toggle("on", b.dataset.v === state.opts.coords);
+      b.setAttribute("aria-checked", String(b.dataset.v === state.opts.coords));
+    }
+  };
+  markCoords();
   els.optEvalBar.checked = state.opts.evalBar;
   els.optLegal.checked = state.opts.legal;
-  els.optCoords.addEventListener("change", () => {
-    state.opts.coords = els.optCoords.checked;
+  els.optCoordsSeg.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-v]");
+    if (!b) return;
+    state.opts.coords = b.dataset.v;
+    markCoords();
     saveOpts();
     layoutBoard();
     renderCoords();

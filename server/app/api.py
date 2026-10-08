@@ -228,7 +228,7 @@ async def put_engine_options(request: Request):
     if not isinstance(values, dict):
         raise HTTPException(status_code=400, detail="values must be an object")
     try:
-        await analysis.set_options(values)
+        await analysis.set_options(values, data.get("auto_stop_sec"))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

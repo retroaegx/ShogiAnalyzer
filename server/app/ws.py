@@ -36,11 +36,20 @@ class SessionHub:
         self._owner_since: str | None = None
         self._owner_token: str | None = None
         self._session_id: str | None = None
+        self._owner_tab: str | None = None
 
-    async def try_grant(self, ws: WebSocket) -> tuple[bool, dict]:
+    async def try_grant(self, ws: WebSocket, tab: str | None = None) -> tuple[bool, dict, WebSocket | None]:
+        """Grant the session when free. The same browser tab coming back (its old socket not
+        yet noticed as dead, e.g. a phone waking up) also gets it back, without the
+        「別の画面で操作中」 prompt; the replaced socket is returned so it can be closed."""
         async with self._lock:
+            replaced: WebSocket | None = None
+            if self._owner is not None and tab and tab == self._owner_tab:
+                replaced = self._owner
+                self._owner = None
             if self._owner is None:
                 self._owner = ws
+                self._owner_tab = tab
                 self._owner_since = utc_now_iso()
                 self._owner_token = secrets.token_urlsafe(12)
                 self._session_id = secrets.token_urlsafe(12)
@@ -48,11 +57,11 @@ class SessionHub:
                     "owner_since": self._owner_since,
                     "owner_token": self._owner_token,
                     "session_id": self._session_id,
-                }
+                }, replaced
             return False, {
                 "owner_since": self._owner_since,
                 "owner_hint": "another session is active",
-            }
+            }, None
 
     async def takeover(self, ws: WebSocket) -> tuple[WebSocket | None, dict]:
         old_owner: WebSocket | None = None
@@ -64,6 +73,7 @@ class SessionHub:
                 }
             old_owner = self._owner
             self._owner = ws
+            self._owner_tab = None
             self._owner_since = utc_now_iso()
             self._owner_token = secrets.token_urlsafe(12)
             self._session_id = secrets.token_urlsafe(12)
@@ -94,6 +104,7 @@ class SessionHub:
             if self._owner is not ws:
                 return False
             self._owner = None
+            self._owner_tab = None
             self._owner_since = None
             self._owner_token = None
             self._session_id = None
@@ -491,8 +502,17 @@ async def websocket_endpoint(ws: WebSocket):
     async def _analysis_sender(type_: str, payload: dict | None = None) -> None:
         await ws_send(ws, type_, payload)
 
-    granted, info = await hub.try_grant(ws)
+    tab = (ws.query_params.get("tab") or "").strip()[:64] or None
+    granted, info, replaced = await hub.try_grant(ws, tab)
     if granted:
+        if replaced is not None:
+            # same tab reconnecting: its previous connection has ended (analysis OFF, as on a disconnect)
+            with contextlib.suppress(Exception):
+                await runtime.mutate(_analysis_off)
+            with contextlib.suppress(Exception):
+                # 4409 = replaced by the same tab id: a live page (e.g. a duplicated tab) stays
+                # read-only instead of reconnecting and taking the session back again
+                await replaced.close(code=4409)
         await analysis.attach_owner_sender(_analysis_sender)
         await _send_granted(ws)
     else:
@@ -508,6 +528,11 @@ async def websocket_endpoint(ws: WebSocket):
                 continue
             if not isinstance(msg, dict):
                 await ws_send(ws, "toast", {"level": "error", "message": "JSON object required"})
+                continue
+
+            if msg.get("type") == "ping":
+                # connection check from the page (works for viewers too)
+                await ws_send(ws, "pong", {})
                 continue
 
             if not await hub.is_owner(ws):

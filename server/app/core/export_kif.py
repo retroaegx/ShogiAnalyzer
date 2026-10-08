@@ -1,7 +1,18 @@
+"""KIF writer (柿木将棋 format, UTF-8 with the version 2.0 encoding line, i.e. a .kifu file).
+
+Header (開始日時, 棋戦/表題, 手合割 or a board diagram, players), the move list with the time
+columns, comments ("*" lines), the game end (「投了」 + 「まで○手で…」) and nested
+variations in Kifu-for-Windows order.
+"""
+
 from __future__ import annotations
 
 from .gametree import GameTree
+from .kifu_common import comment_lines, header_lines, result_line
 from .notation import usi_to_kif_move_text
+from .sfen_ops import parse_usi_move
+
+_TIME = "( 0:00/00:00:00)"
 
 
 def _mainline_nodes(game: GameTree) -> list[str]:
@@ -17,80 +28,73 @@ def _mainline_nodes(game: GameTree) -> list[str]:
     return node_ids
 
 
+def _dest(move_usi: str | None):
+    """Destination square of a move (for 「同」), or None."""
+    if not move_usi:
+        return None
+    try:
+        mvu = parse_usi_move(move_usi)
+        return (mvu.to_row, mvu.to_col)
+    except Exception:
+        return None
+
+
+def _line_from(game: GameTree, first_id: str, first_ply: int) -> list[tuple[int, str]]:
+    """(ply, node_id) from first_id following the first child each time."""
+    line = [(first_ply, first_id)]
+    cur = first_id
+    while True:
+        kids = game.children_of(cur)
+        if not kids:
+            return line
+        cur = kids[0].node_id
+        line.append((line[-1][0] + 1, cur))
+
+
+def _move_line(ply: int, body: str, has_variation: bool = False) -> str:
+    # moves are padded so the time column lines up (full-width characters count as 2)
+    width = sum(2 if ord(ch) > 0xFF else 1 for ch in body)
+    return f"{ply:>4} {body}{' ' * max(1, 14 - width)}{_TIME}{'+' if has_variation else ''}"
+
+
 def export_game_to_kif(game: GameTree) -> str:
-    lines: list[str] = []
-    meta = game.meta or {}
-    handicap = meta.get("手合割") or "平手"
-    lines.append(f"手合割：{handicap}")
-    if meta.get("先手"):
-        lines.append(f"先手：{meta['先手']}")
-    if meta.get("後手"):
-        lines.append(f"後手：{meta['後手']}")
-    if meta.get("棋戦"):
-        lines.append(f"棋戦：{meta['棋戦']}")
-    lines.append("")
-    lines.append("手数----指手---------")
+    lines: list[str] = ["#KIF version=2.0 encoding=UTF-8"]
+    lines += header_lines(game.meta or {}, game.title, game.created_at, game.initial_sfen)
+    lines.append("手数----指手---------消費時間--")
+    root = game.get_node(game.root_node_id)
+    lines += comment_lines(root.comment)
 
-    main_nodes = _mainline_nodes(game)
-    prev_to = None
-    for i in range(1, len(main_nodes)):
-        parent = game.get_node(main_nodes[i - 1])
-        node = game.get_node(main_nodes[i])
-        body = usi_to_kif_move_text(parent.position_sfen, node.move_usi or "", prev_to_rc=prev_to)
-        # update prev_to
-        if node.move_usi:
-            try:
-                from .sfen_ops import parse_usi_move
+    def write_moves(line: list[tuple[int, str]]) -> None:
+        for ply, nid in line:
+            node = game.get_node(nid)
+            parent = game.get_node(node.parent_id)
+            body = usi_to_kif_move_text(parent.position_sfen, node.move_usi or "", prev_to_rc=_dest(parent.move_usi))
+            has_var = len(game.children_of(node.parent_id)) > 1
+            lines.append(_move_line(ply, body, has_var))
+            lines.extend(comment_lines(node.comment))
 
-                mvu = parse_usi_move(node.move_usi)
-                prev_to = (mvu.to_row, mvu.to_col)
-            except Exception:
-                prev_to = None
-        lines.append(f"{i:>4} {body}")
+    def write_variations(line: list[tuple[int, str]]) -> None:
+        # Kifu-for-Windows order: branch points from the end of the line backwards, each
+        # variation followed right away by its own variations. A reader then finds the parent
+        # of "変化：N手" as the most recently written line that has a move N (see import_kif.py).
+        for ply, nid in reversed(line):
+            for alt in game.children_of(nid)[1:]:
+                sub = _line_from(game, alt.node_id, ply + 1)
+                lines.append("")
+                lines.append(f"変化：{ply + 1}手")
+                write_moves(sub)
+                write_variations(sub)
 
-    # Variations branching from mainline nodes.
-    ply_by_node = {nid: idx for idx, nid in enumerate(main_nodes)}
-    for parent_id in main_nodes:
-        children = game.children_of(parent_id)
-        if not children:
-            continue
-        main_child_id = children[0].node_id
-        for alt in children[1:]:
-            start_ply = ply_by_node.get(parent_id, 0) + 1
-            lines.append("")
-            lines.append(f"変化：{start_ply}手")
-            cur_parent = parent_id
-            prev_to = None
-            # prev_to is destination of the move at parent
-            pnode = game.get_node(parent_id)
-            if pnode.move_usi:
-                try:
-                    from .sfen_ops import parse_usi_move
+    main = _mainline_nodes(game)
+    main_line = [(i, nid) for i, nid in enumerate(main)]
+    write_moves(main_line[1:])
 
-                    mvu = parse_usi_move(pnode.move_usi)
-                    prev_to = (mvu.to_row, mvu.to_col)
-                except Exception:
-                    prev_to = None
-            move_no = start_ply
-            cur = alt.node_id
-            while True:
-                par = game.get_node(cur_parent)
-                nd = game.get_node(cur)
-                body = usi_to_kif_move_text(par.position_sfen, nd.move_usi or "", prev_to_rc=prev_to)
-                if nd.move_usi:
-                    try:
-                        from .sfen_ops import parse_usi_move
+    # game end, when the stored result still matches the main line
+    result = (game.meta or {}).get("_result") or {}
+    played = len(main) - 1
+    if result.get("term") and int(result.get("ply", -1)) == played:
+        lines.append(_move_line(played + 1, result["term"]))
+        lines.append(result_line(result["term"], played, game.get_node(main[-1]).position_sfen, game.initial_sfen))
 
-                        mvu = parse_usi_move(nd.move_usi)
-                        prev_to = (mvu.to_row, mvu.to_col)
-                    except Exception:
-                        prev_to = None
-                lines.append(f"{move_no:>4} {body}")
-                cur_parent = cur
-                kids = game.children_of(cur)
-                if not kids:
-                    break
-                cur = kids[0].node_id
-                move_no += 1
-
+    write_variations(main_line)  # includes the start position (alternatives to move 1)
     return "\n".join(lines).rstrip() + "\n"

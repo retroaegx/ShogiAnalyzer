@@ -174,7 +174,10 @@ def filter_candidates_by_disambig(
     filtered = candidates
 
     if "直" in disambig:
-        filtered = [c for c in filtered if file_of(c) == to_file]
+        filtered = [
+            c for c in filtered
+            if file_of(c) == to_file and (rank_of(c) > to_rank if forward_is_up else rank_of(c) < to_rank)
+        ]
 
     if "寄" in disambig:
         filtered = [c for c in filtered if rank_of(c) == to_rank]

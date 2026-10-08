@@ -1609,7 +1609,10 @@ function renderEvalGraph() {
   const x0 = gutter;
   const x1 = W - 6;
   const x = (i) => x0 + (i / n) * (x1 - x0);
-  const y = (cp) => padY + ((lim - clamp(cp, -lim, lim)) / (2 * lim)) * (H - padY * 2);
+  // move-number axis under the plot when there is room for it
+  const axisH = H >= 90 ? fs + 6 : 0;
+  const yBottom = H - padY - axisH;
+  const y = (cp) => padY + ((lim - clamp(cp, -lim, lim)) / (2 * lim)) * (yBottom - padY);
   graphGeom = { n, x0, x1 };
 
   // background: sente half, grid lines with values (±lim, ±lim/2, 0)
@@ -1620,7 +1623,7 @@ function renderEvalGraph() {
   ctx.textBaseline = "middle";
   for (const v of [lim, lim / 2, 0, -lim / 2, -lim]) {
     const gy = Math.round(y(v)) + 0.5;
-    ctx.strokeStyle = v === 0 ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.08)";
+    ctx.strokeStyle = v === 0 ? "rgba(227,178,90,0.32)" : "rgba(227,178,90,0.11)";
     ctx.beginPath();
     ctx.moveTo(x0, gy);
     ctx.lineTo(x1, gy);
@@ -1636,7 +1639,7 @@ function renderEvalGraph() {
   if (pts.length) {
     // area to the 50% line
     const mid = y(0);
-    const grad = ctx.createLinearGradient(0, padY, 0, H - padY);
+    const grad = ctx.createLinearGradient(0, padY, 0, yBottom);
     grad.addColorStop(0, "rgba(243,237,226,0.42)");
     grad.addColorStop(0.5, "rgba(243,237,226,0.04)");
     grad.addColorStop(0.5, "rgba(159,180,255,0.04)");
@@ -1677,7 +1680,7 @@ function renderEvalGraph() {
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(cx, padY);
-  ctx.lineTo(cx, H - padY);
+  ctx.lineTo(cx, yBottom);
   ctx.stroke();
   const curPt = pts.find((p) => p[2] === curPly());
   if (curPt) {
@@ -1694,7 +1697,15 @@ function renderEvalGraph() {
   ctx.textBaseline = "top";
   ctx.fillText("☗先手", x0 + 4, padY + 2);
   ctx.textBaseline = "bottom";
-  ctx.fillText("☖後手", x0 + 4, H - padY - 2);
+  ctx.fillText("☖後手", x0 + 4, yBottom - 2);
+  if (axisH) {
+    // 0, 10, 20 … plies (step grows for long games)
+    const step = n <= 60 ? 10 : n <= 150 ? 20 : 50;
+    ctx.textBaseline = "bottom";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(154,161,173,0.75)";
+    for (let i = 0; i <= n; i += step) ctx.fillText(String(i), clamp(x(i), x0 + 6, x1 - 6), H - 1);
+  }
   ctx.textBaseline = "alphabetic";
 }
 

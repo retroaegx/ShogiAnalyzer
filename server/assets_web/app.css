@@ -1284,3 +1284,83 @@ textarea.field.mono { font-size: 12px; }
   animation: pop .2s ease-out;
 }
 .conn-overlay[data-state="ok"] .conn-card { border-color: rgba(90, 209, 154, .45); }
+
+/* ============================================================
+   Gold theme (deep navy + thin gold lines, wave header)
+   Colours / borders / glow only: sizes and the board stay as they are.
+   ============================================================ */
+:root {
+  --bg: #070a11;
+  --bg-glow: rgba(227, 178, 90, 0.06);
+  --surface: #0d111a;
+  --surface-2: #131a26;
+  --surface-3: #1b2333;
+  --line: rgba(214, 170, 90, 0.17);
+  --line-strong: rgba(214, 170, 90, 0.34);
+  --gold-edge: linear-gradient(180deg, rgba(240, 200, 120, .55), rgba(214, 170, 90, .14) 45%, rgba(214, 170, 90, .30));
+  --shadow: 0 1px 0 rgba(255, 220, 150, 0.07) inset, 0 18px 40px -20px rgba(0, 0, 0, 0.85);
+}
+body {
+  background:
+    radial-gradient(900px 520px at 85% -8%, rgba(227, 178, 90, .10), transparent 62%),
+    radial-gradient(900px 700px at 0% 110%, rgba(70, 90, 160, .08), transparent 60%),
+    var(--bg);
+}
+/* gold waves behind the top of the screen, fading into the background */
+.app { position: relative; isolation: isolate; }
+.app::before {
+  content: ""; position: absolute; z-index: -1; left: 0; right: 0; top: 0; height: 260px; pointer-events: none;
+  background: url("/img/header-waves.webp?v=1") right top / cover no-repeat;
+  opacity: .75;
+  -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 30%, transparent 100%);
+}
+.topbar {
+  background: linear-gradient(180deg, rgba(5, 8, 14, .55), rgba(5, 8, 14, .25));
+  border-bottom: 1px solid transparent;
+  border-image: linear-gradient(90deg, transparent, rgba(227, 178, 90, .55) 30%, rgba(227, 178, 90, .55) 70%, transparent) 1;
+}
+.title-label { text-shadow: 0 1px 8px rgba(0, 0, 0, .6); }
+.title-edit { border-color: var(--line-strong); background: rgba(13, 17, 26, .7); color: var(--accent); }
+
+/* cards and the move bar: gold hairline + soft inner light */
+.card, .navbar {
+  background: linear-gradient(180deg, rgba(227, 178, 90, .045), transparent 38%), var(--surface);
+  border: 1px solid var(--line-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 222, 160, .10), 0 0 0 1px rgba(0, 0, 0, .35), 0 16px 34px -18px rgba(0, 0, 0, .9);
+}
+.card-head h2 { color: #f4e3bd; text-shadow: 0 0 14px rgba(227, 178, 90, .25); }
+
+/* buttons: dark with gold outline, gold when active */
+.nav-btn, .kifu-btn {
+  background: linear-gradient(180deg, #161d2b, #0e131d);
+  border: 1px solid rgba(214, 170, 90, .30);
+  box-shadow: inset 0 1px 0 rgba(255, 222, 160, .08);
+}
+.nav-btn:hover:not(:disabled) { background: linear-gradient(180deg, #1c2536, #121826); border-color: rgba(227, 178, 90, .6); }
+.nav-btn:disabled { opacity: .45; }
+.nav-btn.flip-btn.on, .kifu-btn.on { color: var(--accent-ink); background: linear-gradient(180deg, var(--accent-2), var(--accent)); border-color: var(--accent); }
+.seg { background: #080c14; border-color: var(--line-strong); }
+.seg button.on {
+  color: #ffe4a8; background: rgba(227, 178, 90, .14);
+  box-shadow: inset 0 0 0 1px rgba(227, 178, 90, .75), 0 0 12px -3px rgba(227, 178, 90, .55);
+}
+.btn-batch { background: linear-gradient(180deg, #161d2b, #0e131d); border-color: rgba(227, 178, 90, .45); color: #f4e3bd; }
+.btn-batch:hover:not(:disabled) { border-color: var(--accent); background: linear-gradient(180deg, #1c2536, #121826); }
+.btn { border-color: var(--line-strong); }
+.btn.primary, .tb-btn.primary { background: linear-gradient(180deg, var(--accent-2), var(--accent)); box-shadow: 0 0 14px -4px rgba(227, 178, 90, .6); }
+.onoff { border-color: var(--line-strong); }
+
+/* piece stands */
+.stand { border-color: var(--line-strong); background: linear-gradient(180deg, rgba(227, 178, 90, .04), transparent), var(--surface); }
+.stand.to-move { border-color: rgba(227, 178, 90, .75); box-shadow: 0 0 14px -6px rgba(227, 178, 90, .6); }
+.stand-pieces { border-color: var(--line); }
+
+/* analysis summary on phones */
+.mini-eval { border-top-color: var(--line); }
+.mini-onoff { border-color: var(--line-strong); }
+.mini-score { text-shadow: 0 0 16px rgba(227, 178, 90, .18); }
+.mini-best { color: #f4e3bd; }
+
+/* dialogs */
+.dialog { border-color: var(--line-strong); box-shadow: inset 0 1px 0 rgba(255, 222, 160, .08), 0 30px 70px -20px rgba(0, 0, 0, .9); }

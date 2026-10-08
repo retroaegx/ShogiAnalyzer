@@ -324,6 +324,11 @@
               <div class="eng-default" id="hashDefault"></div>
             </div>
           </div>
+          <div class="set-title">常時解析</div>
+          <label class="eng-inline">操作がないときの自動停止
+            <select id="autoStopSel" class="field"></select>
+          </label>
+          <div class="eng-note muted">同じ局面のまま指定の時間がたつと、その局面の解析を止めます（常時解析は ON のまま。局面を動かすと再開）</div>
           <div class="set-title">全解析</div>
           <label class="eng-inline">1局面あたりの思考時間
             <input type="number" id="batchSeconds" class="field num" min="0.5" max="120" step="0.5"><span class="unit">秒</span>

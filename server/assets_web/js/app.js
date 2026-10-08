@@ -172,6 +172,7 @@ const els = {
   hashDefault: $("hashDefault"),
   hashOptName: $("hashOptName"),
   batchSeconds: $("batchSeconds"),
+  autoStopSel: $("autoStopSel"),
   engineOptions: $("engineOptions"),
   engineResetAll: $("engineResetAll"),
   engineSave: $("engineSave"),
@@ -605,7 +606,8 @@ function connectWs() {
 
       case "analysis:stopped": {
         const reason = String(payload.reason || "stopped");
-        state.analysis.status = "stopped";
+        // "idle": nobody moved for the auto-stop time; 常時解析 stays ON, the lines stay shown
+        state.analysis.status = reason === "idle" ? "idle" : "stopped";
         // the batch keeps streaming other positions; don't keep showing their lines
         if (reason === "batch finished") state.analysis.lines = [];
         if (/(failed|timeout|not configured|exited|error)/i.test(reason)) toast("error", reason);
@@ -1494,6 +1496,8 @@ function renderEngineStatus() {
   } else if (a.enabled && a.status === "running") {
     st = "running";
     text = `${name} · 解析中`;
+  } else if (a.enabled && a.status === "idle") {
+    text = `${name} · 自動停止`;
   } else if (a.enabled) {
     text = `${name} · 待機`;
   }
@@ -1613,7 +1617,7 @@ function renderAnalysis() {
   els.evalScore.className = `eval-score ${cp == null ? "" : cp >= 0 ? "plus" : "minus"}`;
   if (!a.available) els.evalVerdict.textContent = "エンジン未設定";
   else if (!on && !best) els.evalVerdict.textContent = "解析停止中";
-  else if (on && !best) els.evalVerdict.textContent = "思考中…";
+  else if (on && !best) els.evalVerdict.textContent = a.status === "idle" ? "自動停止中" : "思考中…";
   else els.evalVerdict.textContent = verdict(cp);
   if (state.batch && !best) els.evalVerdict.textContent = "全解析中…";
   els.evalVerdict.dataset.side = !best || cp == null || Math.abs(cp) < 150 ? "even" : cp > 0 ? "sente" : "gote";
@@ -1627,7 +1631,7 @@ function renderAnalysis() {
     const row = el("div", "meta-depth");
     row.append(el("small", null, "深さ"), el("b", null, String(top?.depth ?? best.depth ?? "-")), el("span", null, `/${top?.seldepth || "-"}`));
     if (shown.live) row.append(el("small", "meta-time", `${(a.elapsedMs / 1000).toFixed(1)}s`));
-    else row.prepend(el("small", "meta-state", shown.saved ? "保存済み" : "最終解析"));
+    else row.prepend(el("small", "meta-state", on && a.status === "idle" ? "自動停止" : shown.saved ? "保存済み" : "最終解析"));
     els.evalMeta.append(row);
     if (top?.nodes) els.evalMeta.append(el("div", null, shown.live ? `${fmtNum(top.nodes)} nodes · ${fmtNum(top.nps)} nps` : `${fmtNum(top.nodes)} nodes`));
   }
@@ -2375,6 +2379,16 @@ function renderEngineForm(useDefaults) {
 
   els.batchSeconds.value = String(batchSeconds());
 
+  // 常時解析の自動停止 (kept on the server; 0 = 上限なし)
+  const fmtSec = (s) => (s === 0 ? "上限なし" : s < 60 ? `${s}秒` : `${s / 60}分`);
+  els.autoStopSel.innerHTML = "";
+  for (const s of spec.auto_stop_choices || [10, 20, 30, 60, 120, 180, 300, 600, 1200, 0]) {
+    const opt = el("option", null, fmtSec(s) + (s === 60 ? "（既定）" : ""));
+    opt.value = String(s);
+    els.autoStopSel.append(opt);
+  }
+  els.autoStopSel.value = String(useDefaults ? 60 : spec.auto_stop_sec ?? 60);
+
   // everything else, generated from the engine's option list
   els.engineOptions.innerHTML = "";
   for (const o of spec.options) {
@@ -2448,7 +2462,7 @@ async function saveEngineSettings() {
     const res = await fetch("/api/engine/options", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ values }),
+      body: JSON.stringify({ values, auto_stop_sec: Number(els.autoStopSel.value) }),
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);

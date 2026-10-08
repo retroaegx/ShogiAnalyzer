@@ -250,6 +250,68 @@ export function getDropMoves(board, pieceType, owner) {
   return out;
 }
 
+// ---------- full legality (king safety, 打ち歩詰め) ----------
+const otherSide = (owner) => (owner === "sente" ? "gote" : "sente");
+
+function findKing(board, owner) {
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+    const p = board[r][c];
+    if (p && p.owner === owner && p.piece === "king") return { r, c };
+  }
+  return null;
+}
+
+function isAttacked(board, row, col, byOwner) {
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+    const p = board[r][c];
+    if (p && p.owner === byOwner && getPossibleMoves(board, r, c, p).some((m) => m.row === row && m.col === col)) return true;
+  }
+  return false;
+}
+
+function kingSafeAfter(board, owner, place) {
+  const nb = board.map((row) => row.slice());
+  place(nb);
+  const k = findKing(nb, owner);
+  return !k || !isAttacked(nb, k.r, k.c, otherSide(owner)); // no king (詰将棋の玉方など): nothing to protect
+}
+
+/** Board moves of one piece that do not leave the own king in check (王手放置・自殺手 are illegal). */
+export function legalMovesFrom(board, row, col, piece) {
+  return getPossibleMoves(board, row, col, piece).filter((m) =>
+    kingSafeAfter(board, piece.owner, (nb) => {
+      nb[m.row][m.col] = piece;
+      nb[row][col] = null;
+    }),
+  );
+}
+
+function hasAnyBoardMove(board, owner) {
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+    const p = board[r][c];
+    if (p && p.owner === owner && legalMovesFrom(board, r, c, p).length) return true;
+  }
+  return false;
+}
+
+/** Drops that are legal: 二歩・行き所のない駒 (getDropMoves), the own king safe, and no 打ち歩詰め. */
+export function legalDrops(board, pieceType, owner) {
+  const t = baseType(pieceType);
+  return getDropMoves(board, pieceType, owner).filter((m) => {
+    const dropped = { piece: t, owner };
+    if (!kingSafeAfter(board, owner, (nb) => (nb[m.row][m.col] = dropped))) return false;
+    if (t !== "pawn") return true;
+    const enemy = otherSide(owner);
+    const k = findKing(board, enemy);
+    if (!k || k.r !== m.row + dir(owner) || k.c !== m.col) return true; // the pawn gives no check
+    // 打ち歩詰め: a checking pawn drop the enemy cannot answer (a pawn check is adjacent, so only
+    // board moves — capturing it or moving the king — can answer it)
+    const nb = board.map((row) => row.slice());
+    nb[m.row][m.col] = dropped;
+    return hasAnyBoardMove(nb, enemy);
+  });
+}
+
 const PROMOTABLE = new Set(["pawn", "lance", "knight", "silver", "bishop", "rook"]);
 
 export function canPromote(piece, fromRow, toRow) {

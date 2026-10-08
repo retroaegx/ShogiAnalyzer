@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from .kifu_common import can_promote
+from .movegen import candidates_for_piece, filter_candidates_by_disambig
 from .sfen_ops import ParsedUsiMove, parse_sfen, parse_usi_move, rc_to_square
 
 
@@ -135,7 +137,33 @@ def ja_piece_from_token(token: str) -> str:
     return PIECE_JA.get(norm, norm)
 
 
+def _ki2_relative(board, side: str, piece_norm: str, from_rc: tuple[int, int], to_rc: tuple[int, int]) -> str:
+    """右・左・上・引・寄・直 when several pieces of the same kind can reach the square (JSA rules):
+    the direction (上 / 引 / 寄) first, then the position (直 / 右 / 左), then both (e.g. 右上)."""
+    to_row, to_col = to_rc
+    cands = candidates_for_piece(board, side, piece_norm, to_row, to_col)
+    if len(cands) <= 1:
+        return ""
+    fr, fc = from_rc
+    if fr == to_row:
+        direction = "寄"
+    elif (fr > to_row) == (side == "b"):
+        direction = "上"
+    else:
+        direction = "引"
+    options = [direction]
+    if piece_norm in {"G", "S", "+P", "+L", "+N", "+S"} and fc == to_col and direction == "上":
+        options.append("直")
+    options += ["右", "左", "右" + direction, "左" + direction]
+    for label in options:
+        left = filter_candidates_by_disambig(side, to_row, to_col, cands, list(label))
+        if len(left) == 1 and (left[0].from_row, left[0].from_col) == from_rc:
+            return label
+    return ""
+
+
 def usi_to_kif2_label(parent_sfen: str, move_usi: str, *, prev_to_rc: tuple[int, int] | None = None) -> str:
+    """KI2 move like '▲７六歩', '△同　銀右', '▲５二金左上', '▲２三歩成', '▲２三銀不成', '▲５五角打'."""
     st = parse_sfen(parent_sfen)
     side = st["side"]
     board = st["board"]
@@ -147,13 +175,21 @@ def usi_to_kif2_label(parent_sfen: str, move_usi: str, *, prev_to_rc: tuple[int,
 
     if mv.is_drop:
         piece = PIECE_JA.get(mv.drop_piece or "", mv.drop_piece or "?")
-        return f"{side_mark(side)}{to_sq}{piece}打"
+        # 「打」 only when a piece of that kind on the board could also move there
+        on_board = candidates_for_piece(board, side, mv.drop_piece or "", mv.to_row, mv.to_col) if mv.drop_piece else []
+        return f"{side_mark(side)}{to_sq}{piece}{'打' if on_board else ''}"
 
     assert mv.from_row is not None and mv.from_col is not None
-    token = _piece_token_from_board(board, mv.from_row, mv.from_col)
-    piece = ja_piece_from_token(token or "?")
-    suffix = "成" if mv.promote else ""
-    return f"{side_mark(side)}{to_sq}{piece}{suffix}"
+    token = _piece_token_from_board(board, mv.from_row, mv.from_col) or "?"
+    piece = ja_piece_from_token(token)
+    relative = _ki2_relative(board, side, _normalize_piece_token(token), (mv.from_row, mv.from_col), (mv.to_row, mv.to_col))
+    if mv.promote:
+        suffix = "成"
+    elif can_promote(token, side, mv.from_row, mv.to_row):
+        suffix = "不成"
+    else:
+        suffix = ""
+    return f"{side_mark(side)}{to_sq}{piece}{relative}{suffix}"
 
 
 def usi_to_kif_move_text(parent_sfen: str, move_usi: str, *, prev_to_rc: tuple[int, int] | None = None) -> str:
@@ -171,9 +207,14 @@ def usi_to_kif_move_text(parent_sfen: str, move_usi: str, *, prev_to_rc: tuple[i
         return f"{to_sq}{piece}打"
 
     assert mv.from_row is not None and mv.from_col is not None
-    token = _piece_token_from_board(board, mv.from_row, mv.from_col)
-    piece = ja_piece_from_token(token or "?")
-    suffix = "成" if mv.promote else ""
+    token = _piece_token_from_board(board, mv.from_row, mv.from_col) or "?"
+    piece = ja_piece_from_token(token)
+    if mv.promote:
+        suffix = "成"
+    elif can_promote(token, st["side"], mv.from_row, mv.to_row):
+        suffix = "不成"
+    else:
+        suffix = ""
     return f"{to_sq}{piece}{suffix}{format_from_paren(mv.from_row, mv.from_col)}"
 
 

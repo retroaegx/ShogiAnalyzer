@@ -342,11 +342,11 @@ async def export_game(request: Request, game_id: str, format: str = Query(defaul
         elif fmt == "kif":
             text = export_game_to_kif(game)
             media_type = "text/plain; charset=utf-8"
-            filename = f"{game_id}.kif"
+            filename = f"{game_id}.kifu"  # UTF-8 KIF
         elif fmt in {"kif2", "ki2"}:
             text = export_game_to_kif2(game)
             media_type = "text/plain; charset=utf-8"
-            filename = f"{game_id}.ki2"
+            filename = f"{game_id}.ki2u"  # UTF-8 KI2
         else:
             raise HTTPException(status_code=400, detail="format must be usi|kif|kif2")
     except NotImplementedError as exc:

@@ -273,7 +273,12 @@
         <div class="set-title">駒</div>
         <div class="theme-grid pieces" id="pieceChoices"></div>
         <div class="set-title">表示</div>
-        <label class="check"><input type="checkbox" id="optCoords" checked> 座標を表示</label>
+        <div class="opt-row">
+          <span>座標（筋・段の数字）</span>
+          <div class="seg" id="optCoordsSeg" role="radiogroup" aria-label="座標の表示">
+            <button type="button" data-v="overlay">盤の縁に重ねる</button><button type="button" data-v="outside">盤の外</button><button type="button" data-v="off">非表示</button>
+          </div>
+        </div>
         <label class="check"><input type="checkbox" id="optEvalBar" checked> 評価値バーを表示</label>
         <label class="check"><input type="checkbox" id="optLegal" checked> 移動可能マスを表示</label>
         <label class="check"><input type="checkbox" id="optLastMove" checked> 最後に指した手を強調 <span class="legend red"></span></label>

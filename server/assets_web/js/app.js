@@ -2822,7 +2822,10 @@ async function setupUpdateNotice() {
   });
   const load = async () => {
     try {
-      renderUpdate(await fetch("/api/app/update_status", { cache: "no-store" }).then((r) => r.json()));
+      const st = await fetch("/api/app/update_status", { cache: "no-store" }).then((r) => r.json());
+      renderUpdate(st);
+      // the server is asking GitHub right now (stale result on connect): read the answer shortly
+      if (st.checking) setTimeout(load, 4000);
     } catch {
       // optional
     }

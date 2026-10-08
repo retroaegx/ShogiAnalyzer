@@ -151,7 +151,8 @@ async def logout():
 
 @router.get("/api/app/update_status")
 async def app_update_status():
-    """Current / latest version (GitHub release) for the update notice in the top bar."""
+    """Current / latest version (GitHub release) for the update notice in the top bar.
+    Also re-checks GitHub in the background when the last check is over an hour old."""
     return get_update_status()
 
 

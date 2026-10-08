@@ -342,8 +342,63 @@ function confirmDialog({ title, message, actions }) {
 }
 
 // ---------- websocket ----------
+// one id per browser tab: when this tab reconnects, the server hands the session straight back
+// (no 「別の画面で操作中」 prompt) even if it has not noticed the old connection is gone yet
+const TAB_ID = (() => {
+  try {
+    let id = sessionStorage.getItem("shogi_analyzer_tab");
+    if (!id) {
+      id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sessionStorage.setItem("shogi_analyzer_tab", id);
+    }
+    return id;
+  } catch {
+    return Math.random().toString(36).slice(2);
+  }
+})();
+
 function wsUrl() {
-  return `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws`;
+  return `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws?tab=${encodeURIComponent(TAB_ID)}`;
+}
+
+// reconnect quickly: first retry almost at once, then back off a little
+const WS_RETRY_MS = [150, 500, 1000, 2000, 3000];
+let wsRetry = 0;
+let wsRetryTimer = null;
+let wsConnectTimer = null;
+let wsPingTimer = null;
+
+function scheduleReconnect(delay) {
+  clearTimeout(wsRetryTimer);
+  wsRetryTimer = setTimeout(connectWs, delay ?? WS_RETRY_MS[Math.min(wsRetry, WS_RETRY_MS.length - 1)]);
+  wsRetry += 1;
+}
+
+/** Make sure the socket is really alive (after the phone wakes up, the network returns, …):
+ * a closed socket reconnects at once, an open one must answer a ping quickly. */
+function checkConnection() {
+  const ws = state.ws;
+  if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+    wsRetry = 0;
+    scheduleReconnect(0);
+    return;
+  }
+  if (ws.readyState !== WebSocket.OPEN) return; // still connecting
+  const sentAt = Date.now();
+  try {
+    ws.send(JSON.stringify({ type: "ping" }));
+  } catch {
+    scheduleReconnect(0);
+    return;
+  }
+  clearTimeout(wsPingTimer);
+  wsPingTimer = setTimeout(() => {
+    // no answer: the connection is dead even if the browser has not noticed; start a new one
+    if (state.ws === ws && (state.wsLastSeen || 0) < sentAt) {
+      wsRetry = 0;
+      connectWs();
+    }
+  }, 3000);
 }
 
 function sendWs(type, payload = {}) {
@@ -370,28 +425,67 @@ function resetSession() {
 }
 
 function connectWs() {
+  clearTimeout(wsRetryTimer);
+  clearTimeout(wsConnectTimer);
+  clearTimeout(wsPingTimer);
+  const old = state.ws;
   setConn("connecting", "接続中");
   const ws = new WebSocket(wsUrl());
   state.ws = ws;
+  if (old && old.readyState <= WebSocket.OPEN) {
+    try {
+      old.close(); // replaced: its events are ignored from now on
+    } catch {
+      // already gone
+    }
+  }
+  // a connection attempt that hangs (bad network) is abandoned and retried
+  wsConnectTimer = setTimeout(() => {
+    if (state.ws === ws && ws.readyState === WebSocket.CONNECTING) {
+      try {
+        ws.close();
+      } catch {
+        // ignore
+      }
+      scheduleReconnect();
+    }
+  }, 6000);
 
   ws.addEventListener("open", () => {
+    if (state.ws !== ws) return;
+    clearTimeout(wsConnectTimer);
+    wsRetry = 0;
+    state.wsLastSeen = Date.now();
     setConn("connected", "接続済み");
     showConnRestored();
   });
   ws.addEventListener("close", (ev) => {
+    if (state.ws !== ws) return; // an old socket we already replaced
+    clearTimeout(wsConnectTimer);
     if (ev.code === 4401) {
       // password protection is on and this browser is not logged in (or the login expired)
       location.replace("/login");
+      return;
+    }
+    if (ev.code === 4409) {
+      // another page with the same tab id (a duplicated tab) took the session: stay read-only
+      toast("warning", "他の画面にセッションが引き継がれました");
+      setConn("busy", "閲覧のみ");
+      resetSession();
+      renderControls();
+      loadReadOnlyState();
       return;
     }
     setConn("error", "切断 — 再接続中");
     showConnLost();
     resetSession();
     renderControls();
-    setTimeout(connectWs, 1200);
+    scheduleReconnect();
   });
 
   ws.addEventListener("message", async (ev) => {
+    if (state.ws !== ws) return;
+    state.wsLastSeen = Date.now();
     let msg;
     try {
       msg = JSON.parse(ev.data);
@@ -402,6 +496,10 @@ function connectWs() {
     const payload = msg?.payload || {};
 
     switch (type) {
+      case "pong":
+        clearTimeout(wsPingTimer);
+        return;
+
       case "toast":
         toast(payload.level || "info", payload.message || "");
         return;
@@ -2922,6 +3020,19 @@ async function main() {
   await loadTheme();
   setupThemeChoices();
   connectWs();
+  // back to the page / network back: check the connection right away instead of waiting for
+  // the browser to notice a dead socket; while visible, check it every 20 seconds
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") checkConnection();
+  });
+  window.addEventListener("online", checkConnection);
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) checkConnection();
+  });
+  window.addEventListener("focus", checkConnection);
+  setInterval(() => {
+    if (document.visibilityState === "visible") checkConnection();
+  }, 20000);
 }
 
 main().catch((e) => {

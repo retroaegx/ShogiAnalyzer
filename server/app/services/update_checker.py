@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import calendar
 import json
 import os
 import re
@@ -27,6 +28,7 @@ VERSION_FILE = ROOT_DIR / "VERSION"
 DEFAULT_REPO = "retroaegx/ShogiAnalyzer"
 DEFAULT_INTERVAL_HOURS = 24.0
 TIMEOUT_SEC = 5.0
+STALE_AFTER_SEC = 3600.0  # re-check on page connect when the last check is older than this
 SEMVER_RE = re.compile(r"^v?(?P<core>\d+(?:\.\d+){0,3})(?:-(?P<pre>[0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$")
 
 
@@ -136,6 +138,7 @@ class UpdateChecker:
         self._thread: threading.Thread | None = None
         self._state = _base_state()
         self._announced: str | None = None
+        self._checking = threading.Event()
 
     def start(self) -> None:
         base = _base_state()
@@ -161,6 +164,28 @@ class UpdateChecker:
     def get_state(self) -> dict[str, Any]:
         with self._lock:
             return dict(self._state)
+
+    def refresh_if_stale(self, max_age_sec: float = STALE_AFTER_SEC) -> dict[str, Any]:
+        """When a page connects: check GitHub again in the background if the last check is older
+        than max_age_sec (so a release made after the server started shows up without waiting
+        for the daily check). Returns the current state with "checking": True while it runs."""
+        state = self.get_state()
+        if not state.get("enabled"):
+            return state
+        checked = _parse_iso(state.get("checked_at"))
+        stale = checked is None or (time.time() - checked) > max_age_sec
+        if stale and not self._checking.is_set():
+            self._checking.set()
+
+            def run() -> None:
+                try:
+                    self.check_now()
+                finally:
+                    self._checking.clear()
+
+            threading.Thread(target=run, name="update-check-on-connect", daemon=True).start()
+        state["checking"] = self._checking.is_set()
+        return state
 
     def check_now(self) -> dict[str, Any]:
         state = {**self.get_state(), **_base_state()}
@@ -222,6 +247,13 @@ class UpdateChecker:
                 return
 
 
+def _parse_iso(value: str | None) -> float | None:
+    try:
+        return calendar.timegm(time.strptime(str(value), "%Y-%m-%dT%H:%M:%SZ"))
+    except (TypeError, ValueError):
+        return None
+
+
 _SERVICE = UpdateChecker()
 
 
@@ -234,7 +266,7 @@ def stop_update_checker() -> None:
 
 
 def get_update_status() -> dict[str, Any]:
-    return _SERVICE.get_state()
+    return _SERVICE.refresh_if_stale()
 
 
 def check_update_now() -> dict[str, Any]:

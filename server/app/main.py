@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import mimetypes
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -13,6 +14,10 @@ from .services.update_checker import start_update_checker, stop_update_checker
 from .services.analysis_service import AnalysisService
 from .services.state_store import RuntimeState, StateStore
 from .ws import SessionHub, router as ws_router
+
+
+# served by StaticFiles; Python does not know this extension on every OS
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 
 def _server_dir() -> Path:
@@ -38,12 +43,14 @@ def create_app() -> FastAPI:
     # other sites use the login cookie)
 
     # pages that must be reachable without logging in (login / first-time password setup)
-    open_paths = {"/login", "/api/login", "/api/auth/status", "/api/auth/setup", "/healthz"}
+    open_paths = {"/login", "/api/login", "/api/auth/status", "/api/auth/setup", "/healthz",
+                  # app install (PWA): the browser fetches these without the login cookie
+                  "/manifest.webmanifest", "/sw.js"}
 
     @app.middleware("http")
     async def _require_login(request, call_next):
         path = request.url.path
-        if not auth.required() or path in open_paths or auth.token_valid(request.cookies.get(auth.COOKIE_NAME)):
+        if not auth.required() or path in open_paths or path.startswith("/icons/") or auth.token_valid(request.cookies.get(auth.COOKIE_NAME)):
             return await call_next(request)
         if path.startswith("/api/"):
             return JSONResponse({"detail": "login required"}, status_code=401)
@@ -64,7 +71,7 @@ def create_app() -> FastAPI:
         path = request.url.path
         if not path.startswith("/api/") and "cache-control" not in response.headers:
             response.headers["Cache-Control"] = (
-                "public, max-age=86400" if path.startswith("/board-theme/images/") else "no-cache"
+                "public, max-age=86400" if path.startswith(("/board-theme/images/", "/icons/")) else "no-cache"
             )
         return response
 

@@ -2075,7 +2075,7 @@ async function refreshExport() {
     const text = await res.text();
     if (!res.ok) throw new Error(text);
     els.exportPreview.value = text;
-    const ext = { kif: "kif", kif2: "ki2", usi: "usi.txt" }[state.exportFormat];
+    const ext = { kif: "kifu", kif2: "ki2u", usi: "usi.txt" }[state.exportFormat]; // UTF-8 KIF / KI2 use .kifu / .ki2u
     const name = `${(state.game.title || "kifu").replace(/[\\/:*?"<>|]/g, "_")}.${ext}`;
     const old = els.exportDownload.href;
     if (old.startsWith("blob:")) URL.revokeObjectURL(old);

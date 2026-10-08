@@ -32,11 +32,12 @@ def detect_format(text: str) -> str:
         return "usi"
     if _is_bare_usi_moves(s):
         return "usi"
-    if "手数----指手" in s:
+    if "手数----指手" in s or lower.startswith("#kif"):
         return "kif"
-    if "▲" in s or "△" in s or "☗" in s or "☖" in s:
+    if lower.startswith("#ki2") or "▲" in s or "△" in s or "☗" in s or "☖" in s:
         return "kif2"
-    if "手合割" in s:
+    # a header-only record: 手合割 or a board diagram (局面図) and no moves yet
+    if "手合割" in s or "+---------------------------+" in s:
         return "kif"
     return "unknown"
 

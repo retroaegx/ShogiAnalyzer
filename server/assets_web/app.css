@@ -1232,6 +1232,8 @@ textarea.field.mono { font-size: 12px; }
 .eng-slider input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--text); border: 4px solid var(--accent); }
 
 .eng-inline { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+.eng-note { font-size: 12px; margin-top: 6px; }
+.eng-inline select.field { width: auto; flex: 0 0 auto; min-width: 9em; }
 
 .eng-table { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 .eng-row {

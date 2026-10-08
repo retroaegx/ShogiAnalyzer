@@ -64,6 +64,9 @@ def _port_in_use(host: str, port: int) -> bool:
     with socket.socket(family, socket.SOCK_STREAM) as s:
         if os.name == "nt":
             s.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        else:
+            # like uvicorn: connections left in TIME_WAIT after a restart must not count as "in use"
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             s.bind((host, port))
         except OSError:

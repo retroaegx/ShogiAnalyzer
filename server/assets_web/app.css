@@ -966,7 +966,13 @@ textarea.field.mono { font-size: 12px; }
 
   .main { display: flex; flex-direction: column; min-height: 0; padding: 3px 4px calc(6px + env(safe-area-inset-bottom)); gap: 6px; }
   /* board first: its size comes from the width (see layoutBoard); the dock below takes the rest */
-  .board-area { flex: none; min-height: 0; gap: 4px; justify-content: flex-start; }
+  .board-area { flex: none; min-height: 0; min-width: 0; width: 100%; gap: 4px; justify-content: flex-start; }
+  /* long analysis text must shrink (ellipsis), never widen the screen */
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .main { min-width: 0; }
+  .navbar { min-width: 0; max-width: 100%; }
+  .mini-eval { overflow: hidden; }
+  .mini-best { flex: 1 1 auto; text-align: right; }
   .board-stage { flex: none; min-height: 0; align-content: start; }
 
   /* board + stands above / below. No eval bar on phones: the score is in the nav strip,
@@ -997,10 +1003,12 @@ textarea.field.mono { font-size: 12px; }
   .stand-label { flex-direction: row; gap: 2px; font-size: 11px; flex: none; padding: 0 7px 0 1px; margin-right: 4px; border-right: 1px solid var(--line); }
   .stand-bottom .stand-label { padding: 0 1px 0 7px; margin: 0 0 0 4px; border-right: 0; border-left: 1px solid var(--line); }
   .stand-label .mark { font-size: 12px; }
-  .stand-pieces { display: flex; flex: 1; min-width: 0; flex-direction: row; height: auto; min-height: 0; padding: 0; gap: 0; background: none; border: 0; box-shadow: none; overflow: hidden; }
+  /* no rounded corners here: with overflow hidden they cut the corners of the end piece */
+  .stand-pieces { display: flex; flex: 1; min-width: 0; flex-direction: row; height: auto; min-height: 0; padding: 0; gap: 0; background: none; border: 0; border-radius: 0; box-shadow: none; overflow: hidden; }
   .stand.to-move .stand-pieces { border: 0; }
   .stand-bottom .stand-pieces { justify-content: flex-end; }
-  .hand-piece { width: calc(var(--cell) * .76); height: calc(var(--cell) * .76); flex: none; }
+  /* fits inside the stand row (row height minus its padding and border): corners are never cut */
+  .hand-piece { width: calc(var(--cell) * .82 - 6px); height: calc(var(--cell) * .82 - 6px); flex: none; }
   .stands-side .hand-piece { width: calc(var(--cell) * .74); height: calc(var(--cell) * .74); }
   .hand-piece .cnt { min-width: 15px; height: 15px; padding: 0 4px; font-size: 10px; right: -1px; bottom: -1px; }
   .stand-empty { display: none; }
@@ -1149,14 +1157,22 @@ textarea.field.mono { font-size: 12px; }
   .graph-wrap { padding: 3px 6px; }
 }
 @media (max-width: 900px) and (max-height: 640px) {
+  /* short screens: everything under the board gets tighter so the board stays large */
   :root { --topbar-h: 42px; }
-  .nav-btn, .kifu-btn, .nav-btn.flip-btn { height: 40px; }
-  .mini-eval { padding: 4px 2px 5px; }
-  .mini-onoff { height: 26px; }
-  .mini-score { font-size: 20px; }
-  .analysis-card .analysis-ctl { padding: 3px 8px 4px; }
-  .seg button { height: 24px; }
-  .btn-batch { height: 26px; }
+  .main { gap: 4px; }
+  .board-area { gap: 3px; }
+  .navbar { padding: 4px 5px 0; gap: 4px; }
+  .nav-btn, .kifu-btn, .nav-btn.flip-btn { height: 34px; }
+  .kifu-btn, .nav-btn.flip-btn { font-size: 9.5px; }
+  .kifu-btn .ico, .nav-btn.flip-btn .ico { width: 16px; height: 16px; }
+  .mini-eval { padding: 3px 2px 4px; }
+  .mini-onoff { height: 24px; }
+  .mini-score { font-size: 19px; }
+  .analysis-card .analysis-ctl { padding: 2px 8px 3px; }
+  .ctl-label { font-size: 11px; }
+  .seg button { height: 22px; }
+  .btn-batch { height: 24px; font-size: 12px; }
+  .graph-wrap { padding: 2px 6px; }
 }
 
 @media (max-width: 380px) {
@@ -1307,7 +1323,8 @@ body {
     var(--bg);
 }
 /* gold waves behind the top of the screen, fading into the background */
-.app { position: relative; isolation: isolate; }
+/* no isolation here: the kifu drawer (inside .app) must stay above its backdrop (outside .app) */
+.app { position: relative; }
 .app::before {
   content: ""; position: absolute; z-index: -1; left: 0; right: 0; top: 0; height: 260px; pointer-events: none;
   background: url("/img/header-waves.webp?v=1") right top / cover no-repeat;
@@ -1361,9 +1378,68 @@ body {
 
 /* analysis summary on phones */
 .mini-eval { border-top-color: var(--line); }
-.mini-onoff { border-color: var(--line-strong); }
+/* phone 解析 ON/OFF: a real button with a small switch inside */
+.mini-onoff {
+  border-radius: 10px; cursor: pointer; /* height / padding stay with the phone size rules */
+  background: linear-gradient(180deg, #1b2335, #0f1520);
+  border: 1px solid rgba(227, 178, 90, .55);
+  box-shadow: inset 0 1px 0 rgba(255, 222, 160, .14), 0 2px 8px rgba(0, 0, 0, .55);
+  color: #f4e3bd;
+  transition: transform .08s, box-shadow .15s, border-color .15s, background .15s;
+}
+.mini-onoff:active { transform: translateY(1px); box-shadow: inset 0 1px 0 rgba(255, 222, 160, .08), 0 1px 3px rgba(0, 0, 0, .5); }
+.mini-onoff i {
+  position: relative; flex: none; width: 26px; height: 15px; border-radius: 8px;
+  background: #2a3244; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .6); animation: none;
+}
+.mini-onoff i::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%;
+  background: #8b93a3; box-shadow: 0 1px 2px rgba(0, 0, 0, .6); transition: transform .18s, background .18s;
+}
+.mini-onoff b { color: var(--muted); }
+.mini-onoff.on {
+  color: #ffe9b8; background: linear-gradient(180deg, #2a2414, #15120a);
+  border-color: var(--accent); box-shadow: inset 0 1px 0 rgba(255, 222, 160, .2), 0 0 14px -3px rgba(227, 178, 90, .7);
+}
+.mini-onoff.on i { background: linear-gradient(180deg, var(--accent-2), var(--accent)); animation: none; }
+.mini-onoff.on i::after { transform: translateX(11px); background: #fff7e2; }
+.mini-onoff.on b { color: var(--accent); }
 .mini-score { text-shadow: 0 0 16px rgba(227, 178, 90, .18); }
 .mini-best { color: #f4e3bd; }
+
+/* kifu: copy as KIF next to the title */
+.kifu-card > .card-head { justify-content: flex-start; }
+.kifu-card > .card-head .card-sub { margin-left: auto; }
+.kifu-copy {
+  flex: none; display: inline-flex; align-items: center; gap: 5px;
+  height: 26px; padding: 0 9px; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(227, 178, 90, .45); background: linear-gradient(180deg, #161d2b, #0e131d);
+  color: #f4e3bd; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; white-space: nowrap;
+}
+.kifu-copy .ico { width: 14px; height: 14px; color: var(--accent); }
+.kifu-copy:hover:not(:disabled) { border-color: var(--accent); }
+.kifu-copy:disabled { opacity: .45; cursor: default; }
+
+/* install suggestion (phones / tablets) */
+.install-card {
+  position: fixed; z-index: 70; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom));
+  max-width: 460px; margin: 0 auto; padding: 14px 14px 12px;
+  display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 10px 12px; align-items: start;
+  background: linear-gradient(180deg, rgba(227, 178, 90, .07), transparent 45%), var(--surface);
+  border: 1px solid var(--accent); border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 222, 160, .12), 0 0 22px -6px rgba(227, 178, 90, .55), 0 24px 50px -14px rgba(0, 0, 0, .9);
+  animation: install-in .3s cubic-bezier(.2, .8, .2, 1);
+}
+.install-card[hidden] { display: none; }
+@keyframes install-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.install-icon { width: 52px; height: 52px; border-radius: 12px; }
+.install-title { font-weight: 800; font-size: 15px; color: #f4e3bd; margin-top: 2px; }
+.install-body { margin-top: 4px; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+.install-body b { color: var(--text); }
+.install-body .share-ico { width: 15px; height: 15px; vertical-align: -3px; color: var(--accent); }
+.install-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
+.install-actions .btn { height: 36px; }
+.install-never { margin-left: auto; border: 0; background: none; color: var(--faint); font-size: 12px; text-decoration: underline; cursor: pointer; }
 
 /* dialogs */
 .dialog { border-color: var(--line-strong); box-shadow: inset 0 1px 0 rgba(255, 222, 160, .08), 0 30px 70px -20px rgba(0, 0, 0, .9); }

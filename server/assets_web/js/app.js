@@ -43,6 +43,14 @@ const THEME_NAMES = {
 
 const LS_OPTS = "shogi_analyzer_view_opts";
 
+// Chrome / Edge (Android) announce that the app can be installed; keep the event for our own button.
+// Registered at load time: the event can fire before the rest of the page is set up.
+let installEvent = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  installEvent = e;
+});
+
 const els = {
   wsStatus: $("wsStatus"),
   engineStatus: $("engineStatus"),
@@ -134,6 +142,7 @@ const els = {
   dropzone: $("dropzone"),
   importFile: $("importFile"),
   pasteBtn: $("pasteBtn"),
+  kifuCopyBtn: $("kifuCopyBtn"),
   dlgPaste: $("dlgPaste"),
   pasteTarget: $("pasteTarget"),
   dlgExport: $("dlgExport"),
@@ -706,17 +715,15 @@ function layoutBoard() {
     const mainH = main.clientHeight - parseFloat(ms.paddingTop) - parseFloat(ms.paddingBottom);
     const gap = parseFloat(ms.rowGap) || 6;
     const ctlH = document.querySelector(".analysis-card")?.offsetHeight || 40;
-    const graphMin = window.innerHeight < 640 ? 52 : 60;
+    // short screens (iPhone SE…): the graph gives way first so the stands can stay above / below
+    const graphMin = window.innerHeight < 640 ? 40 : 60;
     const availW = area.width;
     const availH = mainH - nav - 4 - (ctlH + gap + graphMin + gap);
     const coordPx = coordsOutside ? Math.max(coordMin, Math.min(coordMax, (availW * cellPerBs * coordRatio) / (1 + coordK))) : 0;
-    // (a) stands above / below the board: rows fixed at 0.82 of a square (see app.css)
-    const stacked = Math.min(availW - coordPx, (availH - 8 - coordPx) / (g.natH / g.natW + 2 * cellPerBs * 0.82));
-    // (b) stands beside the board (short screens like iPhone SE): columns one square wide
-    const side = Math.min((availW - coordPx - 2 * (12 + 6)) / (1 + 2 * cellPerBs), availH - coordPx - 4);
-    const useSide = side > stacked + 4;
-    els.boardStage.classList.toggle("stands-side", useSide);
-    bs = useSide ? side : stacked;
+    // stands always above / below the board (rows fixed at 0.82 of a square, see app.css):
+    // beside the board they were too narrow to tap and could not show many captured pieces
+    els.boardStage.classList.remove("stands-side");
+    bs = Math.min(availW - coordPx, (availH - 8 - coordPx) / (g.natH / g.natW + 2 * cellPerBs * 0.82));
   } else {
     els.boardStage.classList.remove("stands-side");
     const standK = cellPerBs * 1.9; // matches --stand-w (fixed 2-column stands)
@@ -1600,7 +1607,9 @@ function renderEvalGraph() {
   const lim = clamp(Math.ceil(peak / 500) * 500, 1000, 3000);
 
   // text and margins follow the graph's size
-  const fs = clamp(Math.round(H * 0.08), 9, 12);
+  // very low graphs (short phones): only ±max and 0, no 先手/後手 captions, so nothing overlaps
+  const compact = H < 56;
+  const fs = compact ? 8 : clamp(Math.round(H * 0.08), 9, 12);
   const font = `${fs}px system-ui, sans-serif`;
   ctx.font = font;
   const fmt = (v) => (v > 0 ? `+${v}` : `${v}`);
@@ -1621,7 +1630,7 @@ function renderEvalGraph() {
   ctx.lineWidth = 1;
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
-  for (const v of [lim, lim / 2, 0, -lim / 2, -lim]) {
+  for (const v of compact ? [lim, 0, -lim] : [lim, lim / 2, 0, -lim / 2, -lim]) {
     const gy = Math.round(y(v)) + 0.5;
     ctx.strokeStyle = v === 0 ? "rgba(227,178,90,0.32)" : "rgba(227,178,90,0.11)";
     ctx.beginPath();
@@ -1694,10 +1703,12 @@ function renderEvalGraph() {
   ctx.fillStyle = "rgba(154,161,173,0.75)";
   ctx.font = font;
   ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  ctx.fillText("☗先手", x0 + 4, padY + 2);
-  ctx.textBaseline = "bottom";
-  ctx.fillText("☖後手", x0 + 4, yBottom - 2);
+  if (!compact) {
+    ctx.textBaseline = "top";
+    ctx.fillText("☗先手", x0 + 4, padY + 2);
+    ctx.textBaseline = "bottom";
+    ctx.fillText("☖後手", x0 + 4, yBottom - 2);
+  }
   if (showAxis) {
     // 0, 10, 20 … plies (step grows for long games)
     const step = n <= 60 ? 10 : n <= 150 ? 20 : 50;
@@ -1756,7 +1767,7 @@ function renderMoveList() {
   });
   updateMoveEvals();
   keepCurrentMoveVisible();
-  els.kifuSub.textContent = `${Math.max(line.length - 1, 0)}手 · ${state.game?.updated_at ? fmtDate(state.game.updated_at) : ""}`;
+  els.kifuSub.textContent = `${Math.max(line.length - 1, 0)}手`;
 }
 
 // Scroll only the list (scrollIntoView would also scroll the page on mobile).
@@ -1876,7 +1887,6 @@ function renderAll() {
   renderControls();
   renderAnalysis();
   renderEvalGraph();
-  document.title = `${state.game.title || "棋譜"} — Shogi Analyzer`;
 }
 
 // ---------- navigation ----------
@@ -1986,6 +1996,41 @@ async function importText(text, { source = "file", filename = "" } = {}) {
   } catch (e) {
     toast("error", `読み込みに失敗しました: ${e.message || e}`);
     return false;
+  }
+}
+
+/** Copy the current kifu as KIF text. The fetch is handed to the clipboard as a promise so the
+ * copy still counts as part of the tap (Safari drops it after an await otherwise). */
+async function copyKifuAsKif() {
+  const id = state.game?.game_id;
+  if (!id) return;
+  const text = fetch(`/api/export/${encodeURIComponent(id)}?format=kif`, { cache: "no-store" }).then(async (r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.text();
+  });
+  try {
+    if (window.ClipboardItem && navigator.clipboard?.write) {
+      await navigator.clipboard.write([new ClipboardItem({ "text/plain": text.then((t) => new Blob([t], { type: "text/plain" })) })]);
+    } else if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(await text);
+    } else {
+      throw new Error("no clipboard");
+    }
+    toast("info", "棋譜を KIF 形式でコピーしました");
+  } catch {
+    // http on the LAN etc.: classic copy through a hidden text area
+    try {
+      const ta = el("textarea");
+      ta.value = await text;
+      ta.style.cssText = "position:fixed;left:-9999px;top:0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      toast(ok ? "info" : "error", ok ? "棋譜を KIF 形式でコピーしました" : "コピーできませんでした（「書出」からコピーしてください）");
+    } catch (e) {
+      toast("error", `コピーできませんでした: ${e.message || e}`);
+    }
   }
 }
 
@@ -2521,6 +2566,7 @@ function wire() {
   els.openBtn.addEventListener("click", openGameList);
   els.importBtn.addEventListener("click", () => showDialog(els.dlgImport));
   els.pasteBtn.addEventListener("click", pasteFromClipboard);
+  els.kifuCopyBtn.addEventListener("click", copyKifuAsKif);
   els.pasteTarget.addEventListener("paste", async (e) => {
     e.preventDefault();
     const text = e.clipboardData?.getData("text/plain") || "";
@@ -2786,6 +2832,63 @@ async function setupUpdateNotice() {
   setInterval(load, 60 * 60 * 1000);
 }
 
+// ---------- "add to home screen" suggestion (phones / tablets only) ----------
+const LS_INSTALL = "shogi_analyzer_install_prompt"; // "never" or the time (ms) until which it stays hidden
+const SHARE_ICON = '<svg class="share-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11v9h12v-9"/></svg>';
+
+function installHelp() {
+  const ua = navigator.userAgent;
+  const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const android = /Android/.test(ua);
+  if (ios) {
+    if (/CriOS/.test(ua)) return `アドレスバー右の <b>共有ボタン</b> ${SHARE_ICON} →「<b>ホーム画面に追加</b>」で、アイコンからアプリのように開けます。`;
+    if (/FxiOS|EdgiOS/.test(ua)) return `メニューの <b>共有</b> ${SHARE_ICON} →「<b>ホーム画面に追加</b>」で、アイコンからアプリのように開けます。`;
+    return `<b>共有ボタン</b> ${SHARE_ICON}（「…」の中にある場合も）→「<b>ホーム画面に追加</b>」で、アイコンからアプリのように開けます。`;
+  }
+  if (android && /Firefox/.test(ua)) return "メニュー <b>⋮</b> →「<b>インストール</b>」（または「ホーム画面に追加」）で、アイコンからアプリのように開けます。";
+  return null; // Android Chrome / Edge: handled with the install button
+}
+
+function setupInstallSuggestion() {
+  const card = $("installCard");
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const phoneLike = window.matchMedia("(pointer: coarse)").matches && /Android|iPhone|iPad|iPod/.test(navigator.userAgent + (navigator.maxTouchPoints > 1 ? " iPad" : ""));
+  const saved = lsGet(LS_INSTALL);
+  if (standalone || !phoneLike || !window.isSecureContext || saved === "never" || Number(saved) > Date.now()) return;
+  const hide = () => (card.hidden = true);
+  $("installLater").addEventListener("click", () => {
+    lsSet(LS_INSTALL, String(Date.now() + 14 * 24 * 3600 * 1000));
+    hide();
+  });
+  $("installNever").addEventListener("click", () => {
+    lsSet(LS_INSTALL, "never");
+    hide();
+  });
+  $("installGo").addEventListener("click", async () => {
+    if (!installEvent) return hide();
+    installEvent.prompt();
+    const choice = await installEvent.userChoice.catch(() => null);
+    installEvent = null;
+    if (choice?.outcome !== "accepted") lsSet(LS_INSTALL, String(Date.now() + 14 * 24 * 3600 * 1000));
+    hide();
+  });
+  window.addEventListener("appinstalled", hide);
+  // a few seconds after opening, so it does not get in the way right away; never on top of a dialog
+  const show = () => {
+    if (openDialogEl) return void setTimeout(show, 3000);
+    if (installEvent) {
+      $("installBody").textContent = "ホーム画面に追加すると、アイコンからアプリのように開けます。";
+      $("installGo").hidden = false;
+    } else {
+      const help = installHelp();
+      if (!help) return; // the browser does not offer installing (yet): say nothing
+      $("installBody").innerHTML = help;
+    }
+    card.hidden = false;
+  };
+  setTimeout(show, 6000);
+}
+
 async function setupLogout() {
   try {
     const st = await fetch("/api/auth/status", { cache: "no-store" }).then((r) => r.json());
@@ -2812,6 +2915,7 @@ async function main() {
   setupUpdateNotice();
   // installable as an app (PWA): needs https (public address) or localhost
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+  setupInstallSuggestion();
   await loadTheme();
   setupThemeChoices();
   connectWs();

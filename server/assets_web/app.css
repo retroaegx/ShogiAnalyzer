@@ -326,6 +326,18 @@ button:disabled { cursor: not-allowed; opacity: 0.4; }
 .coords-ranks { grid-column: 2; grid-row: 2; grid-auto-flow: row; margin-top: var(--rt); height: var(--rh); font-family: var(--font-jp); }
 .board-frame.no-coords { grid-template-columns: var(--bs) 0; grid-template-rows: 0 var(--bs); }
 .board-frame.no-coords .coords { visibility: hidden; }
+/* coordinates on the board's own frame (default): no band outside, so the board gets that space.
+   Centered in the frame margin; where the margin is narrower than the text they reach a little
+   into the outer squares, kept readable by an outline. */
+.board-frame.coords-overlay { position: relative; grid-template-columns: var(--bs) 0; grid-template-rows: 0 var(--bs); }
+.coords-overlay .coords {
+  position: absolute; z-index: 3; margin: 0; pointer-events: none;
+  font-size: var(--cov-font, 11px); font-weight: 700; color: rgba(255, 255, 255, .95);
+  text-shadow: 0 0 2px rgba(0, 0, 0, .95), 0 0 3px rgba(0, 0, 0, .85), 0 1px 2px rgba(0, 0, 0, .9);
+}
+.coords-overlay .coords-files { top: 0; left: var(--rl); width: var(--rw); height: var(--cov-y, var(--rt)); }
+.coords-overlay .coords-ranks { right: 0; top: var(--rt); height: var(--rh); width: var(--cov-x, 14px); font-family: var(--font); font-weight: 800; }
+.opt-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 4px 0 8px; font-size: 14px; }
 
 .board {
   grid-column: 1; grid-row: 2;

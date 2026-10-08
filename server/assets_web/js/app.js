@@ -706,12 +706,12 @@ function layoutBoard() {
     const mainH = main.clientHeight - parseFloat(ms.paddingTop) - parseFloat(ms.paddingBottom);
     const gap = parseFloat(ms.rowGap) || 6;
     const ctlH = document.querySelector(".analysis-card")?.offsetHeight || 40;
-    const graphMin = window.innerHeight < 640 ? 52 : 72;
+    const graphMin = window.innerHeight < 640 ? 52 : 60;
     const availW = area.width;
     const availH = mainH - nav - 4 - (ctlH + gap + graphMin + gap);
     const coordPx = coordsOutside ? Math.max(coordMin, Math.min(coordMax, (availW * cellPerBs * coordRatio) / (1 + coordK))) : 0;
-    // (a) stands above / below the board: rows fixed at 0.7 of a square (see app.css)
-    const stacked = Math.min(availW - coordPx, (availH - 8 - coordPx) / (g.natH / g.natW + 2 * cellPerBs * 0.7));
+    // (a) stands above / below the board: rows fixed at 0.82 of a square (see app.css)
+    const stacked = Math.min(availW - coordPx, (availH - 8 - coordPx) / (g.natH / g.natW + 2 * cellPerBs * 0.82));
     // (b) stands beside the board (short screens like iPhone SE): columns one square wide
     const side = Math.min((availW - coordPx - 2 * (12 + 6)) / (1 + 2 * cellPerBs), availH - coordPx - 4);
     const useSide = side > stacked + 4;
@@ -1610,8 +1610,8 @@ function renderEvalGraph() {
   const x1 = W - 6;
   const x = (i) => x0 + (i / n) * (x1 - x0);
   // move-number axis under the plot when there is room for it
-  const axisH = H >= 90 ? fs + 6 : 0;
-  const yBottom = H - padY - axisH;
+  const showAxis = H >= 56;
+  const yBottom = H - padY;
   const y = (cp) => padY + ((lim - clamp(cp, -lim, lim)) / (2 * lim)) * (yBottom - padY);
   graphGeom = { n, x0, x1 };
 
@@ -1698,13 +1698,14 @@ function renderEvalGraph() {
   ctx.fillText("☗先手", x0 + 4, padY + 2);
   ctx.textBaseline = "bottom";
   ctx.fillText("☖後手", x0 + 4, yBottom - 2);
-  if (axisH) {
+  if (showAxis) {
     // 0, 10, 20 … plies (step grows for long games)
     const step = n <= 60 ? 10 : n <= 150 ? 20 : 50;
     ctx.textBaseline = "bottom";
     ctx.textAlign = "center";
-    ctx.fillStyle = "rgba(154,161,173,0.75)";
-    for (let i = 0; i <= n; i += step) ctx.fillText(String(i), clamp(x(i), x0 + 6, x1 - 6), H - 1);
+    ctx.fillStyle = "rgba(154,161,173,0.7)";
+    ctx.font = `${Math.max(8, fs - 2)}px system-ui, sans-serif`;
+    for (let i = step; i <= n; i += step) ctx.fillText(String(i), clamp(x(i), x0 + 8, x1 - 8), H);
   }
   ctx.textBaseline = "alphabetic";
 }

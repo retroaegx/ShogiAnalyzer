@@ -11,6 +11,8 @@ from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from . import auth
+from .core.legality import check_move
+from .core.sfen_ops import SfenError
 
 
 router = APIRouter()
@@ -294,12 +296,17 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
             return
 
         def _play(g):
+            # moves from the board must be legal; an illegal position must never be analyzed
+            check_move(g.get_node(from_node_id).position_sfen, move_usi)
             g.play_move(from_node_id, move_usi)
 
         try:
             await runtime.mutate(_play)
             await _send_state(ws)
             analysis.schedule_sync(_sync_analysis_to_current_game)
+        except SfenError as exc:
+            await ws_send(ws, "toast", {"level": "error", "message": f"指せない手です: {exc}"})
+            await _send_state(ws)
         except Exception as exc:
             await ws_send(ws, "toast", {"level": "error", "message": f"play_move failed: {exc}"})
         return

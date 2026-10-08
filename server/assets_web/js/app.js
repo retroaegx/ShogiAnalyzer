@@ -8,8 +8,8 @@ import {
   RANK_LABEL,
   canPromote,
   formatScore,
-  getDropMoves,
-  getPossibleMoves,
+  legalDrops,
+  legalMovesFrom,
   kifMove,
   kifPv,
   moveTarget,
@@ -1234,7 +1234,7 @@ function selectBoard(row, col) {
   const p = state.parsed?.board?.[row]?.[col];
   if (!p || !state.isOwner || p.owner !== state.parsed.currentPlayer) return false;
   state.selection = { kind: "board", owner: p.owner, pieceType: p.piece, fromRow: row, fromCol: col };
-  state.legal = getPossibleMoves(state.parsed.board, row, col, p);
+  state.legal = legalMovesFrom(state.parsed.board, row, col, p);
   applyHighlights();
   return true;
 }
@@ -1242,7 +1242,7 @@ function selectBoard(row, col) {
 function selectHand(owner, type) {
   if (!state.isOwner || owner !== state.parsed?.currentPlayer) return false;
   state.selection = { kind: "hand", owner, pieceType: type };
-  state.legal = getDropMoves(state.parsed.board, type, owner);
+  state.legal = legalDrops(state.parsed.board, type, owner);
   applyHighlights();
   for (const b of document.querySelectorAll(".hand-piece")) {
     b.classList.toggle("selected", b.dataset.owner === owner && b.dataset.type === type);

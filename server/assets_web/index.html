@@ -42,6 +42,7 @@
     <symbol id="i-logout" viewBox="0 0 24 24"><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5M15 8l4 4-4 4M19 12H9"/></symbol>
     <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2"/><circle cx="4.5" cy="12" r="1.2"/><circle cx="4.5" cy="18" r="1.2"/></symbol>
     <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/></symbol>
     <symbol id="i-paste" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 4.5V3.5h6v1M9 4.5h6v2.5H9z"/><path d="M9 12h6M9 16h4"/></symbol>
     <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
     <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-4 3 3 6-6"/></symbol>
@@ -187,7 +188,6 @@
         <section class="card graph-card">
           <header class="card-head">
             <h2>評価値の推移</h2>
-            <span class="card-sub">先手から見た評価値 · ±3000 で頭打ち</span>
           </header>
           <div class="graph-wrap"><canvas id="evalGraph" class="graph"></canvas></div>
         </section>
@@ -197,6 +197,7 @@
         <section class="card kifu-card" id="kifuCard" aria-label="棋譜">
           <header class="card-head">
             <h2>棋譜</h2>
+            <button id="kifuCopyBtn" class="kifu-copy" type="button" title="棋譜を KIF 形式でクリップボードにコピー" aria-label="棋譜を KIF 形式でコピー"><svg class="ico"><use href="#i-copy"/></svg><span>KIFコピー</span></button>
             <span class="card-sub" id="kifuSub"></span>
             <button id="kifuDrawerClose" class="icon-btn drawer-close" type="button" aria-label="棋譜を閉じる"><svg class="ico"><use href="#i-close"/></svg></button>
           </header>
@@ -361,6 +362,20 @@
 
   <!-- phone: backdrop behind the kifu drawer -->
   <div class="drawer-backdrop" id="kifuBackdrop" hidden></div>
+
+  <!-- phones / tablets only, when not opened as an installed app -->
+  <div class="install-card" id="installCard" role="dialog" aria-labelledby="installTitle" hidden>
+    <img class="install-icon" src="/icons/icon-192.png?v=2" alt="">
+    <div class="install-text">
+      <div class="install-title" id="installTitle">アプリとして追加しませんか？</div>
+      <div class="install-body" id="installBody"></div>
+    </div>
+    <div class="install-actions">
+      <button class="btn primary" type="button" id="installGo" hidden>インストール</button>
+      <button class="btn" type="button" id="installLater">あとで</button>
+      <button class="install-never" type="button" id="installNever">今後表示しない</button>
+    </div>
+  </div>
 
   <!-- shown while the WebSocket is down -->
   <div class="conn-overlay" id="connOverlay" role="alertdialog" aria-live="assertive" hidden>

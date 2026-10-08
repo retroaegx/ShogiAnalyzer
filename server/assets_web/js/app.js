@@ -730,11 +730,12 @@ function layoutBoard() {
   const cell = (g.rw * scale) / 9;
   const coord = coordsOutside ? Math.round(clamp(cell * coordRatio, coordMin, coordMax)) : 0;
   // overlay: font from the square size; strips at least as wide as the text
-  const covFont = Math.round(clamp(cell * 0.24, 9, 15));
+  const covFont = Math.round(clamp(cell * 0.22, 9, 14));
   const rightMargin = bs - (g.rx + g.rw) * scale;
   root.style.setProperty("--cov-font", `${covFont}px`);
-  root.style.setProperty("--cov-x", `${Math.max(rightMargin, covFont * 1.25)}px`);
-  root.style.setProperty("--cov-y", `${Math.max(g.ry * scale, covFont * 1.2)}px`);
+  // strips a little narrower than the frame margin: the text sits slightly toward the outer edge
+  root.style.setProperty("--cov-x", `${Math.max(rightMargin * 0.84, covFont * 1.1)}px`);
+  root.style.setProperty("--cov-y", `${Math.max(g.ry * scale * 0.84, covFont * 1.05)}px`);
   root.style.setProperty("--bs", `${bs}px`);
   root.style.setProperty("--cell", `${cell}px`);
   root.style.setProperty("--coord", `${coord}px`);

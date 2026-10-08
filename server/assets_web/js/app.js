@@ -2775,6 +2775,8 @@ async function main() {
   wire();
   setupLogout();
   setupUpdateNotice();
+  // installable as an app (PWA): needs https (public address) or localhost
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
   await loadTheme();
   setupThemeChoices();
   connectWs();

@@ -366,6 +366,36 @@ async def export_game(request: Request, game_id: str, format: str = Query(defaul
     return resp
 
 
+# Display options, board / piece set and the 全解析 time per position: kept on the server so every
+# browser and device shows the same (the browser keeps only a copy for a fast first paint).
+_SETTING_KEYS = {"view": dict, "batch_seconds": (int, float), "board_set": str, "piece_set": str}
+
+
+@router.get("/api/settings")
+async def get_settings(request: Request):
+    settings = _store(request).get_ui_settings()
+    return {"settings": settings or {}, "exists": settings is not None}
+
+
+@router.put("/api/settings")
+async def put_settings(request: Request):
+    data = await _read_json_or_empty(request)
+    patch = data.get("settings")
+    if not isinstance(patch, dict):
+        raise HTTPException(status_code=400, detail="settings must be an object")
+    store = _store(request)
+    settings = dict(store.get_ui_settings() or {})
+    for key, value in patch.items():
+        kind = _SETTING_KEYS.get(key)
+        if kind is None or isinstance(value, bool) or not isinstance(value, kind):
+            continue  # unknown key / wrong type: ignored
+        if key == "batch_seconds":
+            value = max(0.5, min(120.0, float(value)))
+        settings[key] = value
+    store.set_ui_settings(settings)
+    return {"settings": settings, "exists": True}
+
+
 @router.get("/api/current")
 async def current_game_state(request: Request):
     return {"game": await _runtime(request).current_game_wire()}

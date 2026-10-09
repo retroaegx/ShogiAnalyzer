@@ -271,13 +271,17 @@ function loadOpts() {
   try {
     const raw = JSON.parse(lsGet(LS_OPTS) || "{}");
     Object.assign(state.opts, raw || {});
-    // coordinates used to be on/off: on -> the new default (on the board frame), off -> hidden
-    if (state.opts.coords === true) state.opts.coords = "overlay";
-    if (state.opts.coords === false) state.opts.coords = "off";
-    if (!["overlay", "outside", "off"].includes(state.opts.coords)) state.opts.coords = "overlay";
   } catch {
     // ignore
   }
+  normalizeOpts();
+}
+
+function normalizeOpts() {
+  // coordinates used to be on/off: on -> the new default (on the board frame), off -> hidden
+  if (state.opts.coords === true) state.opts.coords = "overlay";
+  if (state.opts.coords === false) state.opts.coords = "off";
+  if (!["overlay", "outside", "off"].includes(state.opts.coords)) state.opts.coords = "overlay";
 }
 
 function fmtNum(n) {
@@ -553,6 +557,7 @@ function connectWs() {
         state.batch = state.engine?.batch || null;
         if (state.engine?.last_error) toast("error", String(state.engine.last_error));
         setGame(payload.game || null);
+        syncSettingsFromServer();
         return;
       }
 
@@ -2375,6 +2380,7 @@ async function setupThemeChoices() {
       b.append(th, el("span", null, THEME_NAMES[s.displayName] || s.name));
       b.addEventListener("click", async () => {
         lsSet(THEME_LS_KEYS.backgroundSet, s.name);
+        pushSettings({ board_set: s.name });
         await loadTheme();
         draw();
         renderAll();
@@ -2397,6 +2403,7 @@ async function setupThemeChoices() {
       b.append(th, el("span", null, THEME_NAMES[s.displayName] || s.name));
       b.addEventListener("click", async () => {
         lsSet(THEME_LS_KEYS.pieceSet, s.name);
+        pushSettings({ piece_set: s.name });
         await loadTheme();
         draw();
         renderAll();
@@ -2618,7 +2625,10 @@ function renderEngineForm(useDefaults) {
 
 async function saveEngineSettings() {
   const secs = Number(els.batchSeconds.value);
-  if (Number.isFinite(secs) && secs >= 0.5) lsSet(LS_BATCH_SECONDS, String(clamp(secs, 0.5, 120)));
+  if (Number.isFinite(secs) && secs >= 0.5) {
+    lsSet(LS_BATCH_SECONDS, String(clamp(secs, 0.5, 120)));
+    pushSettings({ batch_seconds: clamp(secs, 0.5, 120) });
+  }
   const values = {};
   for (const [name, get] of engineInputs) values[name] = get();
   els.engineSave.disabled = true;
@@ -2719,6 +2729,101 @@ function showConnRestored() {
 
 function saveOpts() {
   lsSet(LS_OPTS, JSON.stringify(state.opts));
+  pushSettings({ view: { ...state.opts } });
+}
+
+// ---------- settings kept on the server ----------
+// Display options, board / piece set and the 全解析 time live on the server, so every browser and
+// device shows the same. localStorage keeps a copy only for the first paint before the fetch.
+let serverSettingsJson = "";
+let settingsPending = {};
+let settingsTimer = null;
+
+function currentSettings() {
+  const out = { view: { ...state.opts }, batch_seconds: batchSeconds() };
+  const board = lsGet(THEME_LS_KEYS.backgroundSet);
+  const pieces = lsGet(THEME_LS_KEYS.pieceSet);
+  if (board) out.board_set = board;
+  if (pieces) out.piece_set = pieces;
+  return out;
+}
+
+/** This browser has settings of its own (not just the defaults). */
+function hasLocalSettings() {
+  return [LS_OPTS, LS_BATCH_SECONDS, THEME_LS_KEYS.backgroundSet, THEME_LS_KEYS.pieceSet].some((k) => lsGet(k));
+}
+
+function pushSettings(patch) {
+  Object.assign(settingsPending, patch);
+  clearTimeout(settingsTimer);
+  settingsTimer = setTimeout(async () => {
+    const body = settingsPending;
+    settingsPending = {};
+    try {
+      const res = await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ settings: body }) });
+      if (res.ok) serverSettingsJson = JSON.stringify((await res.json()).settings || {});
+    } catch {
+      // offline: the change stays in this browser and is sent with the next one
+      Object.assign(settingsPending, body);
+    }
+  }, 250);
+}
+
+/** Take the server's settings into this page. Returns true when something changed. */
+function applySettings(s) {
+  const before = JSON.stringify(currentSettings());
+  if (s.view && typeof s.view === "object") {
+    Object.assign(state.opts, s.view);
+    normalizeOpts();
+    lsSet(LS_OPTS, JSON.stringify(state.opts));
+  }
+  if (Number(s.batch_seconds) >= 0.5) lsSet(LS_BATCH_SECONDS, String(s.batch_seconds));
+  if (s.board_set) lsSet(THEME_LS_KEYS.backgroundSet, s.board_set);
+  if (s.piece_set) lsSet(THEME_LS_KEYS.pieceSet, s.piece_set);
+  return JSON.stringify(currentSettings()) !== before;
+}
+
+/** Read the shared settings. The very first time (nothing stored yet) this browser's become the shared ones. */
+async function fetchServerSettings() {
+  try {
+    const res = await fetch("/api/settings", { cache: "no-store" });
+    if (!res.ok) return false;
+    const json = await res.json();
+    if (!json.exists) {
+      // nothing shared yet: a browser with its own settings (e.g. the one used so far) provides them
+      if (hasLocalSettings()) pushSettings(currentSettings());
+      return false;
+    }
+    const text = JSON.stringify(json.settings || {});
+    if (text === serverSettingsJson) return false;
+    serverSettingsJson = text;
+    return applySettings(json.settings || {});
+  } catch {
+    return false; // server unreachable: keep this browser's copy
+  }
+}
+
+/** After a reconnect: pick up changes made on another device. */
+async function syncSettingsFromServer() {
+  if (!(await fetchServerSettings())) return;
+  syncOptControls();
+  await loadTheme();
+  setupThemeChoices();
+  layoutBoard();
+  renderAll();
+}
+
+/** Settings dialog controls show state.opts. */
+function syncOptControls() {
+  for (const b of els.optCoordsSeg.querySelectorAll("button[data-v]")) {
+    b.classList.toggle("on", b.dataset.v === state.opts.coords);
+    b.setAttribute("aria-checked", String(b.dataset.v === state.opts.coords));
+  }
+  els.optEvalBar.checked = state.opts.evalBar;
+  els.optLegal.checked = state.opts.legal;
+  for (const [key, id] of [["lastMove", "optLastMove"], ["bestMove", "optBestMove"], ["nextMove", "optNextMove"], ["arrowLabels", "optArrowLabels"]]) {
+    $(id).checked = state.opts[key];
+  }
 }
 
 // ---------- wiring ----------
@@ -3192,6 +3297,7 @@ async function setupLogout() {
 
 async function main() {
   loadOpts();
+  await fetchServerSettings();
   ensureSquares();
   renderCoords();
   wire();
@@ -3200,7 +3306,13 @@ async function main() {
   // installable as an app (PWA): needs https (public address) or localhost
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
   setupInstallSuggestion();
+  const themeBefore = [lsGet(THEME_LS_KEYS.backgroundSet), lsGet(THEME_LS_KEYS.pieceSet)].join();
   await loadTheme();
+  // a removed / renamed board or piece set was replaced: share the replacement too
+  if ([lsGet(THEME_LS_KEYS.backgroundSet), lsGet(THEME_LS_KEYS.pieceSet)].join() !== themeBefore) {
+    const { board_set, piece_set } = currentSettings();
+    pushSettings({ board_set, piece_set });
+  }
   setupThemeChoices();
   connectWs();
   // back to the page / network back: check the connection right away instead of waiting for

@@ -194,6 +194,24 @@ class StateStore:
             return None
         return value if isinstance(value, str) and value else None
 
+    # ---------- UI settings shared by every browser / device ----------
+    def get_ui_settings(self) -> dict | None:
+        """None until some browser has stored its settings for the first time."""
+        row = self._conn.execute("SELECT value_json FROM app_state WHERE key = 'ui_settings'").fetchone()
+        if not row:
+            return None
+        return _loads_dict(row["value_json"])
+
+    def set_ui_settings(self, settings: dict) -> None:
+        with self._conn:
+            self._conn.execute(
+                """
+                INSERT INTO app_state(key, value_json) VALUES ('ui_settings', ?)
+                ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json
+                """,
+                (_dumps(settings),),
+            )
+
     def set_last_game_id(self, game_id: str | None) -> None:
         value_json = json.dumps(game_id)
         with self._conn:

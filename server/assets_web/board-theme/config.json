@@ -1,57 +1,6 @@
 {
   "background_sets": [
     {
-      "name": "kaya",
-      "displayName": "theme.bg.wood",
-      "background": "/board-theme/images/boards/kaya.webp",
-      "coordinates": {
-        "color": "#000000",
-        "position": "outside"
-      },
-      "grid": {
-        "show": false
-      },
-      "board_region": {
-        "start": {
-          "x": 32,
-          "y": 28
-        },
-        "end": {
-          "x": 1222,
-          "y": 1223
-        }
-      },
-      "sample": {
-        "image": "/board-theme/images/boards/kaya.webp"
-      },
-      "grid_lines": {
-        "x": [
-          32,
-          165,
-          303,
-          432,
-          565,
-          692,
-          826,
-          959,
-          1092,
-          1222
-        ],
-        "y": [
-          28,
-          157,
-          289,
-          423,
-          556,
-          692,
-          824,
-          957,
-          1091,
-          1223
-        ]
-      }
-    },
-    {
       "name": "kaya_sansui",
       "displayName": "theme.bg.sansui",
       "background": "/board-theme/images/boards/kaya_sansui.webp",
@@ -98,6 +47,57 @@
           824,
           955,
           1090,
+          1223
+        ]
+      }
+    },
+    {
+      "name": "kaya",
+      "displayName": "theme.bg.wood",
+      "background": "/board-theme/images/boards/kaya.webp",
+      "coordinates": {
+        "color": "#000000",
+        "position": "outside"
+      },
+      "grid": {
+        "show": false
+      },
+      "board_region": {
+        "start": {
+          "x": 32,
+          "y": 28
+        },
+        "end": {
+          "x": 1222,
+          "y": 1223
+        }
+      },
+      "sample": {
+        "image": "/board-theme/images/boards/kaya.webp"
+      },
+      "grid_lines": {
+        "x": [
+          32,
+          165,
+          303,
+          432,
+          565,
+          692,
+          826,
+          959,
+          1092,
+          1222
+        ],
+        "y": [
+          28,
+          157,
+          289,
+          423,
+          556,
+          692,
+          824,
+          957,
+          1091,
           1223
         ]
       }
@@ -219,6 +219,38 @@
   ],
   "piece_sets": [
     {
+      "name": "mokume",
+      "displayName": "theme.piece.mokume",
+      "pieces": {
+        "king": "/board-theme/images/pieces/mokume/king.webp",
+        "rook": "/board-theme/images/pieces/mokume/rook.webp",
+        "bishop": "/board-theme/images/pieces/mokume/bishop.webp",
+        "gold": "/board-theme/images/pieces/mokume/gold.webp",
+        "silver": "/board-theme/images/pieces/mokume/silver.webp",
+        "knight": "/board-theme/images/pieces/mokume/knight.webp",
+        "lance": "/board-theme/images/pieces/mokume/lance.webp",
+        "pawn": "/board-theme/images/pieces/mokume/pawn.webp",
+        "dragon": "/board-theme/images/pieces/mokume/dragon.webp",
+        "horse": "/board-theme/images/pieces/mokume/horse.webp",
+        "promoted_silver": "/board-theme/images/pieces/mokume/promoted_silver.webp",
+        "promoted_knight": "/board-theme/images/pieces/mokume/promoted_knight.webp",
+        "promoted_lance": "/board-theme/images/pieces/mokume/promoted_lance.webp",
+        "promoted_pawn": "/board-theme/images/pieces/mokume/promoted_pawn.webp"
+      },
+      "sample": {
+        "pieces": [
+          "king",
+          "rook",
+          "bishop",
+          "gold",
+          "silver",
+          "knight",
+          "lance",
+          "pawn"
+        ]
+      }
+    },
+    {
       "name": "tsuge",
       "displayName": "theme.piece.tsuge",
       "pieces": {
@@ -241,38 +273,6 @@
         "gote": {
           "king": "/board-theme/images/pieces/tsuge/king_gote.webp"
         }
-      },
-      "sample": {
-        "pieces": [
-          "king",
-          "rook",
-          "bishop",
-          "gold",
-          "silver",
-          "knight",
-          "lance",
-          "pawn"
-        ]
-      }
-    },
-    {
-      "name": "mokume",
-      "displayName": "theme.piece.mokume",
-      "pieces": {
-        "king": "/board-theme/images/pieces/mokume/king.webp",
-        "rook": "/board-theme/images/pieces/mokume/rook.webp",
-        "bishop": "/board-theme/images/pieces/mokume/bishop.webp",
-        "gold": "/board-theme/images/pieces/mokume/gold.webp",
-        "silver": "/board-theme/images/pieces/mokume/silver.webp",
-        "knight": "/board-theme/images/pieces/mokume/knight.webp",
-        "lance": "/board-theme/images/pieces/mokume/lance.webp",
-        "pawn": "/board-theme/images/pieces/mokume/pawn.webp",
-        "dragon": "/board-theme/images/pieces/mokume/dragon.webp",
-        "horse": "/board-theme/images/pieces/mokume/horse.webp",
-        "promoted_silver": "/board-theme/images/pieces/mokume/promoted_silver.webp",
-        "promoted_knight": "/board-theme/images/pieces/mokume/promoted_knight.webp",
-        "promoted_lance": "/board-theme/images/pieces/mokume/promoted_lance.webp",
-        "promoted_pawn": "/board-theme/images/pieces/mokume/promoted_pawn.webp"
       },
       "sample": {
         "pieces": [

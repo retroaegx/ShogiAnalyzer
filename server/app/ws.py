@@ -141,7 +141,7 @@ async def _send_granted(ws: WebSocket) -> None:
     token = await hub.owner_token(ws)
     session_id = await hub.session_id(ws)
     game = await runtime.current_game()
-    game_wire = game.to_wire()
+    game_wire = await runtime.current_game_wire()
     capability_notes = []
     if not analysis.is_available():
         capability_notes.append(
@@ -201,6 +201,7 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
         "game:import_text",
         "node:jump",
         "node:play_move",
+        "node:delete",
         "node:reorder_children",
         "analysis:set_multipv",
     }:
@@ -225,6 +226,24 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
             analysis.schedule_sync(_sync_analysis_to_current_game)
         except KeyError:
             await ws_send(ws, "toast", {"level": "error", "message": "game not found"})
+        return
+
+    if msg_type == "game:refresh":
+        # e.g. after an import over HTTP made a new (still unsaved) game current
+        await _send_state(ws)
+        analysis.schedule_sync(_sync_analysis_to_current_game)
+        return
+
+    if msg_type == "game:rename":
+        # renaming only changes the working copy; it is written to the list with 保存
+        title = str(payload.get("title") or "").strip()
+        if title:
+            def _rename(g):
+                g.title = title
+                g.ui_state = {**(g.ui_state or {}), "named": True}
+
+            await runtime.mutate(_rename)
+            await _send_state(ws)
         return
 
     if msg_type == "game:delete":
@@ -260,7 +279,7 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
             g.touch()
 
         try:
-            await runtime.mutate(_save_fields)
+            await runtime.save(_save_fields)
             await _send_state(ws)
             analysis.schedule_sync(_sync_analysis_to_current_game)
         except Exception as exc:
@@ -309,6 +328,19 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
             await _send_state(ws)
         except Exception as exc:
             await ws_send(ws, "toast", {"level": "error", "message": f"play_move failed: {exc}"})
+        return
+
+    if msg_type == "node:delete":
+        node_id = str(payload.get("node_id") or "")
+        if not node_id:
+            await ws_send(ws, "toast", {"level": "error", "message": "node_id is required"})
+            return
+        try:
+            await runtime.mutate(lambda g: g.delete_subtree(node_id))
+            await _send_state(ws)
+            analysis.schedule_sync(_sync_analysis_to_current_game)
+        except (KeyError, ValueError) as exc:
+            await ws_send(ws, "toast", {"level": "error", "message": f"削除できませんでした: {exc}"})
         return
 
     if msg_type == "node:set_comment":
@@ -399,9 +431,20 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
 
         game, _ = await runtime.mutate(_disable)
         wire = game.to_wire()
-        # main line: path to the current position, then the first child onward
-        node_ids = list(wire["current_path_node_ids"])
+        # the line shown on the page (it keeps a branch even after going back before the branch
+        # point); without a valid one: path to the current position, then the first child onward
         children = wire["children_index"]
+        path = list(wire["current_path_node_ids"])
+        line = payload.get("line")
+        if (
+            isinstance(line, list)
+            and len(line) >= len(path)
+            and line[: len(path)] == path
+            and all(str(b) in (children.get(a) or []) for a, b in zip(line, line[1:]))
+        ):
+            node_ids = [str(x) for x in line]
+        else:
+            node_ids = path
         while children.get(node_ids[-1]):
             node_ids.append(children[node_ids[-1]][0])
 

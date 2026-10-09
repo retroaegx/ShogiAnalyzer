@@ -22,6 +22,15 @@ def _dumps(obj: Any) -> str:
     return json.dumps(obj or {}, ensure_ascii=False, separators=(",", ":"))
 
 
+def content_signature(game: GameTree) -> str:
+    """What 「保存」 keeps: title, start position, header and the move tree with comments
+    (not the shown position or UI switches)."""
+    nodes = sorted(
+        (n.node_id, n.parent_id or "", int(n.order_index), n.move_usi or "", n.comment or "") for n in game.nodes.values()
+    )
+    return json.dumps([game.title, game.initial_sfen, game.meta, nodes], ensure_ascii=False, sort_keys=True, default=str)
+
+
 def _loads_dict(text: str | None) -> dict:
     if not text:
         return {}
@@ -236,22 +245,23 @@ class StateStore:
             )
         return snapshot_id
 
-    def latest_evals(self, game_id: str) -> dict[str, dict[str, Any]]:
+    def latest_evals(self, game_id: str, node_ids: list[str] | None = None) -> dict[str, dict[str, Any]]:
         """Deepest snapshot per node: best score + all candidate lines (score is side-to-move perspective).
 
         The lines let the client keep showing candidate moves / arrows for positions that
-        were analysed earlier, even when analysis is OFF.
+        were analysed earlier, even when analysis is OFF. node_ids: the positions of the game
+        being edited (its unsaved moves are not in the nodes table).
         """
-        rows = self._conn.execute(
-            """
-            SELECT s.node_id, s.lines_json
-            FROM analysis_snapshots s
-            JOIN nodes n ON n.node_id = s.node_id
-            WHERE n.game_id = ?
-            ORDER BY s.created_at
-            """,
-            (game_id,),
-        ).fetchall()
+        if node_ids is None:
+            node_ids = [r["node_id"] for r in self._conn.execute("SELECT node_id FROM nodes WHERE game_id = ?", (game_id,))]
+        rows = []
+        for i in range(0, len(node_ids), 500):
+            chunk = node_ids[i : i + 500]
+            rows += self._conn.execute(
+                f"SELECT node_id, lines_json, created_at FROM analysis_snapshots WHERE node_id IN ({','.join('?' * len(chunk))})",
+                chunk,
+            ).fetchall()
+        rows.sort(key=lambda r: r["created_at"])
         out: dict[str, dict[str, Any]] = {}
         for r in rows:
             try:
@@ -282,50 +292,117 @@ class StateStore:
                 return loaded
         return self.create_game()
 
+    def game_exists(self, game_id: str) -> bool:
+        return self._conn.execute("SELECT 1 FROM games WHERE game_id = ?", (game_id,)).fetchone() is not None
+
+    # ---------- working copy (the kifu on screen, saved or not) ----------
+    def save_working(self, game: GameTree, saved_sig: str | None) -> None:
+        value = {"game": game.to_game_record(), "nodes": game.to_node_records(), "saved_sig": saved_sig}
+        with self._conn:
+            self._conn.execute(
+                """
+                INSERT INTO app_state(key, value_json) VALUES ('working_game', ?)
+                ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json
+                """,
+                (json.dumps(value, ensure_ascii=False, separators=(",", ":")),),
+            )
+
+    def load_working(self) -> tuple[GameTree, str | None] | None:
+        row = self._conn.execute("SELECT value_json FROM app_state WHERE key = 'working_game'").fetchone()
+        if not row:
+            return None
+        try:
+            value = json.loads(row["value_json"])
+            game = GameTree.from_rows(dict(value["game"]), [dict(n) for n in value["nodes"]])
+        except Exception:
+            return None
+        sig = value.get("saved_sig")
+        return game, sig if isinstance(sig, str) else None
+
 
 class RuntimeState:
+    """The kifu on screen is a working copy: every change is kept (also over a restart) in
+    app_state 'working_game', but the saved kifu list (games / nodes tables) only changes when
+    the user presses 保存 (save()). dirty = the working copy differs from what was saved."""
+
     def __init__(self, store: StateStore):
         self.store = store
         self._lock = asyncio.Lock()
         self._current_game: GameTree | None = None
+        self._saved_sig: str | None = None  # content signature at the last save/load (None: never saved)
+
+    def _ensure_locked(self) -> GameTree:
+        if self._current_game is None:
+            working = self.store.load_working()
+            if working:
+                self._current_game, self._saved_sig = working
+            else:
+                last_id = self.store.get_last_game_id()
+                loaded = self.store.load_game(last_id) if last_id else None
+                if loaded:
+                    self._current_game = loaded
+                    self._saved_sig = content_signature(loaded)
+                else:
+                    self._set_new_locked(GameTree.new(title=default_game_title()))
+        return self._current_game
+
+    def _set_new_locked(self, game: GameTree) -> None:
+        """A fresh, still empty game: nothing to lose, so it does not count as unsaved."""
+        self._current_game = game
+        self._saved_sig = content_signature(game)
+
+    def _persist_locked(self) -> None:
+        if self._current_game is not None:
+            self.store.save_working(self._current_game, self._saved_sig)
+
+    def is_dirty(self) -> bool:
+        game = self._current_game
+        return game is not None and content_signature(game) != self._saved_sig
 
     async def startup(self) -> None:
         async with self._lock:
-            self._current_game = self.store.ensure_last_or_create()
+            game = self._ensure_locked()
             # nobody is connected yet: analysis always starts OFF (also after a crash while ON)
-            ui = dict(self._current_game.ui_state or {})
+            ui = dict(game.ui_state or {})
             if ui.get("analysis_enabled"):
                 ui["analysis_enabled"] = False
-                self._current_game.ui_state = ui
-                self.store.save_game(self._current_game)
+                game.ui_state = ui
+            self._persist_locked()
 
     async def current_game(self) -> GameTree:
         async with self._lock:
-            if self._current_game is None:
-                self._current_game = self.store.ensure_last_or_create()
-            return self._current_game
+            return self._ensure_locked()
 
     async def current_game_wire(self) -> dict:
-        game = await self.current_game()
-        return game.to_wire()
+        async with self._lock:
+            game = self._ensure_locked()
+            return {**game.to_wire(), "dirty": self.is_dirty(), "saved": self._saved_sig is not None and self.store.game_exists(game.game_id)}
 
     async def set_current_game(self, game: GameTree) -> GameTree:
+        """Show a newly built game (import): not in the saved list until 保存."""
         async with self._lock:
-            # Persist the game because callers may construct a new GameTree
-            # (e.g., imports) without saving it yet.
-            self.store.save_game(game)
             self._current_game = game
-            self.store.set_last_game_id(game.game_id)
+            self._saved_sig = None
+            self._persist_locked()
             return game
 
     async def mutate(self, fn: Callable[[GameTree], Any]) -> tuple[GameTree, Any]:
         async with self._lock:
-            if self._current_game is None:
-                self._current_game = self.store.ensure_last_or_create()
-            result = fn(self._current_game)
-            self.store.save_game(self._current_game)
-            self.store.set_last_game_id(self._current_game.game_id)
-            return self._current_game, result
+            game = self._ensure_locked()
+            result = fn(game)
+            self._persist_locked()
+            return game, result
+
+    async def save(self, fn: Callable[[GameTree], Any] | None = None) -> tuple[GameTree, Any]:
+        """保存: apply fn (title etc.) and write the working copy to the saved kifu list."""
+        async with self._lock:
+            game = self._ensure_locked()
+            result = fn(game) if fn else None
+            self.store.save_game(game)
+            self.store.set_last_game_id(game.game_id)
+            self._saved_sig = content_signature(game)
+            self._persist_locked()
+            return game, result
 
     async def load_game(self, game_id: str) -> GameTree:
         async with self._lock:
@@ -333,13 +410,16 @@ class RuntimeState:
             if loaded is None:
                 raise KeyError(f"game not found: {game_id}")
             self._current_game = loaded
+            self._saved_sig = content_signature(loaded)
             self.store.set_last_game_id(game_id)
+            self._persist_locked()
             return loaded
 
     async def create_game(self, title: str | None = None, initial_sfen: str | None = None) -> GameTree:
         async with self._lock:
-            game = self.store.create_game(title=title, initial_sfen=initial_sfen)
-            self._current_game = game
+            game = GameTree.new(title=(title or "").strip() or default_game_title(), initial_sfen=initial_sfen)
+            self._set_new_locked(game)
+            self._persist_locked()
             return game
 
     async def delete_game(self, game_id: str) -> bool:
@@ -347,12 +427,9 @@ class RuntimeState:
         async with self._lock:
             deleted = self.store.delete_game(game_id)
             if deleted and self._current_game is not None and self._current_game.game_id == game_id:
-                # otherwise the next save would write the deleted game back
-                self._current_game = self.store.create_game()
+                self._set_new_locked(GameTree.new(title=default_game_title()))
+                self._persist_locked()
             return deleted
 
     async def import_usi_text(self, text: str, title: str | None = None) -> GameTree:
-        async with self._lock:
-            game = self.store.import_usi_text(text=text, title=title)
-            self._current_game = game
-            return game
+        return await self.set_current_game(import_usi_game(text, title=title))

@@ -1,173 +1,104 @@
 {
   "background_sets": [
     {
-      "name": "wood_3",
+      "name": "kaya",
       "displayName": "theme.bg.wood",
-      "background": "/board-theme/images/boards/board_background_normal.png",
+      "background": "/board-theme/images/boards/kaya.webp",
       "coordinates": {
         "color": "#000000",
-        "position": "outside",
-        "outside": {
-          "background_vertical": "/board-theme/images/boards/board_background_normal.png",
-          "background_horizontal": "/board-theme/images/boards/board_background_normal.png",
-          "background_corner_left": "/board-theme/images/boards/board_background_normal_cell_inner_piece.png"
-        }
-      },
-      "grid": {
-        "show": false,
-        "color": "#9ca3af"
-      },
-      "board_region": {
-        "start": {
-          "x": 42,
-          "y": 42
-        },
-        "end": {
-          "x": 1560,
-          "y": 1560
-        }
-      },
-      "sample": {
-        "image": "/board-theme/images/boards/board_background_normal.png"
-      },
-      "grid_lines": {
-        "x": [
-          42,
-          214,
-          387,
-          551,
-          722,
-          888,
-          1058,
-          1227,
-          1394,
-          1562
-        ],
-        "y": [
-          37,
-          201,
-          371,
-          541,
-          711,
-          882,
-          1052,
-          1221,
-          1392,
-          1561
-        ]
-      }
-    },
-    {
-      "name": "classic",
-      "displayName": "theme.bg.classic_carbon",
-      "background": "/board-theme/images/boards/board_background_carbon.png",
-      "coordinates": {
-        "color": "#ffffff",
-        "position": "outside",
-        "outside": {
-          "background_vertical": "/board-theme/images/boards/board_background_carbon.png",
-          "background_horizontal": "/board-theme/images/boards/board_background_carbon.png",
-          "background_corner_left": "/board-theme/images/boards/board_background_carbon_cell_inner_piece.png"
-        }
-      },
-      "grid": {
-        "show": false,
-        "color": "#9ca3af"
-      },
-      "board_region": {
-        "start": {
-          "x": 32,
-          "y": 32
-        },
-        "end": {
-          "x": 992,
-          "y": 992
-        }
-      },
-      "sample": {
-        "image": "/board-theme/images/boards/board_background_carbon.png"
-      },
-      "grid_lines": {
-        "x": [
-          31,
-          137,
-          243,
-          349,
-          455,
-          561,
-          668,
-          775,
-          882,
-          988
-        ],
-        "y": [
-          37,
-          143,
-          248,
-          353,
-          458,
-          562,
-          668,
-          772,
-          878,
-          984
-        ]
-      }
-    },
-    {
-      "name": "ice_blue",
-      "displayName": "theme.bg.ice_blue",
-      "background": "/board-theme/images/boards/board_ice_blue.png",
-      "board_region": {
-        "start": {
-          "x": 47,
-          "y": 56
-        },
-        "end": {
-          "x": 1994,
-          "y": 1994
-        }
+        "position": "outside"
       },
       "grid": {
         "show": false
       },
-      "coordinates": {
-        "color": "#ffffff",
-        "position": "outside",
-        "outside": {
-          "background_vertical": "/board-theme/images/boards/board_ice_blue.png",
-          "background_horizontal": "/board-theme/images/boards/board_ice_blue.png",
-          "background_corner_left": "/board-theme/images/boards/board_ice_blue_cell_inner_piece.png",
-          "left": true
+      "board_region": {
+        "start": {
+          "x": 32,
+          "y": 28
+        },
+        "end": {
+          "x": 1222,
+          "y": 1223
         }
       },
       "sample": {
-        "image": "/board-theme/images/boards/board_ice_blue.png"
+        "image": "/board-theme/images/boards/kaya.webp"
       },
       "grid_lines": {
         "x": [
-          45,
-          259,
-          476,
+          32,
+          165,
+          303,
+          432,
+          565,
           692,
-          909,
-          1128,
-          1345,
-          1562,
-          1779,
-          1993
+          826,
+          959,
+          1092,
+          1222
         ],
         "y": [
-          55,
-          269,
-          485,
-          701,
-          917,
-          1136,
-          1352,
-          1568,
-          1785,
-          1998
+          28,
+          157,
+          289,
+          423,
+          556,
+          692,
+          824,
+          957,
+          1091,
+          1223
+        ]
+      }
+    },
+    {
+      "name": "kaya_sansui",
+      "displayName": "theme.bg.sansui",
+      "background": "/board-theme/images/boards/kaya_sansui.webp",
+      "coordinates": {
+        "color": "#000000",
+        "position": "outside"
+      },
+      "grid": {
+        "show": false
+      },
+      "board_region": {
+        "start": {
+          "x": 31,
+          "y": 29
+        },
+        "end": {
+          "x": 1223,
+          "y": 1223
+        }
+      },
+      "sample": {
+        "image": "/board-theme/images/boards/kaya_sansui.webp"
+      },
+      "grid_lines": {
+        "x": [
+          31,
+          165,
+          304,
+          434,
+          564,
+          694,
+          825,
+          958,
+          1091,
+          1223
+        ],
+        "y": [
+          29,
+          159,
+          291,
+          424,
+          557,
+          691,
+          824,
+          955,
+          1090,
+          1223
         ]
       }
     },
@@ -288,23 +219,28 @@
   ],
   "piece_sets": [
     {
-      "name": "koma_illustration",
-      "displayName": "theme.piece.standard",
+      "name": "tsuge",
+      "displayName": "theme.piece.tsuge",
       "pieces": {
-        "king": "/board-theme/images/pieces/normal/king.png",
-        "rook": "/board-theme/images/pieces/normal/rook.png",
-        "bishop": "/board-theme/images/pieces/normal/bishop.png",
-        "gold": "/board-theme/images/pieces/normal/gold.png",
-        "silver": "/board-theme/images/pieces/normal/silver.png",
-        "knight": "/board-theme/images/pieces/normal/knight.png",
-        "lance": "/board-theme/images/pieces/normal/lance.png",
-        "pawn": "/board-theme/images/pieces/normal/pawn.png",
-        "dragon": "/board-theme/images/pieces/normal/dragon.png",
-        "horse": "/board-theme/images/pieces/normal/horse.png",
-        "promoted_silver": "/board-theme/images/pieces/normal/promoted_silver.png",
-        "promoted_knight": "/board-theme/images/pieces/normal/promoted_knight.png",
-        "promoted_lance": "/board-theme/images/pieces/normal/promoted_lance.png",
-        "promoted_pawn": "/board-theme/images/pieces/normal/promoted_pawn.png"
+        "sente": {
+          "king": "/board-theme/images/pieces/tsuge/king_sente.webp",
+          "rook": "/board-theme/images/pieces/tsuge/rook.webp",
+          "bishop": "/board-theme/images/pieces/tsuge/bishop.webp",
+          "gold": "/board-theme/images/pieces/tsuge/gold.webp",
+          "silver": "/board-theme/images/pieces/tsuge/silver.webp",
+          "knight": "/board-theme/images/pieces/tsuge/knight.webp",
+          "lance": "/board-theme/images/pieces/tsuge/lance.webp",
+          "pawn": "/board-theme/images/pieces/tsuge/pawn.webp",
+          "dragon": "/board-theme/images/pieces/tsuge/dragon.webp",
+          "horse": "/board-theme/images/pieces/tsuge/horse.webp",
+          "promoted_silver": "/board-theme/images/pieces/tsuge/promoted_silver.webp",
+          "promoted_knight": "/board-theme/images/pieces/tsuge/promoted_knight.webp",
+          "promoted_lance": "/board-theme/images/pieces/tsuge/promoted_lance.webp",
+          "promoted_pawn": "/board-theme/images/pieces/tsuge/promoted_pawn.webp"
+        },
+        "gote": {
+          "king": "/board-theme/images/pieces/tsuge/king_gote.webp"
+        }
       },
       "sample": {
         "pieces": [
@@ -320,23 +256,60 @@
       }
     },
     {
-      "name": "koma_photo",
-      "displayName": "theme.piece.dark",
+      "name": "mokume",
+      "displayName": "theme.piece.mokume",
       "pieces": {
-        "king": "/board-theme/images/pieces/koma_photo/king.png",
-        "rook": "/board-theme/images/pieces/koma_photo/rook.png",
-        "bishop": "/board-theme/images/pieces/koma_photo/bishop.png",
-        "gold": "/board-theme/images/pieces/koma_photo/gold.png",
-        "silver": "/board-theme/images/pieces/koma_photo/silver.png",
-        "knight": "/board-theme/images/pieces/koma_photo/knight.png",
-        "lance": "/board-theme/images/pieces/koma_photo/lance.png",
-        "pawn": "/board-theme/images/pieces/koma_photo/pawn.png",
-        "dragon": "/board-theme/images/pieces/koma_photo/dragon.png",
-        "horse": "/board-theme/images/pieces/koma_photo/horse.png",
-        "promoted_silver": "/board-theme/images/pieces/koma_photo/promoted_silver.png",
-        "promoted_knight": "/board-theme/images/pieces/koma_photo/promoted_knight.png",
-        "promoted_lance": "/board-theme/images/pieces/koma_photo/promoted_lance.png",
-        "promoted_pawn": "/board-theme/images/pieces/koma_photo/promoted_pawn.png"
+        "king": "/board-theme/images/pieces/mokume/king.png",
+        "rook": "/board-theme/images/pieces/mokume/rook.png",
+        "bishop": "/board-theme/images/pieces/mokume/bishop.png",
+        "gold": "/board-theme/images/pieces/mokume/gold.png",
+        "silver": "/board-theme/images/pieces/mokume/silver.png",
+        "knight": "/board-theme/images/pieces/mokume/knight.png",
+        "lance": "/board-theme/images/pieces/mokume/lance.png",
+        "pawn": "/board-theme/images/pieces/mokume/pawn.png",
+        "dragon": "/board-theme/images/pieces/mokume/dragon.png",
+        "horse": "/board-theme/images/pieces/mokume/horse.png",
+        "promoted_silver": "/board-theme/images/pieces/mokume/promoted_silver.png",
+        "promoted_knight": "/board-theme/images/pieces/mokume/promoted_knight.png",
+        "promoted_lance": "/board-theme/images/pieces/mokume/promoted_lance.png",
+        "promoted_pawn": "/board-theme/images/pieces/mokume/promoted_pawn.png"
+      },
+      "sample": {
+        "pieces": [
+          "king",
+          "rook",
+          "bishop",
+          "gold",
+          "silver",
+          "knight",
+          "lance",
+          "pawn"
+        ]
+      }
+    },
+    {
+      "name": "urushi",
+      "displayName": "theme.piece.urushi",
+      "pieces": {
+        "sente": {
+          "king": "/board-theme/images/pieces/urushi/king_sente.webp",
+          "rook": "/board-theme/images/pieces/urushi/rook.webp",
+          "bishop": "/board-theme/images/pieces/urushi/bishop.webp",
+          "gold": "/board-theme/images/pieces/urushi/gold.webp",
+          "silver": "/board-theme/images/pieces/urushi/silver.webp",
+          "knight": "/board-theme/images/pieces/urushi/knight.webp",
+          "lance": "/board-theme/images/pieces/urushi/lance.webp",
+          "pawn": "/board-theme/images/pieces/urushi/pawn.webp",
+          "dragon": "/board-theme/images/pieces/urushi/dragon.webp",
+          "horse": "/board-theme/images/pieces/urushi/horse.webp",
+          "promoted_silver": "/board-theme/images/pieces/urushi/promoted_silver.webp",
+          "promoted_knight": "/board-theme/images/pieces/urushi/promoted_knight.webp",
+          "promoted_lance": "/board-theme/images/pieces/urushi/promoted_lance.webp",
+          "promoted_pawn": "/board-theme/images/pieces/urushi/promoted_pawn.webp"
+        },
+        "gote": {
+          "king": "/board-theme/images/pieces/urushi/king_gote.webp"
+        }
       },
       "sample": {
         "pieces": [
@@ -373,80 +346,6 @@
         },
         "gote": {
           "king": "/board-theme/images/pieces/black/king_gote.png"
-        }
-      },
-      "sample": {
-        "pieces": [
-          "king",
-          "rook",
-          "bishop",
-          "gold",
-          "silver",
-          "knight",
-          "lance",
-          "pawn"
-        ]
-      }
-    },
-    {
-      "name": "matrix",
-      "displayName": "theme.piece.matrix",
-      "pieces": {
-        "sente": {
-          "king": "/board-theme/images/pieces/matrix/king_sente.png",
-          "rook": "/board-theme/images/pieces/matrix/rook.png",
-          "bishop": "/board-theme/images/pieces/matrix/bishop.png",
-          "gold": "/board-theme/images/pieces/matrix/gold.png",
-          "silver": "/board-theme/images/pieces/matrix/silver.png",
-          "knight": "/board-theme/images/pieces/matrix/knight.png",
-          "lance": "/board-theme/images/pieces/matrix/lance.png",
-          "pawn": "/board-theme/images/pieces/matrix/pawn.png",
-          "dragon": "/board-theme/images/pieces/matrix/dragon.png",
-          "horse": "/board-theme/images/pieces/matrix/horse.png",
-          "promoted_silver": "/board-theme/images/pieces/matrix/promoted_silver.png",
-          "promoted_knight": "/board-theme/images/pieces/matrix/promoted_knight.png",
-          "promoted_lance": "/board-theme/images/pieces/matrix/promoted_lance.png",
-          "promoted_pawn": "/board-theme/images/pieces/matrix/promoted_pawn.png"
-        },
-        "gote": {
-          "king": "/board-theme/images/pieces/matrix/king_gote.png"
-        }
-      },
-      "sample": {
-        "pieces": [
-          "king",
-          "rook",
-          "bishop",
-          "gold",
-          "silver",
-          "knight",
-          "lance",
-          "pawn"
-        ]
-      }
-    },
-    {
-      "name": "neon",
-      "displayName": "theme.piece.neon",
-      "pieces": {
-        "sente": {
-          "king": "/board-theme/images/pieces/neon/king_sente.png",
-          "rook": "/board-theme/images/pieces/neon/rook.png",
-          "bishop": "/board-theme/images/pieces/neon/bishop.png",
-          "gold": "/board-theme/images/pieces/neon/gold.png",
-          "silver": "/board-theme/images/pieces/neon/silver.png",
-          "knight": "/board-theme/images/pieces/neon/knight.png",
-          "lance": "/board-theme/images/pieces/neon/lance.png",
-          "pawn": "/board-theme/images/pieces/neon/pawn.png",
-          "dragon": "/board-theme/images/pieces/neon/dragon.png",
-          "horse": "/board-theme/images/pieces/neon/horse.png",
-          "promoted_silver": "/board-theme/images/pieces/neon/promoted_silver.png",
-          "promoted_knight": "/board-theme/images/pieces/neon/promoted_knight.png",
-          "promoted_lance": "/board-theme/images/pieces/neon/promoted_lance.png",
-          "promoted_pawn": "/board-theme/images/pieces/neon/promoted_pawn.png"
-        },
-        "gote": {
-          "king": "/board-theme/images/pieces/neon/king_gote.png"
         }
       },
       "sample": {

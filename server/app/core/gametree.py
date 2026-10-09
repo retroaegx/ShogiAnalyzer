@@ -173,6 +173,25 @@ class GameTree:
         self.touch()
         return node
 
+    def delete_subtree(self, node_id: str) -> int:
+        """Remove a move and everything after it (its branches too). Returns the number of moves removed."""
+        node = self.get_node(node_id)
+        if node.parent_id is None:
+            raise ValueError("開始局面は取り消せません")
+        doomed = {node_id}
+        stack = [node_id]
+        while stack:
+            pid = stack.pop()
+            for child in self.children_of(pid):
+                doomed.add(child.node_id)
+                stack.append(child.node_id)
+        if self.current_node_id in doomed:
+            self.current_node_id = node.parent_id
+        for nid in doomed:
+            del self.nodes[nid]
+        self.touch()
+        return len(doomed)
+
     def set_comment(self, node_id: str, comment: str) -> None:
         node = self.get_node(node_id)
         node.comment = comment

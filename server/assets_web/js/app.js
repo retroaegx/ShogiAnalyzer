@@ -172,6 +172,11 @@ const els = {
   hashDefault: $("hashDefault"),
   hashOptName: $("hashOptName"),
   batchSeconds: $("batchSeconds"),
+  winRate: $("winRate"),
+  wrSente: $("wrSente"),
+  wrGote: $("wrGote"),
+  wrFill: $("wrFill"),
+  pvHead: $("pvHead"),
   autoStopSel: $("autoStopSel"),
   engineOptions: $("engineOptions"),
   engineResetAll: $("engineResetAll"),
@@ -684,13 +689,21 @@ async function fetchEvals(gameId) {
   }
 }
 
-// Line shown in the kifu list / slider / graph: path to the current position, then the
-// first child onward. While 全解析 runs it is exactly the line being analysed.
+// Line shown in the kifu list / slider / graph (and analysed by 全解析): path to the current
+// position, then onward. Going back inside the line shown so far (also to before a branch
+// point) keeps following that line; otherwise the first child onward. While 全解析 runs it is
+// exactly the line being analysed.
 function computeMainLine(game) {
   const line = state.batch?.line;
   if (Array.isArray(line) && line.includes(game.current_node_id)) return [...line];
+  const kids = (id) => game.children_index?.[id] || [];
   const path = [...(game.current_path_node_ids || [])];
-  for (let next = firstChild(path[path.length - 1]); next; next = firstChild(next)) path.push(next);
+  const prev = state.mainLine || [];
+  const at = prev.indexOf(game.current_node_id);
+  if (at >= 0 && at + 1 === path.length && path.every((id, i) => prev[i] === id)) {
+    for (let i = at + 1; i < prev.length && kids(path[path.length - 1]).includes(prev[i]); i++) path.push(prev[i]);
+  }
+  for (let next = kids(path[path.length - 1])[0]; next; next = kids(next)[0]) path.push(next);
   return path;
 }
 
@@ -987,34 +1000,79 @@ function textWidth(text, fs) {
 
 // label boxes placed in the current overlay render (to keep labels from overlapping)
 let overlayLabels = [];
+// boxes along every arrow / marker drawn in this render ({x, y, w, h, owner}): labels keep off them
+let overlayObstacles = [];
 const boxesOverlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/** Arrow sizes for a move (shared by the drawing and the label avoidance). */
+function arrowSize(weight) {
+  const cell = state.geom.rw / 9;
+  const s = Math.max(weight, 0.7);
+  return { shaftW: cell * 0.085 * s, headW: cell * 0.32 * s, headL: cell * 0.32 * s };
+}
+
+/** Register the area an arrow (or drop marker) covers, as a row of small boxes along it. */
+function addArrowObstacles(usi, weight, owner) {
+  const t = moveTarget(usi);
+  if (!t || !state.geom) return;
+  const cell = state.geom.rw / 9;
+  const to = toView(t.row, t.col);
+  const p1 = cellCenter(to.vr, to.vc);
+  if (t.fromRow == null) {
+    const r = cell * 0.34 * Math.max(weight, 0.8);
+    overlayObstacles.push({ x: p1.x - r, y: p1.y - r, w: 2 * r, h: 2 * r, owner });
+    return;
+  }
+  const fr = toView(t.fromRow, t.fromCol);
+  const p0 = cellCenter(fr.vr, fr.vc);
+  const { shaftW, headW } = arrowSize(weight);
+  const dist = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+  const steps = Math.max(2, Math.ceil(dist / (cell * 0.25)));
+  for (let k = 0; k <= steps; k++) {
+    const f = k / steps;
+    const half = (f > 0.75 ? headW : shaftW * 1.6) / 2;
+    const x = p0.x + (p1.x - p0.x) * f;
+    const y = p0.y + (p1.y - p0.y) * f;
+    overlayObstacles.push({ x: x - half, y: y - half, w: 2 * half, h: 2 * half, owner });
+  }
+}
 
 /**
  * Small pill label beside a move ("候補手 -134" / "指し手" ...), nudged away from other labels.
  * score: optional {text, cls} shown after the name in the same pill (one pill per move,
  * so the name and the evaluation can never collide).
  */
-function moveLabel(anchor, normal, dist, text, cls, primary, score = null) {
+function moveLabel(anchor, normal, dist, text, cls, primary, score = null, owner = null, along = null) {
   const { rw, rh } = state.geom;
   const cell = rw / 9;
   const fs = Math.max(cell * (primary ? 0.17 : 0.15), (primary ? 9.5 : 8.5) / overlayPxPerUnit());
   const sfs = fs * 1.12;
   const gap = fs * 0.35;
-  const w = textWidth(text, fs) + (score ? (text ? gap : 0) + textWidth(score.text, sfs) * 0.92 : 0) + fs * 0.9;
+  const pfs = fs * 0.78;
+  const promoW = score?.promo ? gap * 0.6 + textWidth(score.promo, pfs) : 0;
+  const w = textWidth(text, fs) + (score ? (text ? gap : 0) + textWidth(score.text, sfs) * 0.92 + promoW : 0) + fs * 0.9;
   const h = fs * 1.5;
   // distance from the arrow to the pill's centre: half the pill's extent along the normal
   // (its width for vertical arrows, its height for horizontal ones), so it never covers the arrow
   const base = dist + Math.abs(normal.x) * (w / 2) + Math.abs(normal.y) * (h / 2);
+  // beside the arrow first, then further out, then slid along it; never on another label or arrow
+  const slide = along ? [0, 0.9, -0.9, 1.6, -1.6].map((v) => v * cell) : [0];
   let box = null;
-  for (const k of [1, -1, 1.9, -1.9, 2.8, -2.8]) {
-    const cx = clamp(anchor.x + normal.x * base * k, w / 2, rw - w / 2);
-    const cy = clamp(anchor.y + normal.y * base * k, h / 2, rh - h / 2);
-    box = { x: cx - w / 2, y: cy - h / 2, w, h };
-    // keep a small gap between pills, not just "not overlapping"
-    const m = h * 0.2;
-    const padded = { x: box.x - m, y: box.y - m, w: w + 2 * m, h: h + 2 * m };
-    if (!overlayLabels.some((b) => boxesOverlap(b, padded))) break;
+  let first = null;
+  search: for (const sl of slide) {
+    for (const k of [1, -1, 1.9, -1.9, 2.8, -2.8]) {
+      const cx = clamp(anchor.x + normal.x * base * k + (along?.x || 0) * sl, w / 2, rw - w / 2);
+      const cy = clamp(anchor.y + normal.y * base * k + (along?.y || 0) * sl, h / 2, rh - h / 2);
+      box = { x: cx - w / 2, y: cy - h / 2, w, h };
+      first ??= box;
+      // keep a small gap between pills, not just "not overlapping"
+      const m = h * 0.2;
+      const padded = { x: box.x - m, y: box.y - m, w: w + 2 * m, h: h + 2 * m };
+      if (!overlayLabels.some((b) => boxesOverlap(b, padded)) && !overlayObstacles.some((o) => o.owner !== owner && boxesOverlap(o, padded))) break search;
+      box = null;
+    }
   }
+  box ??= first;
   overlayLabels.push(box);
   const g = svgEl("g", { class: `mv-label ${cls}` });
   g.appendChild(svgEl("rect", { x: box.x, y: box.y, width: w, height: h, rx: h * 0.35, "stroke-width": cell * 0.016 }));
@@ -1026,6 +1084,11 @@ function moveLabel(anchor, normal, dist, text, cls, primary, score = null) {
     const sc = svgEl("tspan", { class: `lab-score ${score.cls || ""}`.trim(), dx: text ? gap : 0, "font-size": sfs });
     sc.textContent = score.text;
     t.appendChild(sc);
+    if (score.promo) {
+      const pr = svgEl("tspan", { class: "lab-promo", dx: gap * 0.6, "font-size": pfs });
+      pr.textContent = score.promo;
+      t.appendChild(pr);
+    }
   }
   g.appendChild(t);
   return g;
@@ -1035,7 +1098,7 @@ function moveLabel(anchor, normal, dist, text, cls, primary, score = null) {
  * Arrow (shaft + head) for a move, or a marker for a drop, with a small label.
  * kind: "best" | "best sub" | "next" | "branch"; score: optional {text, cls} for candidates
  */
-function overlayShape(usi, kind, weight = 1, labelText = "", score = null) {
+function overlayShape(usi, kind, weight = 1, labelText = "", score = null, owner = null) {
   const t = moveTarget(usi);
   if (!t || !state.geom) return null;
   const cell = state.geom.rw / 9;
@@ -1057,7 +1120,7 @@ function overlayShape(usi, kind, weight = 1, labelText = "", score = null) {
     if (upsideDown(state.parsed?.currentPlayer || "sente")) text.setAttribute("transform", `rotate(180 ${p1.x} ${p1.y})`);
     text.textContent = name;
     g.appendChild(text);
-    if (labelText || score) g.appendChild(moveLabel(p1, { x: 0, y: -1 }, r + cell * 0.04, labelText, labelCls, primary, score));
+    if (labelText || score) g.appendChild(moveLabel(p1, { x: 0, y: -1 }, r + cell * 0.04, labelText, labelCls, primary, score, owner));
     return g;
   }
 
@@ -1067,13 +1130,13 @@ function overlayShape(usi, kind, weight = 1, labelText = "", score = null) {
   if (dist < 1) return null;
   const u = { x: (p1.x - p0.x) / dist, y: (p1.y - p0.y) / dist };
   const n = { x: -u.y, y: u.x };
-  const s = Math.max(weight, 0.7);
-  const shaftW = cell * 0.12 * s;
-  const headW = cell * 0.4 * s;
+  const size = arrowSize(weight);
+  const shaftW = size.shaftW;
+  const headW = size.headW;
   const start = { x: p0.x + u.x * cell * 0.22, y: p0.y + u.y * cell * 0.22 };
   const tip = { x: p1.x + u.x * cell * 0.04, y: p1.y + u.y * cell * 0.04 };
   const len = Math.hypot(tip.x - start.x, tip.y - start.y);
-  const headL = Math.min(cell * 0.38 * s, len * 0.6);
+  const headL = Math.min(size.headL, len * 0.6);
   const base = { x: tip.x - u.x * headL, y: tip.y - u.y * headL };
   const P = (p, k) => `${(p.x + n.x * k).toFixed(1)} ${(p.y + n.y * k).toFixed(1)}`;
   const d = [
@@ -1100,7 +1163,7 @@ function overlayShape(usi, kind, weight = 1, labelText = "", score = null) {
     let ln = n;
     if (ln.y > 0.2 || (Math.abs(ln.y) <= 0.2 && ln.x < 0)) ln = { x: -n.x, y: -n.y };
     const mid = { x: (start.x + base.x) / 2, y: (start.y + base.y) / 2 };
-    g.appendChild(moveLabel(mid, ln, shaftW / 2 + cell * 0.06, labelText, labelCls, primary, score));
+    g.appendChild(moveLabel(mid, ln, shaftW / 2 + cell * 0.08, labelText, labelCls, primary, score, owner, u));
   }
   return g;
 }
@@ -1110,9 +1173,11 @@ function renderOverlay() {
   if (!svg) return;
   svg.innerHTML = "";
   overlayLabels = [];
+  overlayObstacles = [];
   if (!state.game || !state.geom) return;
   const cur = state.game.current_node_id;
-  const shapes = [];
+  // collect every arrow first, so each label can keep off all of them
+  const specs = []; // [usi, kind, weight, name, score]
 
   // next moves stored in the kifu: the next move of the displayed line (指し手) + other branches
   if (state.opts.nextMove) {
@@ -1122,7 +1187,7 @@ function renderOverlay() {
       if (!n.move_usi) return;
       const isNext = n.node_id === nextId;
       const name = state.opts.arrowLabels ? (isNext ? "指し手" : "分岐") : "";
-      shapes.push(overlayShape(n.move_usi, isNext ? "next" : "branch", isNext ? 1 : 0.7, name));
+      specs.push([n.move_usi, isNext ? "next" : "branch", isNext ? 1 : 0.7, name, null]);
     });
   }
 
@@ -1138,11 +1203,16 @@ function renderOverlay() {
       // the evaluation goes in the same pill as the name ("候補手 -134")
       const cp = senteScore(line, side);
       const score = { text: formatScore(line, side), cls: cp == null ? "" : cp >= 0 ? "plus" : "minus" };
+      // 成 / 不成 of the engine's move, small beside the evaluation
+      score.promo = promotionMark(first);
       // with labels OFF the pill keeps only the evaluation
       const name = state.opts.arrowLabels ? (i === 0 ? "候補手" : `候補${seen.size}`) : "";
-      shapes.push(overlayShape(first, i === 0 ? "best" : "best sub", i === 0 ? 1 : 0.6, name, score));
+      specs.push([first, i === 0 ? "best" : "best sub", i === 0 ? 1 : 0.6, name, score]);
     });
   }
+
+  specs.forEach(([usi, kind, weight], i) => addArrowObstacles(usi, weight, i));
+  const shapes = specs.map(([usi, kind, weight, name, score], i) => overlayShape(usi, kind, weight, name, score, i));
 
   // draw weaker shapes first so the best move / main line stay on top
   const order = { "best sub": 0, branch: 1, next: 2, best: 3 };
@@ -1150,6 +1220,21 @@ function renderOverlay() {
     .filter(Boolean)
     .sort((x, y) => (order[x.getAttribute("class").replace(/^mk /, "")] ?? 0) - (order[y.getAttribute("class").replace(/^mk /, "")] ?? 0))
     .forEach((s) => svg.appendChild(s));
+  // labels on top of every arrow
+  svg.querySelectorAll(".mv-label").forEach((l) => svg.appendChild(l));
+}
+
+/** "成" / "不成" for a board move that could promote in the shown position ("" otherwise). */
+function promotionMark(usi) {
+  const m = /^([1-9])([a-i])([1-9])([a-i])(\+?)$/.exec(String(usi || ""));
+  const board = state.parsed?.board;
+  if (!m || !board) return "";
+  const fromRow = m[2].charCodeAt(0) - 97;
+  const toRow = m[4].charCodeAt(0) - 97;
+  const piece = board[fromRow]?.[9 - Number(m[1])];
+  if (!piece) return "";
+  if (m[5]) return "成";
+  return canPromote(piece, fromRow, toRow) ? "不成" : "";
 }
 
 function applyHighlights() {
@@ -1623,6 +1708,14 @@ function renderAnalysis() {
   els.evalVerdict.dataset.side = !best || cp == null || Math.abs(cp) < 150 ? "even" : cp > 0 ? "sente" : "gote";
   renderMiniEval(best, cp, side);
 
+  // 先手 / 後手 win rate (estimated from the evaluation, as the evaluation bar)
+  const wr = cp == null ? 0.5 : winRate(cp);
+  const sentePct = Math.round(wr * 100);
+  els.wrSente.textContent = `${sentePct}%`;
+  els.wrGote.textContent = `${100 - sentePct}%`;
+  els.wrFill.style.width = `${(wr * 100).toFixed(1)}%`;
+  els.winRate.classList.toggle("none", cp == null);
+
   const shown = shownLines();
   const top = shown.lines[0];
   els.evalMeta.innerHTML = "";
@@ -1638,6 +1731,7 @@ function renderAnalysis() {
 
   els.pvList.innerHTML = "";
   const lines = shown.lines;
+  els.pvHead.hidden = !lines.length;
   if (!lines.length) {
     const msg = !a.available ? "解析エンジンが設定されていません" : on ? "読み筋を計算中…" : "解析をONにすると候補手と読み筋を表示します";
     els.pvList.appendChild(el("li", "pv-empty", msg));
@@ -1656,6 +1750,8 @@ function renderAnalysis() {
       }
       mv.title = moves.map((m) => m.text).join(" ");
       li.appendChild(mv);
+      li.appendChild(el("span", "pv-depth", line.depth ? String(line.depth) : "-"));
+      li.appendChild(el("span", "pv-nodes", line.nodes ? fmtNum(line.nodes) : "-"));
       const play = el("button", "pv-play");
       play.type = "button";
       play.title = "この手を指す";
@@ -1751,10 +1847,11 @@ function renderEvalGraph() {
     // area to the 50% line
     const mid = y(0);
     const grad = ctx.createLinearGradient(0, padY, 0, yBottom);
-    grad.addColorStop(0, "rgba(243,237,226,0.42)");
-    grad.addColorStop(0.5, "rgba(243,237,226,0.04)");
-    grad.addColorStop(0.5, "rgba(159,180,255,0.04)");
-    grad.addColorStop(1, "rgba(159,180,255,0.36)");
+    const midStop = clamp((mid - padY) / Math.max(yBottom - padY, 1), 0, 1);
+    grad.addColorStop(0, "rgba(240,198,116,0.46)");
+    grad.addColorStop(midStop, "rgba(240,198,116,0.05)");
+    grad.addColorStop(midStop, "rgba(130,155,230,0.05)");
+    grad.addColorStop(1, "rgba(130,155,230,0.38)");
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.moveTo(pts[0][0], mid);
@@ -1763,14 +1860,17 @@ function renderEvalGraph() {
     ctx.closePath();
     ctx.fill();
 
-    ctx.strokeStyle = "rgba(236,238,242,0.9)";
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = "#f3cf86";
+    ctx.lineWidth = 1.8;
     ctx.lineJoin = "round";
+    ctx.shadowColor = "rgba(240,198,116,0.75)";
+    ctx.shadowBlur = 8;
     ctx.beginPath();
     pts.forEach(([px, py], k) => (k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
     ctx.stroke();
+    ctx.shadowBlur = 0;
     if (pts.length < 40) {
-      ctx.fillStyle = "rgba(236,238,242,0.9)";
+      ctx.fillStyle = "#f6dc9c";
       for (const [px, py] of pts) {
         ctx.beginPath();
         ctx.arc(px, py, 1.8, 0, Math.PI * 2);
@@ -1795,10 +1895,17 @@ function renderEvalGraph() {
   ctx.stroke();
   const curPt = pts.find((p) => p[2] === curPly());
   if (curPt) {
-    ctx.fillStyle = accent;
+    ctx.fillStyle = "rgba(240,198,116,0.28)";
+    ctx.beginPath();
+    ctx.arc(curPt[0], curPt[1], 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff1cf";
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(curPt[0], curPt[1], 4, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
   }
 
   // labels
@@ -1848,9 +1955,21 @@ function renderMoveList() {
     li.dataset.id = id;
     if (i === 0) {
       li.classList.add("root");
+      li.appendChild(el("span"));
       li.appendChild(el("span", "mv-no", ""));
       li.appendChild(el("span", "mv-text", "開始局面"));
     } else {
+      const del = el("button", "mv-del");
+      del.type = "button";
+      del.title = "この手を取り消す";
+      del.setAttribute("aria-label", `${i}手目を取り消す`);
+      del.appendChild(icon("close"));
+      del.disabled = !state.isOwner || Boolean(state.batch);
+      del.addEventListener("click", (e) => {
+        e.stopPropagation();
+        deleteMove(id, i);
+      });
+      li.appendChild(del);
       li.appendChild(el("span", "mv-no", String(i)));
       li.appendChild(el("span", "mv-text", nodeLabel(n)));
     }
@@ -1870,6 +1989,47 @@ function renderMoveList() {
   updateMoveEvals();
   keepCurrentMoveVisible();
   els.kifuSub.textContent = `${Math.max(line.length - 1, 0)}手`;
+}
+
+/** × in the kifu: take back a move. Removing more than that one move (later moves / branches) asks first. */
+async function deleteMove(id, ply) {
+  if (!state.isOwner || state.batch) return;
+  let count = 0;
+  const stack = [id];
+  while (stack.length) {
+    const nid = stack.pop();
+    count += 1;
+    stack.push(...(state.game?.children_index?.[nid] || []));
+  }
+  if (count > 1) {
+    const n = node(id);
+    const ans = await confirmDialog({
+      title: "まとめて取り消しますか？",
+      message: `${ply}手目「${nodeLabel(n)}」以降の ${count} 手（分岐を含む）を取り消します。`,
+      actions: [
+        { label: "キャンセル", value: null },
+        { label: `${count}手を取り消す`, value: true, primary: true, danger: true },
+      ],
+    });
+    if (!ans) return;
+  }
+  sendWs("node:delete", { node_id: id });
+}
+
+/** Changes not saved yet: ask before replacing the kifu on screen. true = go on. */
+async function confirmDiscard(what) {
+  if (!state.game?.dirty) return true;
+  const ans = await confirmDialog({
+    title: "保存されていない変更があります",
+    message: `表示中の棋譜「${state.game.title || "無題"}」には保存されていない変更があります。${what}と、その変更は失われます。`,
+    actions: [
+      { label: "キャンセル", value: null },
+      { label: "保存せずに続ける", value: "discard", danger: true },
+      { label: "保存して続ける", value: "save", primary: true },
+    ],
+  });
+  if (ans === "save") sendWs("game:save", {}); // handled before the next message on the same socket
+  return Boolean(ans);
 }
 
 // Scroll only the list (scrollIntoView would also scroll the page on mobile).
@@ -1955,6 +2115,8 @@ function renderControls() {
   els.btnNext.disabled = !canNav || !hasNext;
   els.btnEnd.disabled = !canNav || !hasNext;
   els.saveBtn.disabled = !owner;
+  els.saveBtn.classList.toggle("dirty", Boolean(state.game?.dirty));
+  els.saveBtn.title = state.game?.dirty ? "保存されていない変更があります — サーバーに保存 (Ctrl+S)" : "サーバーに保存 (Ctrl+S)";
   for (const b of [els.newGameBtn, els.openBtn, els.importBtn, els.pasteBtn]) b.disabled = !canNav;
   els.plySlider.disabled = !canNav;
   document.body.classList.toggle("batch-lock", Boolean(state.batch));
@@ -1997,7 +2159,10 @@ function navPrev() {
   if (p) jump(p);
 }
 function navNext() {
-  const c = firstChild(state.game?.current_node_id);
+  // follow the displayed line (it keeps the branch played last), else the first child
+  const cur = state.game?.current_node_id;
+  const i = state.mainLine.indexOf(cur);
+  const c = (i >= 0 && state.mainLine[i + 1]) || firstChild(cur);
   if (c) jump(c);
 }
 function navStart() {
@@ -2027,9 +2192,10 @@ async function openGameList() {
         b.type = "button";
         b.appendChild(el("span", "g-title", g.title || "無題"));
         b.appendChild(el("span", "g-date", fmtDate(g.updated_at)));
-        b.addEventListener("click", () => {
-          sendWs("game:load", { game_id: g.game_id });
+        b.addEventListener("click", async () => {
           closeDialog(null);
+          if (!(await confirmDiscard("別の棋譜を開く"))) return;
+          sendWs("game:load", { game_id: g.game_id });
         });
         // small × next to each saved game: delete after a はい/いいえ confirmation
         const del = el("button", "g-delete");
@@ -2079,6 +2245,7 @@ async function importText(text, { source = "file", filename = "" } = {}) {
     toast("warning", source === "paste" ? "クリップボードが空です" : "ファイルが空です");
     return false;
   }
+  if (!(await confirmDiscard("棋譜を読み込む"))) return false;
   try {
     const res = await fetch("/api/import", {
       method: "POST",
@@ -2093,7 +2260,8 @@ async function importText(text, { source = "file", filename = "" } = {}) {
     if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
     const how = source === "paste" ? "貼り付けました" : "読み込みました";
     toast("info", `${FORMAT_NAMES[json.format] || ""} 形式の棋譜を新しい棋譜として${how}`);
-    if (json.game?.game_id) sendWs("game:load", { game_id: json.game.game_id });
+    // the new game is already current on the server (not in the saved list until 保存)
+    if (json.game?.game_id) sendWs("game:refresh", {});
     return true;
   } catch (e) {
     toast("error", `読み込みに失敗しました: ${e.message || e}`);
@@ -2171,8 +2339,6 @@ async function refreshExport() {
   for (const b of els.exportSeg.querySelectorAll("button")) b.classList.toggle("on", b.dataset.v === state.exportFormat);
   els.exportPreview.value = "生成中…";
   try {
-    sendWs("game:save", {});
-    await new Promise((r) => setTimeout(r, 150));
     const res = await fetch(`/api/export/${encodeURIComponent(id)}?format=${state.exportFormat}`, { cache: "no-store" });
     const text = await res.text();
     if (!res.ok) throw new Error(text);
@@ -2601,7 +2767,7 @@ function wire() {
     state.batch = { index: 0, total: n };
     renderAnalysis();
     renderControls();
-    sendWs("analysis:analyze_all", { seconds });
+    sendWs("analysis:analyze_all", { seconds, line: state.mainLine });
     toast("info", `全解析を開始します（${n}局面 × ${seconds}秒 ≒ ${Math.ceil((n * seconds) / 60)}分）`);
   });
   els.engineSettingsBtn.addEventListener("click", openEngineSettings);
@@ -2637,7 +2803,7 @@ function wire() {
     if (titleMode === "save") {
       if (sendWs("game:save", { title: t })) toast("info", "サーバーに保存しました");
     } else if (t !== state.game.title) {
-      sendWs("game:save", { title: t });
+      sendWs("game:rename", { title: t });
     }
     closeDialog(null);
   };
@@ -2665,9 +2831,14 @@ function wire() {
     if (sendWs("game:save", {})) toast("info", "サーバーに保存しました");
   });
   els.newGameBtn.addEventListener("click", async () => {
+    if (state.game?.dirty) {
+      if (!(await confirmDiscard("新しい棋譜を作成する"))) return;
+      sendWs("game:new", {});
+      return;
+    }
     const ans = await confirmDialog({
       title: "新しい棋譜を作成",
-      message: "初期局面から新しい棋譜を作成します。現在の棋譜はサーバーに保存されたまま残ります。",
+      message: "初期局面から新しい棋譜を作成します。",
       actions: [
         { label: "キャンセル", value: null },
         { label: "作成", value: true, primary: true },

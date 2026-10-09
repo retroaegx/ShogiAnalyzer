@@ -200,9 +200,15 @@ async def create_game(request: Request):
     return {"game": game.to_wire()}
 
 
+async def _game_for(request: Request, game_id: str):
+    """The kifu on screen (with unsaved changes) when it is that game, else the saved one."""
+    current = await _runtime(request).current_game()
+    return current if current.game_id == game_id else _store(request).load_game(game_id)
+
+
 @router.get("/api/games/{game_id}")
 async def get_game(request: Request, game_id: str):
-    game = _store(request).load_game(game_id)
+    game = await _game_for(request, game_id)
     if not game:
         raise HTTPException(status_code=404, detail="game not found")
     return {"game": game.to_wire()}
@@ -242,7 +248,9 @@ async def put_engine_options(request: Request):
 
 @router.get("/api/games/{game_id}/evals")
 async def get_game_evals(request: Request, game_id: str):
-    return {"items": _store(request).latest_evals(game_id)}
+    current = await _runtime(request).current_game()
+    node_ids = list(current.nodes) if current.game_id == game_id else None
+    return {"items": _store(request).latest_evals(game_id, node_ids)}
 
 
 @router.put("/api/games/{game_id}")
@@ -264,7 +272,7 @@ async def update_game(request: Request, game_id: str):
             g.jump(str(data["current_node_id"]))
         g.touch()
 
-    game, _ = await runtime.mutate(_mutate)
+    game, _ = await runtime.save(_mutate)
     return {"game": game.to_wire()}
 
 
@@ -331,7 +339,7 @@ async def import_game(request: Request):
 
 @router.get("/api/export/{game_id}")
 async def export_game(request: Request, game_id: str, format: str = Query(default="usi")):
-    game = _store(request).load_game(game_id)
+    game = await _game_for(request, game_id)
     if not game:
         raise HTTPException(status_code=404, detail="game not found")
     fmt = (format or "usi").lower()

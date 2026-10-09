@@ -180,7 +180,13 @@
               <span class="eval-verdict" id="evalVerdict">解析停止中</span>
             </div>
             <div class="eval-meta" id="evalMeta"></div>
+            <div class="winrate" id="winRate" aria-label="勝率の目安">
+              <span class="wr-side">先手 <b id="wrSente">50%</b></span>
+              <div class="wr-bar"><i id="wrFill"></i></div>
+              <span class="wr-side"><b id="wrGote">50%</b> 後手</span>
+            </div>
           </div>
+          <div class="pv-head" id="pvHead" hidden><span></span><span>評価値</span><span>読み筋</span><span>深さ</span><span>ノード数</span><span></span></div>
           <ol class="pv-list" id="pvList"></ol>
         </section>
 

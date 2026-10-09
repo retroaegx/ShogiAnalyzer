@@ -29,15 +29,13 @@ const $ = (id) => document.getElementById(id);
 
 const THEME_NAMES = {
   "theme.bg.wood": "木目",
-  "theme.bg.classic_carbon": "カーボン",
-  "theme.bg.ice_blue": "アイスブルー",
+  "theme.bg.sansui": "山水",
   "theme.bg.neon_night": "ネオンナイト",
   "theme.bg.white_gold": "ホワイトゴールド",
-  "theme.piece.standard": "標準",
-  "theme.piece.dark": "写真",
+  "theme.piece.tsuge": "黄楊",
+  "theme.piece.mokume": "杢目",
+  "theme.piece.urushi": "漆黒",
   "theme.piece.black": "黒文字",
-  "theme.piece.matrix": "マトリックス",
-  "theme.piece.neon": "ネオン",
   "theme.piece.white": "白地",
 };
 

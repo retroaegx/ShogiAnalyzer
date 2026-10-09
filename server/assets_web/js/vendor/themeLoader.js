@@ -219,11 +219,29 @@ export async function loadBoardThemeConfig() {
   return cachedConfig;
 }
 
+// sets that were renamed: the old saved choice moves to the new name
+const RENAMED_SETS = { wood_3: 'kaya', koma_photo: 'mokume' };
+
+/** Keep the saved choice valid: renamed sets move to their new name, removed sets fall back to the
+ * first one, and the stored value is updated so the settings list marks the set actually shown. */
+function settleSelection(list, saved, key) {
+  const wanted = saved && RENAMED_SETS[saved] ? RENAMED_SETS[saved] : saved;
+  const picked = pickByNameOrFirst(list, wanted);
+  if (picked && saved && picked.name !== saved) {
+    try {
+      localStorage.setItem(key, picked.name);
+    } catch {
+      // storage unavailable: the fallback is still used for this page
+    }
+  }
+  return picked;
+}
+
 export async function loadBoardTheme() {
   const cfg = await loadBoardThemeConfig();
   const sel = readSelection();
-  const bg = pickByNameOrFirst(cfg.background_sets, sel.backgroundSet);
-  const ps = pickByNameOrFirst(cfg.piece_sets, sel.pieceSet);
+  const bg = settleSelection(cfg.background_sets, sel.backgroundSet, THEME_LS_KEYS.backgroundSet);
+  const ps = settleSelection(cfg.piece_sets, sel.pieceSet, THEME_LS_KEYS.pieceSet);
   return buildTheme(bg, ps);
 }
 

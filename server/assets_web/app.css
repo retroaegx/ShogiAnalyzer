@@ -916,23 +916,27 @@ textarea.field.mono { font-size: 12px; }
 .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 
 .set-title { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .06em; margin-top: 4px; }
-.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+/* compact tiles: a whole set fits in one or two rows, also on phones */
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 8px; }
+@media (min-width: 901px) { .theme-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); } }
 .theme-opt {
-  display: flex; flex-direction: column; gap: 6px; align-items: stretch;
-  padding: 6px; border-radius: 12px;
+  display: flex; flex-direction: column; gap: 4px; align-items: stretch;
+  padding: 4px; border-radius: 10px;
   border: 1px solid var(--line); background: var(--bg);
-  font-size: 12px; color: var(--muted);
+  font-size: 11px; line-height: 1.3; color: var(--muted);
+  min-width: 0;
 }
+.theme-opt > span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
 .theme-opt:hover { border-color: var(--line-strong); color: var(--text); }
 .theme-opt.on { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 1px var(--accent); }
-.theme-opt .thumb { aspect-ratio: 1; border-radius: 8px; background: center / cover no-repeat var(--surface-2); display: grid; place-items: center; overflow: hidden; }
+.theme-opt .thumb { aspect-ratio: 1; border-radius: 6px; background: center / cover no-repeat var(--surface-2); display: grid; place-items: center; overflow: hidden; }
 .theme-grid.pieces .thumb { background: var(--surface-2); }
-.theme-opt .thumb img { width: 64%; height: 64%; object-fit: contain; }
+.theme-opt .thumb img { width: 72%; height: 72%; object-fit: contain; }
 .check { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text); cursor: pointer; }
 .check input { width: 16px; height: 16px; accent-color: var(--accent); }
 .legend { width: 18px; height: 4px; border-radius: 2px; margin-left: auto; }
 .legend.red { background: rgb(239, 68, 68); }
-.legend.green { background: rgb(34, 197, 94); }
+.legend.green { background: rgb(40, 215, 200); }
 .legend.orange { background: rgb(245, 158, 11); }
 
 /* toast */

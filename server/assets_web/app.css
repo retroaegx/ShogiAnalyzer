@@ -476,13 +476,36 @@ button:disabled { cursor: not-allowed; opacity: 0.4; }
 /* arrows: filled shaft + head with a dark outline (readable on every board theme) */
 .board-overlay .arrow { stroke: rgba(8, 10, 14, .45); stroke-linejoin: round; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .35)); }
 /* engine candidates: bright green with a soft glow (thin, so the pieces stay readable) */
-.board-overlay .best > .arrow { fill: rgba(70, 225, 125, .96); stroke: rgba(225, 255, 235, .8); filter: drop-shadow(0 0 5px rgba(90, 240, 140, .85)) drop-shadow(0 1px 2px rgba(0, 0, 0, .4)); }
-.board-overlay .best.sub > .arrow { fill: rgba(70, 225, 125, .6); stroke: rgba(225, 255, 235, .4); filter: drop-shadow(0 0 4px rgba(90, 240, 140, .45)); }
-.board-overlay .next > .arrow { fill: rgba(245, 158, 11, .92); animation: arrow-pulse 1.6s ease-in-out infinite; }
+/* see-through, so the pieces and squares under an arrow stay readable; a light streak shows the direction */
+.board-overlay .best > .arrow { fill: rgba(70, 225, 125, .5); stroke: rgba(225, 255, 235, .75); filter: drop-shadow(0 0 5px rgba(90, 240, 140, .6)); }
+.board-overlay .best.sub > .arrow { fill: rgba(70, 225, 125, .28); stroke: rgba(225, 255, 235, .4); filter: drop-shadow(0 0 3px rgba(90, 240, 140, .35)); }
+.board-overlay .next > .arrow { fill: rgba(245, 158, 11, .5); stroke: rgba(255, 236, 200, .75); filter: drop-shadow(0 0 5px rgba(245, 170, 40, .55)); }
+.board-overlay .flow {
+  fill: none; stroke-linecap: butt;
+  stroke-dasharray: 26 100; stroke-dashoffset: 26;
+  filter: blur(1.5px);
+  animation: arrow-flow 2.2s cubic-bezier(.45, 0, .25, 1) infinite;
+}
+.board-overlay .best > .flow { stroke: rgba(225, 255, 235, .85); }
+.board-overlay .best.sub > .flow { stroke: rgba(225, 255, 235, .45); }
+.board-overlay .next > .flow { stroke: rgba(255, 244, 214, .85); }
+@keyframes arrow-flow { 0% { stroke-dashoffset: 26; opacity: 0; } 12% { opacity: 1; } 70% { opacity: 1; } 100% { stroke-dashoffset: -100; opacity: 0; } }
+/* drops: a ring spreading from the marker */
+.board-overlay .mk.mk circle.ripple { fill: none; stroke-opacity: 1; transform-box: fill-box; transform-origin: center; animation: drop-ripple 2.2s ease-out infinite; }
+.board-overlay .mk.mk.best circle.ripple { stroke: rgba(150, 245, 185, .9); }
+.board-overlay .mk.mk.best.sub circle.ripple { stroke: rgba(150, 245, 185, .45); }
+.board-overlay .mk.mk.next circle.ripple { stroke: rgba(255, 214, 140, .9); }
+@keyframes drop-ripple { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(1.7); opacity: 0; } }
+/* a newly shown arrow / marker fades in */
+.board-overlay .enter { animation: arrow-enter .35s ease-out; }
+@keyframes arrow-enter { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .board-overlay .flow, .board-overlay .mk .ripple { display: none; }
+  .board-overlay .enter { animation: none; }
+}
 .board-overlay .branch > .arrow { fill: rgba(245, 158, 11, .5); stroke: rgba(245, 158, 11, .95); }
 .board-overlay .mk.best.sub > circle, .board-overlay .mk.best.sub > text,
 .board-overlay .mk.branch > circle, .board-overlay .mk.branch > text { opacity: .45; }
-@keyframes arrow-pulse { 50% { fill-opacity: .62; } }
 
 /* small "候補手 / 指し手 / 分岐" labels beside the arrows */
 .board-overlay .mv-label rect { fill: rgba(12, 14, 18, .86); }
@@ -506,8 +529,8 @@ button:disabled { cursor: not-allowed; opacity: 0.4; }
 .board-overlay .mv-label.lab-branch rect { stroke: rgba(245, 158, 11, .6); stroke-dasharray: 3 2; }
 .board-overlay .mv-label.lab-branch text { fill: #f5d9a8; }
 .board-overlay .mk circle { stroke: #fff; stroke-opacity: .9; }
-.board-overlay .mk.best circle { fill: rgba(80, 220, 130, .95); }
-.board-overlay .mk.next circle, .board-overlay .mk.branch circle { fill: rgba(245, 158, 11, .95); }
+.board-overlay .mk.best circle { fill: rgba(80, 220, 130, .72); }
+.board-overlay .mk.next circle, .board-overlay .mk.branch circle { fill: rgba(245, 158, 11, .72); }
 .board-overlay .mk text { fill: #fff; stroke: rgba(0, 0, 0, .78); paint-order: stroke; stroke-linejoin: round; font-weight: 900; font-family: var(--font-jp); text-anchor: middle; dominant-baseline: central; }
 .board-overlay .mk { filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .38)); }
 .piece-token { font-family: var(--font-jp); font-weight: 700; font-size: calc(var(--cell) * .5); color: #111; position: relative; z-index: 1; }

@@ -1777,6 +1777,8 @@ function renderAnalysis() {
 
 // ---------- eval graph ----------
 let graphGeom = null;
+// while dragging on the graph: the ply under the pointer (the marker follows it at once)
+let graphSeekPly = null;
 
 function renderEvalGraph() {
   const cv = els.evalGraph;
@@ -1892,14 +1894,15 @@ function renderEvalGraph() {
   }
 
   // current ply marker
-  const cx = x(curPly());
+  const shownPly = graphSeekPly ?? curPly();
+  const cx = x(shownPly);
   ctx.strokeStyle = accent;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(cx, padY);
   ctx.lineTo(cx, yBottom);
   ctx.stroke();
-  const curPt = pts.find((p) => p[2] === curPly());
+  const curPt = pts.find((p) => p[2] === shownPly);
   if (curPt) {
     ctx.fillStyle = "rgba(240,198,116,0.28)";
     ctx.beginPath();
@@ -2087,12 +2090,60 @@ function drawGraphBranches(ctx, g) {
   }
 }
 
-function onGraphClick(e) {
-  if (!graphGeom || !state.mainLine.length) return;
-  const rect = els.evalGraph.getBoundingClientRect();
-  const t = (e.clientX - rect.left - graphGeom.x0) / (graphGeom.x1 - graphGeom.x0);
-  const i = clamp(Math.round(t * graphGeom.n), 0, state.mainLine.length - 1);
-  jump(state.mainLine[i]);
+/**
+ * The graph works as a seek bar: press anywhere on it and the position moves there, keep the
+ * button / finger down and drag to scrub through the moves, let go to settle. Only the horizontal
+ * position counts, and once pressed the pointer may wander off the graph (captured).
+ */
+function wireGraphSeek() {
+  const cv = els.evalGraph;
+  let seek = null; // { id, line, target, sentAt, timer }
+  const plyAt = (clientX) => {
+    const rect = cv.getBoundingClientRect();
+    const t = (clientX - rect.left - graphGeom.x0) / (graphGeom.x1 - graphGeom.x0);
+    return clamp(Math.round(t * graphGeom.n), 0, seek.line.length - 1);
+  };
+  // the board follows while dragging, at most every 90 ms; the last spot is always sent
+  const send = () => {
+    clearTimeout(seek.timer);
+    seek.timer = null;
+    seek.sentAt = performance.now();
+    jump(seek.line[seek.target]);
+  };
+  const moveTo = (clientX) => {
+    const i = plyAt(clientX);
+    if (i === seek.target) return;
+    seek.target = i;
+    graphSeekPly = i;
+    renderEvalGraph();
+    const wait = 90 - (performance.now() - seek.sentAt);
+    if (wait <= 0) send();
+    else if (!seek.timer) seek.timer = setTimeout(send, wait);
+  };
+  const end = (e) => {
+    if (!seek || e.pointerId !== seek.id) return;
+    if (seek.timer) send();
+    seek = null;
+    graphSeekPly = null;
+    cv.classList.remove("seeking");
+    renderEvalGraph();
+  };
+  cv.addEventListener("pointerdown", (e) => {
+    if (seek || (e.pointerType === "mouse" && e.button !== 0)) return;
+    if (!graphGeom || !state.mainLine.length || kifuLocked()) return;
+    e.preventDefault();
+    cv.setPointerCapture(e.pointerId);
+    cv.classList.add("seeking");
+    // the line as it is now: jumping back inside it keeps it, so the moves under the bar stay put
+    seek = { id: e.pointerId, line: [...state.mainLine], target: -1, sentAt: 0, timer: null };
+    moveTo(e.clientX);
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (seek && e.pointerId === seek.id) moveTo(e.clientX);
+  });
+  cv.addEventListener("pointerup", end);
+  cv.addEventListener("pointercancel", end);
+  cv.addEventListener("lostpointercapture", end);
 }
 
 // ---------- kifu ----------
@@ -2822,7 +2873,8 @@ function wireDrawerSwipe() {
       if (!isMobile() || e.touches.length !== 1 || openDialogEl) return;
       const t = e.touches[0];
       const open = document.body.classList.contains("kifu-open");
-      const fromEdge = !open && t.clientX > window.innerWidth - 24;
+      // (not on the graph: dragging there seeks through the moves)
+      const fromEdge = !open && t.clientX > window.innerWidth - 24 && e.target !== els.evalGraph;
       const onDrawer = open && els.kifuCard.contains(e.target);
       start = fromEdge || onDrawer ? { x: t.clientX, y: t.clientY, open } : null;
     },
@@ -3040,7 +3092,7 @@ function wire() {
     sendWs("analysis:set_multipv", { multipv: v });
   });
 
-  els.evalGraph.addEventListener("click", onGraphClick);
+  wireGraphSeek();
 
   // title: label + pencil -> rename popup. The same popup asks for a name on the first save
   // of a kifu that still has its automatic name (kif_YYYYMMDD_hhmmss).

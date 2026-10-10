@@ -475,32 +475,30 @@ button:disabled { cursor: not-allowed; opacity: 0.4; }
 }
 /* arrows: filled shaft + head with a dark outline (readable on every board theme) */
 .board-overlay .arrow { stroke: rgba(8, 10, 14, .45); stroke-linejoin: round; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .35)); }
-/* engine candidates: bright green with a soft glow (thin, so the pieces stay readable) */
-/* see-through, so the pieces and squares under an arrow stay readable; a light streak shows the direction */
-.board-overlay .best > .arrow { fill: rgba(70, 225, 125, .5); stroke: rgba(225, 255, 235, .75); filter: drop-shadow(0 0 5px rgba(90, 240, 140, .6)); }
-.board-overlay .best.sub > .arrow { fill: rgba(70, 225, 125, .28); stroke: rgba(225, 255, 235, .4); filter: drop-shadow(0 0 3px rgba(90, 240, 140, .35)); }
+/* engine candidates: cyan-leaning green with a soft glow */
+/* see-through, so the pieces and squares under an arrow stay readable; a light runs round the outline */
+.board-overlay .best > .arrow { fill: rgba(40, 215, 200, .5); stroke: rgba(220, 255, 252, .75); filter: drop-shadow(0 0 5px rgba(60, 225, 215, .6)); }
+.board-overlay .best.sub > .arrow { fill: rgba(40, 215, 200, .28); stroke: rgba(220, 255, 252, .4); filter: drop-shadow(0 0 3px rgba(60, 225, 215, .35)); }
 .board-overlay .next > .arrow { fill: rgba(245, 158, 11, .5); stroke: rgba(255, 236, 200, .75); filter: drop-shadow(0 0 5px rgba(245, 170, 40, .55)); }
-.board-overlay .flow {
-  fill: none; stroke-linecap: butt;
-  stroke-dasharray: 26 100; stroke-dashoffset: 26;
-  filter: blur(1.5px);
-  animation: arrow-flow 2.2s cubic-bezier(.45, 0, .25, 1) infinite;
+.board-overlay .orbit {
+  fill: none; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 16 84;
+  animation: arrow-orbit 1.3s linear infinite;
 }
-.board-overlay .best > .flow { stroke: rgba(225, 255, 235, .85); }
-.board-overlay .best.sub > .flow { stroke: rgba(225, 255, 235, .45); }
-.board-overlay .next > .flow { stroke: rgba(255, 244, 214, .85); }
-@keyframes arrow-flow { 0% { stroke-dashoffset: 26; opacity: 0; } 12% { opacity: 1; } 70% { opacity: 1; } 100% { stroke-dashoffset: -100; opacity: 0; } }
-/* drops: a ring spreading from the marker */
-.board-overlay .mk.mk circle.ripple { fill: none; stroke-opacity: 1; transform-box: fill-box; transform-origin: center; animation: drop-ripple 2.2s ease-out infinite; }
-.board-overlay .mk.mk.best circle.ripple { stroke: rgba(150, 245, 185, .9); }
-.board-overlay .mk.mk.best.sub circle.ripple { stroke: rgba(150, 245, 185, .45); }
-.board-overlay .mk.mk.next circle.ripple { stroke: rgba(255, 214, 140, .9); }
-@keyframes drop-ripple { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(1.7); opacity: 0; } }
+.board-overlay .best > .orbit { stroke: #e6fffd; filter: drop-shadow(0 0 3px rgba(80, 235, 230, .95)) drop-shadow(0 0 7px rgba(60, 220, 230, .7)); }
+.board-overlay .best.sub > .orbit { stroke: rgba(230, 255, 253, .55); filter: drop-shadow(0 0 4px rgba(60, 220, 230, .5)); }
+.board-overlay .next > .orbit { stroke: #fff4d6; filter: drop-shadow(0 0 3px rgba(255, 196, 90, .95)) drop-shadow(0 0 7px rgba(245, 170, 40, .7)); }
+@keyframes arrow-orbit { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
+/* drops: the same light round the marker */
+.board-overlay .mk.mk circle.orbit { fill: none; stroke-opacity: 1; }
+.board-overlay .mk.mk.best circle.orbit { stroke: #e6fffd; }
+.board-overlay .mk.mk.best.sub circle.orbit { stroke: rgba(230, 255, 253, .55); opacity: 1; }
+.board-overlay .mk.mk.next circle.orbit { stroke: #fff4d6; }
 /* a newly shown arrow / marker fades in */
 .board-overlay .enter { animation: arrow-enter .35s ease-out; }
 @keyframes arrow-enter { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .board-overlay .flow, .board-overlay .mk .ripple { display: none; }
+  .board-overlay .orbit { display: none; }
   .board-overlay .enter { animation: none; }
 }
 .board-overlay .branch > .arrow { fill: rgba(245, 158, 11, .5); stroke: rgba(245, 158, 11, .95); }
@@ -519,17 +517,17 @@ button:disabled { cursor: not-allowed; opacity: 0.4; }
 .board-overlay g.mv-label > text .lab-score { font-family: var(--font-num); font-weight: 700; letter-spacing: .02em; fill: #f3ede2; }
 .board-overlay g.mv-label > text .lab-score.minus { fill: #b9c8ff; }
 .board-overlay g.mv-label > text .lab-promo { font-weight: 700; fill: #f5d9a8; }
-.board-overlay .mv-label.lab-best rect { stroke: rgba(120, 245, 160, .95); }
-.board-overlay .mv-label.lab-best text { fill: #d6fbe2; }
+.board-overlay .mv-label.lab-best rect { stroke: rgba(90, 235, 220, .95); }
+.board-overlay .mv-label.lab-best text { fill: #d2fbf6; }
 .board-overlay .mv-label.lab-sub { opacity: .85; }
-.board-overlay .mv-label.lab-sub rect { stroke: rgba(120, 245, 160, .6); }
+.board-overlay .mv-label.lab-sub rect { stroke: rgba(90, 235, 220, .6); }
 .board-overlay .mv-label.lab-next rect { stroke: rgba(245, 158, 11, .95); }
 .board-overlay .mv-label.lab-next text { fill: #ffe3b3; }
 .board-overlay .mv-label.lab-branch { opacity: .8; }
 .board-overlay .mv-label.lab-branch rect { stroke: rgba(245, 158, 11, .6); stroke-dasharray: 3 2; }
 .board-overlay .mv-label.lab-branch text { fill: #f5d9a8; }
 .board-overlay .mk circle { stroke: #fff; stroke-opacity: .9; }
-.board-overlay .mk.best circle { fill: rgba(80, 220, 130, .72); }
+.board-overlay .mk.best circle { fill: rgba(40, 205, 195, .72); }
 .board-overlay .mk.next circle, .board-overlay .mk.branch circle { fill: rgba(245, 158, 11, .72); }
 .board-overlay .mk text { fill: #fff; stroke: rgba(0, 0, 0, .78); paint-order: stroke; stroke-linejoin: round; font-weight: 900; font-family: var(--font-jp); text-anchor: middle; dominant-baseline: central; }
 .board-overlay .mk { filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .38)); }

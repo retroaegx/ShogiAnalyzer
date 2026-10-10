@@ -654,6 +654,9 @@ function setGame(game) {
   if ("analysis_enabled" in ui) state.analysis.enabled = Boolean(ui.analysis_enabled);
   if (ui.analysis_multipv) state.analysis.multipv = clamp(Number(ui.analysis_multipv) || 1, 1, 5);
 
+  // another game (新規 / 貼り付け / 読込 / 開く) starts from 先手's side again
+  if (prevGame && prevGame !== game.game_id) state.flip = false;
+
   if (prevNode !== game.current_node_id || prevGame !== game.game_id) {
     if (closePromotion) closePromotion(null);
     clearSelection(false);
@@ -1911,6 +1914,8 @@ function renderEvalGraph() {
     ctx.stroke();
   }
 
+  drawGraphBranches(ctx, { x, pts, y, padY, yBottom, x0, fs, font, compact, axisTop: showAxis ? H - Math.max(8, fs - 2) - 2 : H });
+
   // labels
   ctx.fillStyle = "rgba(154,161,173,0.75)";
   ctx.font = font;
@@ -1929,6 +1934,83 @@ function renderEvalGraph() {
     ctx.fillStyle = "rgba(154,161,173,0.7)";
     ctx.font = `${Math.max(8, fs - 2)}px system-ui, sans-serif`;
     for (let i = step; i <= n; i += step) ctx.fillText(String(i), clamp(x(i), x0 + 8, x1 - 8), H);
+  }
+  ctx.textBaseline = "alphabetic";
+}
+
+/**
+ * Branch marks for the line shown: a small diamond at every move that has other moves beside it
+ * (with their count when more than one). Each mark sits at the top or the bottom edge of the plot,
+ * whichever is further from the evaluation line there, so it never covers the line.
+ */
+function drawGraphBranches(ctx, g) {
+  const line = state.mainLine;
+  if (!state.game || line.length < 2) return;
+  const r = g.compact ? 3.5 : 5;
+  // the evaluation line's height at a ply (between analysed points: straight, as drawn)
+  const lineY = (i) => {
+    const p = g.pts;
+    if (!p.length) return g.y(0);
+    if (i <= p[0][2]) return p[0][1];
+    for (let k = 1; k < p.length; k++) {
+      if (i <= p[k][2]) {
+        const [, ya, ia] = p[k - 1];
+        const [, yb, ib] = p[k];
+        return ya + ((yb - ya) * (i - ia)) / Math.max(ib - ia, 1);
+      }
+    }
+    return p[p.length - 1][1];
+  };
+  const topY = g.padY + r + 1;
+  // above the move numbers under the plot
+  const bottomY = Math.min(g.yBottom - r - 1, g.axisTop - r - 1);
+  // keep off the ☗先手 / ☖後手 captions at the left
+  ctx.font = g.font;
+  const capW = g.compact ? 0 : ctx.measureText("☖後手").width + 10;
+  ctx.font = `${Math.max(8, g.fs - 2)}px system-ui, sans-serif`;
+  ctx.textBaseline = "middle";
+  const perPly = (g.x(line.length - 1) - g.x0) / Math.max(line.length - 1, 1);
+  const capBoxes = g.compact
+    ? []
+    : [
+        { y0: g.padY + 2, y1: g.padY + 2 + g.fs }, // ☗先手
+        { y0: g.yBottom - 2 - g.fs, y1: g.yBottom - 2 }, // ☖後手
+      ];
+  for (let i = 1; i < line.length; i++) {
+    const parent = node(line[i])?.parent_id;
+    const others = (state.game.children_index?.[parent] || []).length - 1;
+    if (others < 1) continue;
+    const bx = g.x(i);
+    // where the line runs across the mark's width
+    const d = (r + 2) / Math.max(perPly, 0.01);
+    const ys = [lineY(i - d), lineY(i), lineY(i + d)];
+    const lo = Math.min(...ys) - r - 3;
+    const hi = Math.max(...ys) + r + 3;
+    const clear = (cy) => (cy < lo || cy > hi) && !(bx - r < g.x0 + capW && capBoxes.some((b) => cy + r > b.y0 && cy - r < b.y1));
+    // the edge further from the line first, then the other edge, then stepping in towards the middle
+    const ly = lineY(i);
+    const [far, near] = Math.abs(ly - topY) >= Math.abs(ly - bottomY) ? [topY, bottomY] : [bottomY, topY];
+    const cands = [far, near];
+    for (let k = 1; k * r * 2 < bottomY - topY; k++) cands.push(far + Math.sign(near - far) * k * r * 2, near + Math.sign(far - near) * k * r * 2);
+    const by = cands.find(clear) ?? far;
+    const cur = line[i] === state.game.current_node_id;
+    ctx.fillStyle = cur ? "#d6f0ff" : "#7cc4ff";
+    ctx.strokeStyle = "rgba(6,10,20,0.85)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(bx, by - r);
+    ctx.lineTo(bx + r, by);
+    ctx.lineTo(bx, by + r);
+    ctx.lineTo(bx - r, by);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    if (others > 1 && !g.compact) {
+      ctx.fillStyle = "rgba(170,210,255,0.9)";
+      const right = bx + r + 12 > g.x(line.length - 1); // near the right edge: count on the left
+      ctx.textAlign = right ? "right" : "left";
+      ctx.fillText(String(others), right ? bx - r - 2 : bx + r + 2, by);
+    }
   }
   ctx.textBaseline = "alphabetic";
 }

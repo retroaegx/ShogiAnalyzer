@@ -792,7 +792,7 @@ body.batch-lock .board-grid, body.batch-lock .board-grid .sq.mine { cursor: not-
 /* ============================================================
    Dialogs
    ============================================================ */
-.dialog-host { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 16px; }
+.dialog-host { position: fixed; inset: 0; z-index: 80; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 16px; }
 .dialog-backdrop { position: absolute; inset: 0; background: rgba(5, 6, 8, .66); backdrop-filter: blur(3px); animation: fade .15s ease-out; }
 .dialog {
   position: relative;
@@ -811,7 +811,7 @@ body.batch-lock .board-grid, body.batch-lock .board-grid .sq.mine { cursor: not-
 @keyframes fade { from { opacity: 0; } }
 .dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 8px; }
 .dialog-head h3 { margin: 0; font-size: 16px; font-weight: 700; }
-.dialog-body { padding: 8px 18px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.dialog-body { min-height: 0; padding: 8px 18px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 .dialog-body p { margin: 0; line-height: 1.6; }
 .dialog-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px 16px; border-top: 1px solid var(--line); }
 .icon-btn { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; border: 0; background: transparent; color: var(--muted); }

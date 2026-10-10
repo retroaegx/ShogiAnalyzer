@@ -30,8 +30,8 @@ const $ = (id) => document.getElementById(id);
 const THEME_NAMES = {
   "theme.bg.wood": "木目",
   "theme.bg.sansui": "山水",
-  "theme.bg.neon_night": "ネオンナイト",
-  "theme.bg.white_gold": "ホワイトゴールド",
+  "theme.bg.neon_night": "ネオン\u200bナイト", // \u200b: where the name may wrap in a small tile
+  "theme.bg.white_gold": "ホワイト\u200bゴールド",
   "theme.piece.tsuge": "黄楊",
   "theme.piece.mokume": "杢目",
   "theme.piece.urushi": "漆黒",

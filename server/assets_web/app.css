@@ -716,7 +716,8 @@ body.batch-lock .board-grid, body.batch-lock .board-grid .sq.mine { cursor: not-
 
 /* graph */
 .graph-wrap { padding: 0 10px 10px; }
-.graph { display: block; width: 100%; height: 150px; cursor: pointer; border-radius: 8px; }
+.graph { display: block; width: 100%; height: 150px; cursor: pointer; border-radius: 8px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.graph.seeking { cursor: ew-resize; }
 
 /* kifu */
 /* analysis + graph keep their natural height (they were shrinking and clipping the PV rows); the kifu takes the rest */

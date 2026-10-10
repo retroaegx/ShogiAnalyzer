@@ -1940,8 +1940,8 @@ function renderEvalGraph() {
 
 /**
  * Branch marks for the line shown: a small diamond at every move that has other moves beside it
- * (with their count when more than one). Each mark sits at the top or the bottom edge of the plot,
- * whichever is further from the evaluation line there, so it never covers the line.
+ * (with their count when more than one). Each mark sits just above the evaluation line at that move
+ * (below it when there is no room above), close enough to read as "this move" but never on the line.
  */
 function drawGraphBranches(ctx, g) {
   const line = state.mainLine;
@@ -1986,13 +1986,12 @@ function drawGraphBranches(ctx, g) {
     const ys = [lineY(i - d), lineY(i), lineY(i + d)];
     const lo = Math.min(...ys) - r - 3;
     const hi = Math.max(...ys) + r + 3;
-    const clear = (cy) => (cy < lo || cy > hi) && !(bx - r < g.x0 + capW && capBoxes.some((b) => cy + r > b.y0 && cy - r < b.y1));
-    // the edge further from the line first, then the other edge, then stepping in towards the middle
-    const ly = lineY(i);
-    const [far, near] = Math.abs(ly - topY) >= Math.abs(ly - bottomY) ? [topY, bottomY] : [bottomY, topY];
-    const cands = [far, near];
-    for (let k = 1; k * r * 2 < bottomY - topY; k++) cands.push(far + Math.sign(near - far) * k * r * 2, near + Math.sign(far - near) * k * r * 2);
-    const by = cands.find(clear) ?? far;
+    const inside = (cy) => cy >= topY && cy <= bottomY;
+    const clear = (cy) => inside(cy) && (cy < lo || cy > hi) && !(bx - r < g.x0 + capW && capBoxes.some((b) => cy + r > b.y0 && cy - r < b.y1));
+    // right above the line, else right below it, then a little further out on either side
+    const cands = [];
+    for (let k = 0; k < 6; k++) cands.push(lo - k * r * 1.6, hi + k * r * 1.6);
+    const by = cands.find(clear) ?? clamp(lo, topY, bottomY);
     const cur = line[i] === state.game.current_node_id;
     ctx.fillStyle = cur ? "#d6f0ff" : "#7cc4ff";
     ctx.strokeStyle = "rgba(6,10,20,0.85)";

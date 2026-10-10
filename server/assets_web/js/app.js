@@ -1104,10 +1104,11 @@ function moveLabel(anchor, normal, dist, text, cls, primary, score = null, owner
  * Arrow (shaft + head) for a move, or a marker for a drop, with a small label.
  * kind: "best" | "best sub" | "next" | "branch"; score: optional {text, cls} for candidates
  */
-// Arrow animations: a short light runs round each arrow's outline (round the marker for drops).
-// The overlay is rebuilt on every analysis update, so each animation starts at the phase of a
-// shared clock and keeps running smoothly; only arrows that were not shown before fade in.
+// Arrow animations: a light streak runs from the moving piece to the destination (a ripple for
+// drops). The overlay is rebuilt on every analysis update, so each animation starts at the phase
+// of a shared clock and keeps running smoothly; only arrows that were not shown before fade in.
 const ARROW_FLOW_MS = 1300;
+let arrowClipSeq = 0;
 let shownArrowKeys = new Set();
 let drawnArrowKeys = new Set();
 const flowPhase = (el, ms = ARROW_FLOW_MS) => (el.style.animationDelay = `${-(performance.now() % ms).toFixed(0)}ms`);
@@ -1131,12 +1132,12 @@ function overlayShape(usi, kind, weight = 1, labelText = "", score = null, owner
     const name = { P: "歩", L: "香", N: "桂", S: "銀", G: "金", B: "角", R: "飛" }[type] || "打";
     const r = cell * 0.34 * Math.max(weight, 0.8);
     g.setAttribute("class", `mk ${kind}${fresh ? " enter" : ""}`);
-    g.appendChild(svgEl("circle", { cx: p1.x, cy: p1.y, r, "stroke-width": cell * 0.05 }));
     if (kind !== "branch") {
-      const orbit = svgEl("circle", { class: "orbit", cx: p1.x, cy: p1.y, r, "stroke-width": cell * 0.06, pathLength: 100 });
-      flowPhase(orbit);
-      g.appendChild(orbit);
+      const ripple = svgEl("circle", { class: "ripple", cx: p1.x, cy: p1.y, r, "stroke-width": cell * 0.035 });
+      flowPhase(ripple);
+      g.appendChild(ripple);
     }
+    g.appendChild(svgEl("circle", { cx: p1.x, cy: p1.y, r, "stroke-width": cell * 0.05 }));
     const text = svgEl("text", { x: p1.x, y: p1.y, "font-size": r * 1.2, "stroke-width": cell * 0.045 });
     // oriented like the dropping side's pieces (upside down for the side at the top)
     if (upsideDown(state.parsed?.currentPlayer || "sente")) text.setAttribute("transform", `rotate(180 ${p1.x} ${p1.y})`);
@@ -1181,10 +1182,20 @@ function overlayShape(usi, kind, weight = 1, labelText = "", score = null, owner
   );
   if (fresh) g.classList.add("enter");
   if (kind !== "branch") {
-    // a short light running round the arrow's outline
-    const orbit = svgEl("path", { class: "orbit", d, "stroke-width": (cell * 0.045).toFixed(1), pathLength: 100 });
-    flowPhase(orbit);
-    g.appendChild(orbit);
+    // the streak: a short dash along the arrow's center line, cut to the arrow's outline
+    const id = `arclip${++arrowClipSeq}`;
+    const clip = svgEl("clipPath", { id });
+    clip.appendChild(svgEl("path", { d }));
+    g.appendChild(clip);
+    const flow = svgEl("path", {
+      class: "flow",
+      d: `M ${start.x.toFixed(1)} ${start.y.toFixed(1)} L ${tip.x.toFixed(1)} ${tip.y.toFixed(1)}`,
+      "clip-path": `url(#${id})`,
+      "stroke-width": (headW * 1.3).toFixed(1),
+      pathLength: 100,
+    });
+    flowPhase(flow);
+    g.appendChild(flow);
   }
 
   if (labelText || score) {

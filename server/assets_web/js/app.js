@@ -27,9 +27,20 @@ import {
 
 const $ = (id) => document.getElementById(id);
 
+// UI themes (表示設定 → テーマ): colours / background of the whole screen, defined in app.css
+// under [data-theme]. The first one is the default. themeColor: the browser / app bar colour.
+const UI_THEMES = [
+  { id: "sumikin", name: "墨金", themeColor: "#070a11" },
+  { id: "aurora", name: "極光", themeColor: "#0d0a26" },
+  { id: "emerald", name: "翠苑", themeColor: "#05150f" },
+  { id: "sakura", name: "暁桜", themeColor: "#f6e2d6" },
+  { id: "pearl", name: "白金", themeColor: "#f5f1e8" },
+];
+
 const THEME_NAMES = {
   "theme.bg.wood": "木目",
   "theme.bg.sansui": "山水",
+  "theme.bg.fujitsuki": "藤月",
   "theme.bg.neon_night": "ネオン\u200bナイト", // \u200b: where the name may wrap in a small tile
   "theme.bg.white_gold": "ホワイト\u200bゴールド",
   "theme.piece.tsuge": "黄楊",
@@ -149,6 +160,7 @@ const els = {
   exportCopy: $("exportCopy"),
   exportDownload: $("exportDownload"),
   dlgSettings: $("dlgSettings"),
+  uiThemeChoices: $("uiThemeChoices"),
   bgChoices: $("bgChoices"),
   pieceChoices: $("pieceChoices"),
   optCoordsSeg: $("optCoordsSeg"),
@@ -193,7 +205,7 @@ const state = {
   sessionId: null,
   ownerToken: null,
   flip: false,
-  opts: { coords: "overlay", evalBar: true, legal: true, lastMove: true, bestMove: true, nextMove: true, arrowLabels: true },
+  opts: { theme: UI_THEMES[0].id, coords: "overlay", evalBar: true, legal: true, lastMove: true, bestMove: true, nextMove: true, arrowLabels: true },
 
   theme: null,
   geom: null, // {natW, natH, rx, ry, rw, rh} in image px
@@ -282,6 +294,16 @@ function normalizeOpts() {
   if (state.opts.coords === true) state.opts.coords = "overlay";
   if (state.opts.coords === false) state.opts.coords = "off";
   if (!["overlay", "outside", "off"].includes(state.opts.coords)) state.opts.coords = "overlay";
+  // a theme that no longer exists: the default one
+  if (!UI_THEMES.some((t) => t.id === state.opts.theme)) state.opts.theme = UI_THEMES[0].id;
+}
+
+/** Put the chosen UI theme on the page (the graph is drawn on a canvas, so it is redrawn). */
+function applyUiTheme() {
+  const t = UI_THEMES.find((x) => x.id === state.opts.theme) || UI_THEMES[0];
+  document.documentElement.dataset.theme = t.id;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t.themeColor);
+  if (state.game) renderEvalGraph();
 }
 
 function fmtNum(n) {
@@ -1816,6 +1838,26 @@ let graphGeom = null;
 // while dragging on the graph: the ply under the pointer (the marker follows it at once)
 let graphSeekPly = null;
 
+/** The eval graph's colours, from the UI theme's CSS variables (fallbacks: the 墨金 theme). */
+function graphPalette(css) {
+  const v = (name, fb) => css.getPropertyValue(name).trim() || fb;
+  return {
+    line: v("--g-line", "#f3cf86"),
+    up: v("--g-up-rgb", "240,198,116"),
+    down: v("--g-down-rgb", "130,155,230"),
+    grid: v("--g-grid-rgb", "227,178,90"),
+    label: v("--g-label-rgb", "154,161,173"),
+    plate: v("--g-plate-rgb", "255,255,255"),
+    dot: v("--g-dot", "#f6dc9c"),
+    cur: v("--g-cur", "#fff1cf"),
+    pin: v("--g-pin", "#f6dc9c"),
+    pinLit: v("--g-pin-lit", "#d9a646"),
+    pinInk: v("--g-pin-ink", "#3a2606"),
+    discTop: v("--g-disc-top", "rgba(46,52,72,0.98)"),
+    discBottom: v("--g-disc-bottom", "rgba(10,14,26,0.98)"),
+  };
+}
+
 function renderEvalGraph() {
   const cv = els.evalGraph;
   const rect = cv.getBoundingClientRect();
@@ -1831,6 +1873,8 @@ function renderEvalGraph() {
 
   const css = getComputedStyle(document.documentElement);
   const accent = css.getPropertyValue("--accent").trim() || "#e3b25a";
+  // colours follow the UI theme (CSS variables; the fallbacks are the 墨金 theme's)
+  const g = graphPalette(css);
 
   const line = state.mainLine;
   const n = Math.max(line.length - 1, 1);
@@ -1867,19 +1911,19 @@ function renderEvalGraph() {
   graphGeom = { n, x0, x1 };
 
   // background: sente half, grid lines with values (±lim, ±lim/2, 0)
-  ctx.fillStyle = "rgba(255,255,255,0.025)";
+  ctx.fillStyle = `rgba(${g.plate},0.025)`;
   ctx.fillRect(x0, padY, x1 - x0, y(0) - padY);
   ctx.lineWidth = 1;
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   for (const v of compact ? [lim, 0, -lim] : [lim, lim / 2, 0, -lim / 2, -lim]) {
     const gy = Math.round(y(v)) + 0.5;
-    ctx.strokeStyle = v === 0 ? "rgba(227,178,90,0.32)" : "rgba(227,178,90,0.11)";
+    ctx.strokeStyle = v === 0 ? `rgba(${g.grid},0.32)` : `rgba(${g.grid},0.11)`;
     ctx.beginPath();
     ctx.moveTo(x0, gy);
     ctx.lineTo(x1, gy);
     ctx.stroke();
-    ctx.fillStyle = v === 0 ? "rgba(154,161,173,0.85)" : "rgba(154,161,173,0.7)";
+    ctx.fillStyle = v === 0 ? `rgba(${g.label},0.85)` : `rgba(${g.label},0.7)`;
     ctx.fillText(fmt(v), gutter - 5, gy);
   }
   ctx.textBaseline = "alphabetic";
@@ -1892,10 +1936,10 @@ function renderEvalGraph() {
     const mid = y(0);
     const grad = ctx.createLinearGradient(0, padY, 0, yBottom);
     const midStop = clamp((mid - padY) / Math.max(yBottom - padY, 1), 0, 1);
-    grad.addColorStop(0, "rgba(240,198,116,0.46)");
-    grad.addColorStop(midStop, "rgba(240,198,116,0.05)");
-    grad.addColorStop(midStop, "rgba(130,155,230,0.05)");
-    grad.addColorStop(1, "rgba(130,155,230,0.38)");
+    grad.addColorStop(0, `rgba(${g.up},0.46)`);
+    grad.addColorStop(midStop, `rgba(${g.up},0.05)`);
+    grad.addColorStop(midStop, `rgba(${g.down},0.05)`);
+    grad.addColorStop(1, `rgba(${g.down},0.38)`);
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.moveTo(pts[0][0], mid);
@@ -1904,17 +1948,17 @@ function renderEvalGraph() {
     ctx.closePath();
     ctx.fill();
 
-    ctx.strokeStyle = "#f3cf86";
+    ctx.strokeStyle = g.line;
     ctx.lineWidth = 1.8;
     ctx.lineJoin = "round";
-    ctx.shadowColor = "rgba(240,198,116,0.75)";
+    ctx.shadowColor = `rgba(${g.up},0.75)`;
     ctx.shadowBlur = 8;
     ctx.beginPath();
     pts.forEach(([px, py], k) => (k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
     ctx.stroke();
     ctx.shadowBlur = 0;
     if (pts.length < 40) {
-      ctx.fillStyle = "#f6dc9c";
+      ctx.fillStyle = g.dot;
       for (const [px, py] of pts) {
         ctx.beginPath();
         ctx.arc(px, py, 1.8, 0, Math.PI * 2);
@@ -1922,7 +1966,7 @@ function renderEvalGraph() {
       }
     }
   } else {
-    ctx.fillStyle = "rgba(154,161,173,0.7)";
+    ctx.fillStyle = `rgba(${g.label},0.7)`;
     ctx.font = "12px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.font = font;
@@ -1940,11 +1984,11 @@ function renderEvalGraph() {
   ctx.stroke();
   const curPt = pts.find((p) => p[2] === shownPly);
   if (curPt) {
-    ctx.fillStyle = "rgba(240,198,116,0.28)";
+    ctx.fillStyle = `rgba(${g.up},0.28)`;
     ctx.beginPath();
     ctx.arc(curPt[0], curPt[1], 8, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#fff1cf";
+    ctx.fillStyle = g.cur;
     ctx.strokeStyle = accent;
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -1953,10 +1997,10 @@ function renderEvalGraph() {
     ctx.stroke();
   }
 
-  drawGraphBranches(ctx, { x, pts, y, padY, yBottom, x0, fs, font, compact, axisTop: showAxis ? H - Math.max(8, fs - 2) - 2 : H });
+  drawGraphBranches(ctx, { pal: g, x, pts, y, padY, yBottom, x0, fs, font, compact, axisTop: showAxis ? H - Math.max(8, fs - 2) - 2 : H });
 
   // labels
-  ctx.fillStyle = "rgba(154,161,173,0.75)";
+  ctx.fillStyle = `rgba(${g.label},0.75)`;
   ctx.font = font;
   ctx.textAlign = "left";
   if (!compact) {
@@ -1970,7 +2014,7 @@ function renderEvalGraph() {
     const step = n <= 60 ? 10 : n <= 150 ? 20 : 50;
     ctx.textBaseline = "bottom";
     ctx.textAlign = "center";
-    ctx.fillStyle = "rgba(154,161,173,0.7)";
+    ctx.fillStyle = `rgba(${g.label},0.7)`;
     ctx.font = `${Math.max(8, fs - 2)}px system-ui, sans-serif`;
     for (let i = step; i <= n; i += step) ctx.fillText(String(i), clamp(x(i), x0 + 8, x1 - 8), H);
   }
@@ -2045,16 +2089,16 @@ function drawGraphBranches(ctx, g) {
     pins.push(pin);
   }
 
-  const css = getComputedStyle(document.documentElement);
-  const gold = css.getPropertyValue("--gold-hi").trim() || "#f6dc9c";
+  const pal = g.pal;
+  const gold = pal.pin;
   for (const p of pins) {
     const cur = line[p.i] === state.game.current_node_id;
     const edge = p.cy - p.dir * R; // where the stem meets the badge
     ctx.save();
     // stem: fades in from the line towards the badge
     const sg = ctx.createLinearGradient(0, p.from, 0, edge);
-    sg.addColorStop(0, "rgba(240,198,116,0)");
-    sg.addColorStop(1, cur ? "rgba(255,236,190,0.95)" : "rgba(240,198,116,0.75)");
+    sg.addColorStop(0, `rgba(${pal.up},0)`);
+    sg.addColorStop(1, cur ? pal.cur : `rgba(${pal.up},0.75)`);
     ctx.strokeStyle = sg;
     ctx.lineWidth = 1.2;
     ctx.beginPath();
@@ -2062,29 +2106,29 @@ function drawGraphBranches(ctx, g) {
     ctx.lineTo(p.bx, edge);
     ctx.stroke();
     // badge: dark glass disc with a gold ring and a soft glow
-    ctx.shadowColor = cur ? "rgba(255,214,130,0.95)" : "rgba(240,198,116,0.55)";
+    ctx.shadowColor = cur ? `rgba(${pal.up},0.95)` : `rgba(${pal.up},0.55)`;
     ctx.shadowBlur = cur ? 12 : 7;
     const fill = ctx.createRadialGradient(p.bx - R * 0.35, p.cy - R * 0.45, R * 0.1, p.bx, p.cy, R);
     if (cur) {
-      fill.addColorStop(0, "#fff3d0");
-      fill.addColorStop(1, "#d9a646");
+      fill.addColorStop(0, pal.cur);
+      fill.addColorStop(1, pal.pinLit);
     } else {
-      fill.addColorStop(0, "rgba(46,52,72,0.98)");
-      fill.addColorStop(1, "rgba(10,14,26,0.98)");
+      fill.addColorStop(0, pal.discTop);
+      fill.addColorStop(1, pal.discBottom);
     }
     ctx.fillStyle = fill;
     ctx.beginPath();
     ctx.arc(p.bx, p.cy, R, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = cur ? "#fff1cf" : gold;
+    ctx.strokeStyle = cur ? pal.cur : gold;
     ctx.lineWidth = 1.2;
     ctx.stroke();
     // branch glyph (as in a version-control branch icon): a trunk with a dot at each end and a
     // limb curving off it to a third dot, growing away from the line
     const s = R * 0.48;
     const fwd = p.dir; // -1: the pin stands above the line, so the glyph grows upwards
-    const ink = cur ? "#3a2606" : gold;
+    const ink = cur ? pal.pinInk : gold;
     const tx = p.bx - s * 0.55;
     const yNear = p.cy - fwd * s;
     const yFar = p.cy + fwd * s;
@@ -2113,11 +2157,11 @@ function drawGraphBranches(ctx, g) {
       const tw = ctx.measureText(t).width + 6;
       const tx = p.bx + R * 0.55;
       const ty = p.cy - R * 0.95;
-      ctx.fillStyle = cur ? "#fff1cf" : "#e3b25a";
+      ctx.fillStyle = cur ? pal.cur : pal.pinLit;
       ctx.beginPath();
       ctx.roundRect(tx, ty - 5, tw, 10, 5);
       ctx.fill();
-      ctx.fillStyle = "#1b1405";
+      ctx.fillStyle = pal.pinInk;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(t, tx + tw / 2, ty + 0.5);
@@ -2610,6 +2654,26 @@ async function setupThemeChoices() {
   const pieceSets = cfg.piece_sets || [];
 
   const draw = () => {
+    // UI themes: a small mock-up of the screen in each theme's own colours
+    els.uiThemeChoices.innerHTML = "";
+    for (const t of UI_THEMES) {
+      const b = el("button", `theme-opt${t.id === state.opts.theme ? " on" : ""}`);
+      b.type = "button";
+      const th = el("span", "thumb");
+      const mock = el("span", "ui-mock");
+      mock.dataset.theme = t.id;
+      for (const part of ["m-save", "m-board", "m-card", "m-title", "m-score", "m-bar", "m-line"]) mock.appendChild(el("i", part));
+      th.appendChild(mock);
+      b.append(th, el("span", null, t.name));
+      b.addEventListener("click", () => {
+        state.opts.theme = t.id;
+        saveOpts();
+        applyUiTheme();
+        draw();
+      });
+      els.uiThemeChoices.appendChild(b);
+    }
+
     const curBg = lsGet(THEME_LS_KEYS.backgroundSet) || bgSets[0]?.name;
     const curPs = lsGet(THEME_LS_KEYS.pieceSet) || pieceSets[0]?.name;
     els.bgChoices.innerHTML = "";
@@ -3048,6 +3112,7 @@ async function fetchServerSettings() {
 /** After a reconnect: pick up changes made on another device. */
 async function syncSettingsFromServer() {
   if (!(await fetchServerSettings())) return;
+  applyUiTheme();
   syncOptControls();
   await loadTheme();
   setupThemeChoices();
@@ -3539,7 +3604,9 @@ async function setupLogout() {
 
 async function main() {
   loadOpts();
+  applyUiTheme();
   await fetchServerSettings();
+  applyUiTheme();
   ensureSquares();
   renderCoords();
   wire();

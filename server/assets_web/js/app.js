@@ -1939,14 +1939,18 @@ function renderEvalGraph() {
 }
 
 /**
- * Branch marks for the line shown: a small diamond at every move that has other moves beside it
- * (with their count when more than one). Each mark sits just above the evaluation line at that move
- * (below it when there is no room above), close enough to read as "this move" but never on the line.
+ * Branch pins for the line shown: at every move that has other moves beside it, a short gold stem
+ * rises from just above the evaluation line to a small round badge with a fork glyph (and the
+ * number of other moves when more than one). The stem starts a little off the line, so nothing
+ * covers it; with no room above, the pin hangs below the line instead. Pins at nearby moves are
+ * staggered so they don't overlap; the current move's pin is lit.
  */
 function drawGraphBranches(ctx, g) {
   const line = state.mainLine;
   if (!state.game || line.length < 2) return;
-  const r = g.compact ? 3.5 : 5;
+  const R = g.compact ? 6 : 8.5; // badge radius
+  const gap = 3; // between the line and the stem
+  const stem0 = g.compact ? 5 : 8;
   // the evaluation line's height at a ply (between analysed points: straight, as drawn)
   const lineY = (i) => {
     const p = g.pts;
@@ -1961,57 +1965,126 @@ function drawGraphBranches(ctx, g) {
     }
     return p[p.length - 1][1];
   };
-  const topY = g.padY + r + 1;
-  // above the move numbers under the plot
-  const bottomY = Math.min(g.yBottom - r - 1, g.axisTop - r - 1);
-  // keep off the ☗先手 / ☖後手 captions at the left
+  const top = g.padY + 1;
+  const bottom = Math.min(g.yBottom, g.axisTop) - 1;
   ctx.font = g.font;
   const capW = g.compact ? 0 : ctx.measureText("☖後手").width + 10;
-  ctx.font = `${Math.max(8, g.fs - 2)}px system-ui, sans-serif`;
-  ctx.textBaseline = "middle";
-  const perPly = (g.x(line.length - 1) - g.x0) / Math.max(line.length - 1, 1);
-  const capBoxes = g.compact
+  const caps = g.compact
     ? []
     : [
-        { y0: g.padY + 2, y1: g.padY + 2 + g.fs }, // ☗先手
-        { y0: g.yBottom - 2 - g.fs, y1: g.yBottom - 2 }, // ☖後手
+        { x0: g.x0, x1: g.x0 + capW, y0: g.padY + 2, y1: g.padY + 2 + g.fs }, // ☗先手
+        { x0: g.x0, x1: g.x0 + capW, y0: g.yBottom - 2 - g.fs, y1: g.yBottom - 2 }, // ☖後手
       ];
+  const perPly = (g.x(line.length - 1) - g.x0) / Math.max(line.length - 1, 1);
+
+  const pins = [];
+  const placed = [];
+  const hits = (bx, cy) => [...placed, ...caps].some((b) => bx + R > b.x0 && bx - R < b.x1 && cy + R > b.y0 && cy - R < b.y1);
   for (let i = 1; i < line.length; i++) {
     const parent = node(line[i])?.parent_id;
     const others = (state.game.children_index?.[parent] || []).length - 1;
     if (others < 1) continue;
     const bx = g.x(i);
-    // where the line runs across the mark's width
-    const d = (r + 2) / Math.max(perPly, 0.01);
+    // the line's extent across the badge's width
+    const d = (R + 1) / Math.max(perPly, 0.01);
     const ys = [lineY(i - d), lineY(i), lineY(i + d)];
-    const lo = Math.min(...ys) - r - 3;
-    const hi = Math.max(...ys) + r + 3;
-    const inside = (cy) => cy >= topY && cy <= bottomY;
-    const clear = (cy) => inside(cy) && (cy < lo || cy > hi) && !(bx - r < g.x0 + capW && capBoxes.some((b) => cy + r > b.y0 && cy - r < b.y1));
-    // right above the line, else right below it, then a little further out on either side
-    const cands = [];
-    for (let k = 0; k < 6; k++) cands.push(lo - k * r * 1.6, hi + k * r * 1.6);
-    const by = cands.find(clear) ?? clamp(lo, topY, bottomY);
-    const cur = line[i] === state.game.current_node_id;
-    ctx.fillStyle = cur ? "#d6f0ff" : "#7cc4ff";
-    ctx.strokeStyle = "rgba(6,10,20,0.85)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(bx, by - r);
-    ctx.lineTo(bx + r, by);
-    ctx.lineTo(bx, by + r);
-    ctx.lineTo(bx - r, by);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    if (others > 1 && !g.compact) {
-      ctx.fillStyle = "rgba(170,210,255,0.9)";
-      const right = bx + r + 12 > g.x(line.length - 1); // near the right edge: count on the left
-      ctx.textAlign = right ? "right" : "left";
-      ctx.fillText(String(others), right ? bx - r - 2 : bx + r + 2, by);
+    const lineTop = Math.min(...ys);
+    const lineBottom = Math.max(...ys);
+    let pin = null;
+    for (let k = 0; k < 4 && !pin; k++) {
+      const len = stem0 + k * (R * 2 + 2);
+      for (const dir of [-1, 1]) {
+        const from = dir < 0 ? lineTop - gap : lineBottom + gap;
+        const cy = from + dir * (len + R);
+        if (cy - R < top || cy + R > bottom || hits(bx, cy)) continue;
+        pin = { i, bx, from, cy, dir, others };
+        break;
+      }
     }
+    if (!pin) continue; // no free spot (very crowded / tiny graph): leave the line readable
+    placed.push({ x0: bx - R - 1, x1: bx + R + 1, y0: pin.cy - R - 1, y1: pin.cy + R + 1 });
+    pins.push(pin);
   }
-  ctx.textBaseline = "alphabetic";
+
+  const css = getComputedStyle(document.documentElement);
+  const gold = css.getPropertyValue("--gold-hi").trim() || "#f6dc9c";
+  for (const p of pins) {
+    const cur = line[p.i] === state.game.current_node_id;
+    const edge = p.cy - p.dir * R; // where the stem meets the badge
+    ctx.save();
+    // stem: fades in from the line towards the badge
+    const sg = ctx.createLinearGradient(0, p.from, 0, edge);
+    sg.addColorStop(0, "rgba(240,198,116,0)");
+    sg.addColorStop(1, cur ? "rgba(255,236,190,0.95)" : "rgba(240,198,116,0.75)");
+    ctx.strokeStyle = sg;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(p.bx, p.from);
+    ctx.lineTo(p.bx, edge);
+    ctx.stroke();
+    // badge: dark glass disc with a gold ring and a soft glow
+    ctx.shadowColor = cur ? "rgba(255,214,130,0.95)" : "rgba(240,198,116,0.55)";
+    ctx.shadowBlur = cur ? 12 : 7;
+    const fill = ctx.createRadialGradient(p.bx - R * 0.35, p.cy - R * 0.45, R * 0.1, p.bx, p.cy, R);
+    if (cur) {
+      fill.addColorStop(0, "#fff3d0");
+      fill.addColorStop(1, "#d9a646");
+    } else {
+      fill.addColorStop(0, "rgba(46,52,72,0.98)");
+      fill.addColorStop(1, "rgba(10,14,26,0.98)");
+    }
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.arc(p.bx, p.cy, R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = cur ? "#fff1cf" : gold;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    // branch glyph (as in a version-control branch icon): a trunk with a dot at each end and a
+    // limb curving off it to a third dot, growing away from the line
+    const s = R * 0.48;
+    const fwd = p.dir; // -1: the pin stands above the line, so the glyph grows upwards
+    const ink = cur ? "#3a2606" : gold;
+    const tx = p.bx - s * 0.55;
+    const yNear = p.cy - fwd * s;
+    const yFar = p.cy + fwd * s;
+    const lx = p.bx + s * 0.75;
+    const ly = p.cy + fwd * s * 0.35;
+    ctx.strokeStyle = ink;
+    ctx.fillStyle = ink;
+    ctx.lineWidth = g.compact ? 1 : 1.25;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(tx, yNear);
+    ctx.lineTo(tx, yFar);
+    ctx.moveTo(tx, p.cy - fwd * s * 0.35);
+    ctx.quadraticCurveTo(lx, p.cy - fwd * s * 0.2, lx, ly);
+    ctx.stroke();
+    const dot = g.compact ? 1.2 : 1.55;
+    for (const [dx, dy] of [[tx, yNear], [tx, yFar], [lx, ly]]) {
+      ctx.beginPath();
+      ctx.arc(dx, dy, dot, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // number of other moves, as a tiny tag beside the badge
+    if (p.others > 1 && !g.compact) {
+      const t = String(p.others);
+      ctx.font = `700 ${Math.max(8, g.fs - 3)}px system-ui, sans-serif`;
+      const tw = ctx.measureText(t).width + 6;
+      const tx = p.bx + R * 0.55;
+      const ty = p.cy - R * 0.95;
+      ctx.fillStyle = cur ? "#fff1cf" : "#e3b25a";
+      ctx.beginPath();
+      ctx.roundRect(tx, ty - 5, tw, 10, 5);
+      ctx.fill();
+      ctx.fillStyle = "#1b1405";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(t, tx + tw / 2, ty + 0.5);
+    }
+    ctx.restore();
+  }
 }
 
 function onGraphClick(e) {

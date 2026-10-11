@@ -102,6 +102,10 @@ const els = {
   turnChip: $("turnChip"),
 
   multipvSeg: $("multipvSeg"),
+  multipvSel: $("multipvSel"),
+  analysisCtl: document.querySelector(".analysis-ctl"),
+  miniEval: $("miniEval"),
+  navbar: document.querySelector(".board-area .navbar"),
   analysisOnOff: $("analysisOnOff"),
   engineSettingsBtn: $("engineSettingsBtn"),
   analyzeAllBtn: $("analyzeAllBtn"),
@@ -868,6 +872,12 @@ function isMobile() {
   return window.matchMedia("(max-width: 900px)").matches;
 }
 
+function placeMiniEval(inCtl) {
+  const mini = els.miniEval;
+  if (inCtl && mini.parentElement !== els.analysisCtl) els.analysisCtl.insertBefore(mini, els.analyzeAllBtn);
+  else if (!inCtl && mini.parentElement !== els.navbar) els.navbar.appendChild(mini);
+}
+
 // phones: smallest scale of the top bar / panels, and the least graph height worth showing
 const PHONE_ZOOM_MIN = 0.62;
 const PHONE_GRAPH_MIN = 76;
@@ -895,6 +905,11 @@ function layoutBoard() {
     // short for that (iPhone SE in the browser…) drop the graph instead.
     const main = els.boardArea.parentElement;
     const ana = document.querySelector(".analysis-card");
+    // short phones (iPhone SE…): one row less. The 解析 summary moves from under the move buttons
+    // into the 候補手 row, where 候補手 becomes a pull-down.
+    const compact = window.innerHeight < 700;
+    root.classList.toggle("phone-compact", compact);
+    placeMiniEval(compact);
     els.boardStage.classList.remove("stands-side");
     const fit = (zoom, graph) => {
       root.style.setProperty("--ui-zoom", zoom.toFixed(3));
@@ -930,7 +945,8 @@ function layoutBoard() {
     bs = r.bs;
   } else {
     root.style.setProperty("--ui-zoom", "1");
-    root.classList.remove("phone-no-graph");
+    root.classList.remove("phone-no-graph", "phone-compact");
+    placeMiniEval(false);
     const area = els.boardArea.getBoundingClientRect();
     const nav = els.boardArea.querySelector(".navbar").getBoundingClientRect().height || 54;
     els.boardStage.classList.remove("stands-side");
@@ -1809,6 +1825,8 @@ function renderAnalysis() {
     b.classList.toggle("on", Number(b.dataset.v) === a.multipv);
     b.disabled = !canUse;
   }
+  els.multipvSel.value = String(a.multipv);
+  els.multipvSel.disabled = !canUse;
   els.engineSettingsBtn.disabled = !a.available;
 
   // 全解析 progress / button
@@ -3262,6 +3280,9 @@ function wire() {
   });
   els.engineSettingsBtn.addEventListener("click", openEngineSettings);
   els.miniOnOff.addEventListener("click", () => setAnalysisEnabled(!state.analysis.enabled));
+  els.multipvSel.addEventListener("change", () => {
+    els.multipvSeg.querySelector(`button[data-v="${els.multipvSel.value}"]`)?.click();
+  });
   els.multipvSeg.addEventListener("click", (e) => {
     const b = e.target.closest("button[data-v]");
     if (!b || b.disabled) return;

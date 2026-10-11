@@ -1974,3 +1974,12 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   .mini-eval { padding: 4px 2px 4px; }
   .analysis-card .analysis-ctl { padding-top: 4px; padding-bottom: 4px; }
 }
+/* phones: 全解析 progress is the 「全解析 n/N」 in the analysis summary; no second bar + text in the
+   候補手 panel (it took space from the board). Short phones hide the summary's best move, so the
+   progress takes the verdict's place there while 全解析 runs. */
+@media (max-width: 900px) {
+  .analysis-card .batch-progress { display: none; }
+  .phone-compact .analysis-ctl .mini-eval.batching .mini-best { display: inline; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .phone-compact .analysis-ctl .mini-eval.batching .mini-verdict { display: none; }
+  .phone-compact .analysis-ctl .mini-eval.batching .mini-best small { display: none; }
+}

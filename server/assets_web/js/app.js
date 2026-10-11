@@ -599,6 +599,8 @@ function connectWs() {
       case "session:granted": {
         setConn("connected", "接続済み");
         state.isOwner = true;
+        setTimeout(takeSharedKifu, 0);
+        setTimeout(showAppNotices, 1500);
         state.sessionId = payload.session_id || null;
         state.ownerToken = payload.owner_token || null;
         state.analysis.available = Boolean(payload.server_capabilities?.analysis);
@@ -1835,8 +1837,9 @@ function renderMiniEval(best, cp, side) {
   const cur = node(state.game?.current_node_id);
   const first = shownLines().lines[0]?.pv_usi?.[0];
   els.miniBest.textContent = "";
+  els.miniEval.classList.toggle("batching", Boolean(state.batch));
   if (state.batch) {
-    els.miniBest.textContent = `全解析 ${Math.min(state.batch.index + 1, state.batch.total)}/${state.batch.total}`;
+    els.miniBest.append(el("small", null, "全解析"), `${Math.min(state.batch.index + 1, state.batch.total)}/${state.batch.total}`);
   } else if (first && state.game) {
     const text = shownMarks(kifPv([first], state.game.current_position_sfen, cur?.move_usi ? moveTarget(cur.move_usi) : null)[0]?.text || "");
     els.miniBest.append(el("small", null, "最善"), text);
@@ -2658,7 +2661,7 @@ let pendingDeleteTitle = "";
 const FORMAT_NAMES = { kif: "KIF", kif2: "KI2", usi: "USI" };
 
 /** Read a kifu as a NEW game. source: "file" (filename = title fallback) | "paste". */
-async function importText(text, { source = "file", filename = "" } = {}) {
+async function importText(text, { source = "file", filename = "", quiet = false } = {}) {
   if (!text || !text.trim()) {
     toast("warning", source === "paste" ? "クリップボードが空です" : "ファイルが空です");
     return false;
@@ -2672,6 +2675,7 @@ async function importText(text, { source = "file", filename = "" } = {}) {
     });
     const json = await res.json().catch(() => ({}));
     if (json?.error === "format") {
+      if (quiet) return false; // Ctrl+V / drop / share: not a kifu after all, nothing happens
       toast("error", json.detail || "形式が違います");
       return false;
     }
@@ -2748,6 +2752,83 @@ async function decodeFile(file) {
   } catch {
     // KIF files are frequently Shift_JIS
     return new TextDecoder("shift_jis").decode(buf);
+  }
+}
+
+// ---------- kifu from outside the buttons: Ctrl+V, a dropped file, the phone's share sheet ----------
+// Anything that is not a kifu is ignored without a message.
+const KIFU_FILE = /\.(kif|kifu|ki2|ki2u|usi|sfen|txt)$/i;
+const USI_MOVE = /^([1-9][a-i][1-9][a-i]\+?|[PLNSGBR]\*[1-9][a-i])$/;
+
+/** Same rules as the server's detect_format (server/app/core/import_usi.py). */
+function looksLikeKifu(text) {
+  const s = String(text || "").replace(/^﻿/, "").trim();
+  if (!s) return false;
+  const lower = s.toLowerCase();
+  if (/^(position\s+)?(startpos|sfen\s)/.test(lower)) return true;
+  if (s.split(/\s+/).every((t) => USI_MOVE.test(t))) return true;
+  if (s.includes("手数----指手") || lower.startsWith("#kif") || lower.startsWith("#ki2")) return true;
+  // KI2: a move after ▲△ (a lone mark in ordinary text is not enough)
+  if (/[▲△☗☖]\s*([１-９1-9][一二三四五六七八九1-9]|同)/.test(s)) return true;
+  return s.includes("手合割") || s.includes("+---------------------------+");
+}
+
+async function importFromOutside({ text = "", file = null }) {
+  if (els.pasteBtn.disabled) return; // same as 貼付: not this screen's session, or 全解析中
+  if (file) text = await decodeFile(file);
+  if (!looksLikeKifu(text)) return;
+  await importText(text, file ? { filename: fileStem(file.name), quiet: true } : { source: "paste", quiet: true });
+}
+
+function setupOutsideImport() {
+  const editable = (t) => t instanceof Element && t.closest("input, textarea, select, [contenteditable]");
+  // Ctrl+V anywhere but a text field (and not over a dialog)
+  window.addEventListener("paste", (e) => {
+    if (openDialogEl || editable(e.target)) return;
+    const file = [...(e.clipboardData?.files || [])].find((f) => KIFU_FILE.test(f.name));
+    const text = e.clipboardData?.getData("text/plain") || "";
+    if (!file && !looksLikeKifu(text)) return;
+    e.preventDefault();
+    importFromOutside(file ? { file } : { text });
+  });
+  // a .kif / .ki2 / .usi file dropped anywhere (the browser would otherwise open it)
+  const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
+  window.addEventListener("dragover", (e) => {
+    if (openDialogEl || !hasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  });
+  window.addEventListener("drop", (e) => {
+    if (openDialogEl || !hasFiles(e)) return;
+    e.preventDefault();
+    const file = [...e.dataTransfer.files].find((f) => KIFU_FILE.test(f.name));
+    if (file) importFromOutside({ file });
+  });
+}
+
+// Android (installed app): the share sheet posts to /share-target; sw.js keeps the shared text or
+// file in this cache and opens the app, which reads it once the session is ready. It survives a
+// detour through the login page.
+const SHARE_CACHE = "shogi-share";
+let shareChecked = false;
+async function takeSharedKifu() {
+  if (shareChecked || !("caches" in window)) return;
+  shareChecked = true;
+  let fileRes, textRes;
+  try {
+    const cache = await caches.open(SHARE_CACHE);
+    [fileRes, textRes] = await Promise.all([cache.match("/share/file"), cache.match("/share/text")]);
+    await Promise.all([cache.delete("/share/file"), cache.delete("/share/text")]);
+  } catch {
+    return;
+  }
+  if (!fileRes && !textRes) return;
+  for (let i = 0; i < 100 && !state.game; i++) await new Promise((r) => setTimeout(r, 100));
+  if (fileRes) {
+    const name = decodeURIComponent(fileRes.headers.get("X-Share-Name") || "") || "shared.kif";
+    await importFromOutside({ file: new File([await fileRes.blob()], name) });
+  } else {
+    await importFromOutside({ text: await textRes.text() });
   }
 }
 
@@ -3613,6 +3694,52 @@ function renderUpdate(st) {
   }
 }
 
+// ---------- installed app (Android): one-time notices after an update ----------
+// The page itself is always the latest, but the installed app's own settings (share target,
+// icons, name…) change only when Chrome refreshes the app or it is reinstalled. A change there
+// gets an entry here; each one is shown once, when the server runs that version or later.
+const APP_NOTICES = [
+  {
+    version: "1.1.7",
+    title: "共有から棋譜を読み込めるようになりました",
+    message:
+      "ほかのアプリの「共有」から、棋譜の文字や .kif などのファイルを ShogiAnalyzer に送れるようになりました。共有メニューに ShogiAnalyzer が出ない場合は、ホーム画面のアプリを一度削除して入れ直してください。",
+  },
+];
+const APP_NOTICE_KEY = "shogi_analyzer_app_notice_seen";
+const versionParts = (v) => String(v || "").replace(/^v/i, "").split(".").map((n) => parseInt(n, 10) || 0);
+function versionAtLeast(v, min) {
+  const a = versionParts(v);
+  const b = versionParts(min);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
+  }
+  return true;
+}
+let appNoticeShown = false;
+async function showAppNotices() {
+  if (appNoticeShown || openDialogEl) return;
+  const installed = window.matchMedia("(display-mode: standalone)").matches;
+  if (!installed || !/Android/i.test(navigator.userAgent)) return;
+  let current = "";
+  try {
+    current = (await fetch("/api/app/update_status", { cache: "no-store" }).then((r) => r.json())).current_version;
+  } catch {
+    return;
+  }
+  const seen = (lsGet(APP_NOTICE_KEY) || "").split(",").filter(Boolean);
+  const due = APP_NOTICES.filter((n) => !seen.includes(n.version) && versionAtLeast(current, n.version));
+  if (!due.length || openDialogEl) return;
+  appNoticeShown = true;
+  lsSet(APP_NOTICE_KEY, [...seen, ...due.map((n) => n.version)].join(","));
+  const last = due[due.length - 1];
+  await confirmDialog({
+    title: last.title,
+    message: due.map((n) => n.message).join("\n\n"),
+    actions: [{ label: "OK", value: true, primary: true }],
+  });
+}
+
 async function setupUpdateNotice() {
   const popup = $("updatePopup");
   const badge = $("updateBadge");
@@ -3752,6 +3879,7 @@ async function main() {
   // installable as an app (PWA): needs https (public address) or localhost
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
   setupInstallSuggestion();
+  setupOutsideImport();
   const themeBefore = [lsGet(THEME_LS_KEYS.backgroundSet), lsGet(THEME_LS_KEYS.pieceSet)].join();
   await loadTheme();
   // a removed / renamed board or piece set was replaced: share the replacement too

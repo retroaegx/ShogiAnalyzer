@@ -729,12 +729,24 @@ def _download_engine_variant(root: Path, engine: dict) -> Path | None:
     lic = (engine.get("license_url") or "").strip()
     terms = (engine.get("terms_url") or "").strip()
 
+    eval_meta = engine.get("eval") or {}
+    eval_in_archive = bool(eval_meta.get("in_archive"))
+
     print(tr("\n[installer] エンジンのダウンロード", "\n[installer] Engine download"))
     print(tr(f"  名前      : {name}", f"  name   : {name}"))
     _print_license(str(engine.get("license") or ""), [("ライセンス条項|license text", lic), ("規約|terms", terms)])
+    if eval_in_archive:
+        # the evaluation file comes in the same download: its terms are shown here, before the one consent
+        print(tr(f"  評価関数  : {eval_meta.get('name') or eval_meta.get('id')}（同じファイルに入っています）",
+                 f"  eval   : {eval_meta.get('name') or eval_meta.get('id')} (in the same download)"))
+        _print_license(str(eval_meta.get("license") or ""), [("評価関数の配布ページ|eval page", str(eval_meta.get("license_url") or ""))])
     if url:
         print(tr(f"  ダウンロード元: {url}", f"  download: {url}"))
-        if not _prompt_consent("エンジン", "engine"):
+        if build:
+            print(tr("  （この環境向けの実行ファイルはないため、同じファイルに入っているソースからビルドします）",
+                     "  (no binary for this platform: built from the source in the same download)"))
+        what = ("エンジンと評価関数", "engine and evaluation file") if eval_in_archive else ("エンジン", "engine")
+        if not _prompt_consent(*what):
             return None
     else:
         # build flow
@@ -754,7 +766,8 @@ def _download_engine_variant(root: Path, engine: dict) -> Path | None:
         shutil.rmtree(extracted_root, ignore_errors=True)
 
     if url:
-        filename = Path(url.split("?")[0]).name or "engine.bin"
+        # "filename": for links whose path is not the file name (e.g. Google Drive)
+        filename = (variant.get("filename") or "").strip() or Path(url.split("?")[0]).name or "engine.bin"
         dst = engines_dir / filename
         try:
             _download(url, dst)
@@ -775,24 +788,37 @@ def _download_engine_variant(root: Path, engine: dict) -> Path | None:
             # treat as direct binary
             extracted_root.mkdir(parents=True, exist_ok=True)
             shutil.copy2(dst, extracted_root / dst.name)
-    else:
-        # Build from source (linux only for now)
-        git_url = (build.get("git") or "").strip()
-        tag = (build.get("tag") or "").strip()
-        if not git_url:
-            return None
-        src_dir = engines_dir / "_src"
-        if src_dir.exists():
-            shutil.rmtree(src_dir, ignore_errors=True)
-        print(tr("[installer] エンジンのソースを取得しています ...", "[installer] Cloning engine source..."))
-        rc = run_streamed(["git", "clone", "--depth", "1", "--branch", tag or "master", git_url, str(src_dir)])
-        if rc != 0:
-            print(tr("[installer] エラー: git clone に失敗しました", "[installer] ERROR: git clone failed"))
-            return None
+
+    if build:
+        # Build from source (linux): the source is in the download ("source_dir") or cloned with git
+        source_in_archive = (build.get("source_dir") or "").strip()
+        if source_in_archive:
+            source = extracted_root / source_in_archive
+            if not source.is_dir():
+                print(tr(f"[installer] エラー: ダウンロードしたファイルにソースがありません: {source_in_archive}",
+                         f"[installer] ERROR: the download has no source folder: {source_in_archive}"))
+                return None
+        else:
+            git_url = (build.get("git") or "").strip()
+            tag = (build.get("tag") or "").strip()
+            if not git_url:
+                return None
+            src_dir = engines_dir / "_src"
+            if src_dir.exists():
+                shutil.rmtree(src_dir, ignore_errors=True)
+            print(tr("[installer] エンジンのソースを取得しています ...", "[installer] Cloning engine source..."))
+            rc = run_streamed(["git", "clone", "--depth", "1", "--branch", tag or "master", git_url, str(src_dir)])
+            if rc != 0:
+                print(tr("[installer] エラー: git clone に失敗しました", "[installer] ERROR: git clone failed"))
+                return None
+            source = src_dir / "source"
         # Follow upstream build guidance; choose CPU based on flags.
         flags = _cpu_flags()
         target = "AVX2" if "avx2" in flags else "SSE42"
-        make_cmd = ["make", "-C", str(src_dir / "source"), "clean", "tournament", f"TARGET_CPU={target}", "YANEURAOU_EDITION=YANEURAOU_ENGINE_NNUE"]
+        edition = (build.get("edition") or "").strip() or "YANEURAOU_ENGINE_NNUE"
+        make_cmd = ["make", "-C", str(source), "clean", "tournament", f"TARGET_CPU={target}", f"YANEURAOU_EDITION={edition}"]
+        if not shutil.which("clang++") and shutil.which("g++"):
+            make_cmd.append("COMPILER=g++")  # the Makefile's default is clang++
         print(tr("[installer] エンジンをビルドしています（時間がかかります）...", "[installer] Building engine (this may take a while)..."))
         rc = run_streamed(make_cmd)
         if rc != 0:
@@ -801,15 +827,32 @@ def _download_engine_variant(root: Path, engine: dict) -> Path | None:
         extracted_root.mkdir(parents=True, exist_ok=True)
         # Try to locate built binary
         built = None
-        for p in (src_dir / "source").rglob("YaneuraOu*"):
+        for p in source.rglob("YaneuraOu*"):
             if p.is_file() and os.access(p, os.X_OK):
                 built = p
                 break
         if built:
             shutil.copy2(built, extracted_root / built.name)
+            if source_in_archive:
+                built.unlink()  # one engine binary under _engine_extract, next to which the eval is found
 
-    # download eval (best effort)
-    _download_eval_if_needed(root, engine, engines_dir)
+    if eval_in_archive:
+        # the evaluation file came with the engine: engines/<id>/eval/nn.bin, as for a separate download
+        nn = next((p for p in extracted_root.rglob("nn.bin") if p.is_file()), None)
+        if nn:
+            eval_dir = engines_dir / "eval"
+            eval_dir.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(nn), str(eval_dir / "nn.bin"))
+            try:
+                nn.parent.rmdir()  # the archive's own eval folder, now empty
+            except OSError:
+                pass
+        else:
+            print(tr("[installer] 警告: ダウンロードしたファイルに評価関数（nn.bin）がありません",
+                     "[installer] WARNING: the download has no evaluation file (nn.bin)"))
+    else:
+        # download eval (best effort)
+        _download_eval_if_needed(root, engine, engines_dir)
 
     # choose best engine exe
     type_hint = (variant.get("engine_type_hint") or "").strip()

@@ -5,8 +5,46 @@
   },
   "engines": [
     {
+      "id": "aobannue_v11",
+      "name": "AobaNNUE v1.1 (engine + eval) — auto-select by CPU",
+      "license": "GPLv3",
+      "license_url": "https://github.com/yssaya/AobaNNUE/blob/master/Copying.txt",
+      "terms_url": "https://github.com/yssaya/AobaNNUE",
+      "license_note": "The distributor's zip (Google Drive, linked from the official release page) holds the Windows exe files, the evaluation file and the source.",
+      "eval": {
+        "id": "aobannue_nnue",
+        "name": "AobaNNUE (nn.bin, in the same zip)",
+        "license_url": "https://github.com/yssaya/AobaNNUE/releases/tag/v1.1",
+        "in_archive": true
+      },
+      "platforms": [
+        {
+          "os": "windows",
+          "arch": "amd64",
+          "url": "https://drive.usercontent.google.com/download?id=1bf7GGGM8vM8kQ_icAwbiR7IM6uH3BJ4u&export=download&confirm=t",
+          "filename": "20260103AobaNNUE.zip",
+          "sha256": "83d4798d7461e29e95ba1700f4f5bf10e670b360ab1004102e21b913c22ed979",
+          "extract_dir_hint": "aobannue_v11",
+          "engine_type_hint": "AobaNNUE"
+        },
+        {
+          "os": "linux",
+          "arch": "amd64",
+          "url": "https://drive.usercontent.google.com/download?id=1bf7GGGM8vM8kQ_icAwbiR7IM6uH3BJ4u&export=download&confirm=t",
+          "filename": "20260103AobaNNUE.zip",
+          "sha256": "83d4798d7461e29e95ba1700f4f5bf10e670b360ab1004102e21b913c22ed979",
+          "extract_dir_hint": "aobannue_v11",
+          "engine_type_hint": "",
+          "build": {
+            "source_dir": "AobaNNUE/source",
+            "edition": "YANEURAOU_ENGINE_NNUE_HALFKP_768X2_16_64"
+          }
+        }
+      ]
+    },
+    {
       "id": "yaneuraou_v830git",
-      "name": "YaneuraOu v8.30 (NNUE) — auto-select by CPU",
+      "name": "YaneuraOu v8.30 (NNUE) + Suisho5 — auto-select by CPU",
       "license": "GPLv3",
       "license_url": "https://github.com/yaneurao/YaneuraOu/blob/master/LICENSE",
       "terms_url": "https://github.com/yaneurao/YaneuraOu",

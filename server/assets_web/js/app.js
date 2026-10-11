@@ -35,6 +35,7 @@ const UI_THEMES = [
   { id: "emerald", name: "翠苑", themeColor: "#05150f" },
   { id: "sakura", name: "暁桜", themeColor: "#f6e2d6" },
   { id: "pearl", name: "白金", themeColor: "#f5f1e8" },
+  { id: "frost", name: "蒼雪", themeColor: "#e8f1fb" },
 ];
 
 const THEME_NAMES = {

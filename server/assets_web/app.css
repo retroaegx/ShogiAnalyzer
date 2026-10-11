@@ -1927,3 +1927,5 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
 :is([data-theme="sakura"], [data-theme="pearl"]) .install-card { background: linear-gradient(180deg, rgba(var(--acc-rgb), .10), transparent 45%), rgba(var(--deep-rgb), .97); }
 :is([data-theme="sakura"], [data-theme="pearl"]) .conn-overlay { background: rgba(60, 40, 30, .38); }
 
+
+#dlgConfirmExtra { margin-top: 14px; }

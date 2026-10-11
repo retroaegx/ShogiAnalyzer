@@ -170,6 +170,8 @@
             <div class="seg" id="multipvSeg" role="radiogroup" aria-label="候補手数">
               <button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button><button type="button" data-v="5">5</button>
             </div>
+            <!-- short phones: a pull-down instead of the 1-5 buttons, and the 解析 summary moves in here -->
+            <select id="multipvSel" class="field mpv-sel" aria-label="候補手数"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
             <button id="analyzeAllBtn" class="btn-batch" type="button" title="棋譜の全局面を順に解析して評価値グラフを作ります"><svg class="ico"><use href="#i-chart"/></svg><span>全解析</span></button>
           </div>
           <div class="batch-progress" id="batchProgress" hidden>

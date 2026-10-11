@@ -1966,3 +1966,15 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   .topbar, .navbar, .analysis-card { zoom: var(--ui-zoom, 1); }
   .app { grid-template-rows: calc(var(--topbar-h) * var(--ui-zoom, 1)) minmax(0, 1fr); }
 }
+/* 候補手 pull-down: only on short phones (phone-compact, set by layoutBoard) */
+.mpv-sel { display: none; }
+@media (max-width: 900px) {
+  .phone-compact #multipvSeg { display: none; }
+  .phone-compact .mpv-sel { display: block; width: auto; flex: none; height: 30px; padding: 0 6px; font-size: 14px; border-radius: 8px; appearance: auto; }
+  .phone-compact .analysis-ctl { gap: 8px; }
+  .phone-compact .analysis-ctl :is(.ctl-label, .btn-batch) { flex: none; white-space: nowrap; }
+  .phone-compact .analysis-ctl .mini-eval { min-width: 0; }
+  .phone-compact .analysis-ctl .mini-eval { flex: 1 1 auto; width: auto; padding: 0; border-top: 0; gap: 6px; }
+  .phone-compact .analysis-ctl :is(.mini-depth, .mini-best) { display: none; }
+  .phone-compact .analysis-ctl .mini-verdict { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}

@@ -1920,3 +1920,10 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
 }
 [data-theme="sakura"] .move-list .mv-eval.minus { color: #b9cbff; }
 
+/* pop-ups (toast, update notice, connection screen, install suggestion): solid glass in the theme's
+   own colours, so the text never sits on a see-through or mismatched background */
+.toast { background: var(--panel-hi), rgba(var(--deep-rgb), .96); color: var(--text); border-color: var(--panel-line); box-shadow: var(--card-shadow), 0 16px 40px -10px rgba(0, 0, 0, .55); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+:is([data-theme="sakura"], [data-theme="pearl"]) :is(.update-popup, .conn-card) { background: var(--panel-hi), rgba(var(--deep-rgb), .97); }
+:is([data-theme="sakura"], [data-theme="pearl"]) .install-card { background: linear-gradient(180deg, rgba(var(--acc-rgb), .10), transparent 45%), rgba(var(--deep-rgb), .97); }
+:is([data-theme="sakura"], [data-theme="pearl"]) .conn-overlay { background: rgba(60, 40, 30, .38); }
+

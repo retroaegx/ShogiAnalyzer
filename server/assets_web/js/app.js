@@ -903,7 +903,10 @@ function layoutBoard() {
     // stands always above / below the board (rows fixed at 0.82 of a square, see app.css):
     // beside the board they were too narrow to tap and could not show many captured pieces
     els.boardStage.classList.remove("stands-side");
-    bs = Math.min(availW - coordPx, (availH - 8 - coordPx) / (g.natH / g.natW + 2 * cellPerBs * 0.82));
+    // the board always takes the full width; only very short screens (iPhone SE…) shrink it to the
+    // height. When the graph would get too small for the full-width board, the page scrolls instead.
+    const fitH = (availH - 8 - coordPx) / (g.natH / g.natW + 2 * cellPerBs * 0.82);
+    bs = window.innerHeight < 600 ? Math.min(availW - coordPx, fitH) : availW - coordPx;
   } else {
     els.boardStage.classList.remove("stands-side");
     const standK = cellPerBs * 1.9; // matches --stand-w (fixed 2-column stands)

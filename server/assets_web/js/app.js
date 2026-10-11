@@ -773,10 +773,24 @@ function firstChild(id) {
   const ids = state.game?.children_index?.[id];
   return Array.isArray(ids) && ids.length ? ids[0] : null;
 }
+// 駒落ち: 上手 (the SFEN's gote) moves first, so on screen it is 先手 (☗/▲) and the evaluation is
+// from its side. Only the handicap start positions swap; any other position keeps the SFEN's sides.
+function handicapGame() {
+  const key = (sfen) => String(sfen || "").split(/\s+/).slice(0, 3).join(" ");
+  const start = key(state.game?.initial_sfen);
+  return HANDICAPS.some(([, sfen]) => sfen && key(sfen) === start);
+}
+/** SFEN side ("sente" = b) -> the side shown as 先手/後手. */
+function shownSide(side) {
+  return handicapGame() ? (side === "sente" ? "gote" : "sente") : side;
+}
+function shownMarks(text) {
+  return handicapGame() ? String(text).replace(/^[▲△]/, (m) => (m === "▲" ? "△" : "▲")) : text;
+}
 function sideToMoveOf(n) {
-  if (!n) return "sente";
+  if (!n) return shownSide("sente");
   const parts = String(n.position_sfen || "").split(/\s+/);
-  return parts[1] === "w" ? "gote" : "sente";
+  return shownSide(parts[1] === "w" ? "gote" : "sente");
 }
 function curPly() {
   return Math.max(0, (state.game?.current_path_node_ids?.length || 1) - 1);
@@ -803,7 +817,7 @@ function nodeLabel(n) {
   const parent = n.parent_id ? node(n.parent_id) : null;
   if (!parent) return n.move_usi;
   const prevTo = parent.move_usi ? moveTarget(parent.move_usi) : null;
-  return kifMove(parent.position_sfen, n.move_usi, prevTo);
+  return shownMarks(kifMove(parent.position_sfen, n.move_usi, prevTo));
 }
 
 // ---------- theme / geometry ----------
@@ -1353,10 +1367,10 @@ function renderStands() {
   const topOwner = state.flip ? "sente" : "gote";
   const bottomOwner = state.flip ? "gote" : "sente";
 
-  els.standTopMark.textContent = topOwner === "sente" ? "☗" : "☖";
-  els.standTopName.textContent = topOwner === "sente" ? "先手" : "後手";
-  els.standBottomMark.textContent = bottomOwner === "sente" ? "☗" : "☖";
-  els.standBottomName.textContent = bottomOwner === "sente" ? "先手" : "後手";
+  els.standTopMark.textContent = shownSide(topOwner) === "sente" ? "☗" : "☖";
+  els.standTopName.textContent = shownSide(topOwner) === "sente" ? "先手" : "後手";
+  els.standBottomMark.textContent = shownSide(bottomOwner) === "sente" ? "☗" : "☖";
+  els.standBottomName.textContent = shownSide(bottomOwner) === "sente" ? "先手" : "後手";
   els.standTop.classList.toggle("to-move", turn === topOwner);
   els.standBottom.classList.toggle("to-move", turn === bottomOwner);
 
@@ -1748,7 +1762,7 @@ function renderMiniEval(best, cp, side) {
   if (state.batch) {
     els.miniBest.textContent = `全解析 ${Math.min(state.batch.index + 1, state.batch.total)}/${state.batch.total}`;
   } else if (first && state.game) {
-    const text = kifPv([first], state.game.current_position_sfen, cur?.move_usi ? moveTarget(cur.move_usi) : null)[0]?.text || "";
+    const text = shownMarks(kifPv([first], state.game.current_position_sfen, cur?.move_usi ? moveTarget(cur.move_usi) : null)[0]?.text || "");
     els.miniBest.append(el("small", null, "最善"), text);
   }
 }
@@ -1831,7 +1845,7 @@ function renderAnalysis() {
       const s = senteScore(line, side);
       li.appendChild(el("span", "pv-idx", String(line.pv_index ?? 1)));
       li.appendChild(el("span", `pv-score ${s == null ? "" : s >= 0 ? "plus" : "minus"}`, formatScore(line, side)));
-      const moves = kifPv((line.pv_usi || []).slice(0, 14), state.game.current_position_sfen, prevTo);
+      const moves = kifPv((line.pv_usi || []).slice(0, 14), state.game.current_position_sfen, prevTo).map((m) => ({ ...m, text: shownMarks(m.text) }));
       const mv = el("span", "pv-moves");
       if (moves.length) {
         mv.appendChild(el("b", null, moves[0].text));
@@ -2454,7 +2468,7 @@ function renderControls() {
   els.plySlider.style.setProperty("--p", `${max ? (ply / max) * 100 : 0}%`);
   els.plyNow.textContent = String(ply);
   els.plyMax.textContent = String(max);
-  const turn = state.parsed?.currentPlayer;
+  const turn = shownSide(state.parsed?.currentPlayer);
   els.turnChip.textContent = turn === "gote" ? "☖後手番" : "☗先手番";
   els.turnChip.classList.toggle("gote", turn === "gote");
   els.flipBtn.classList.toggle("on", state.flip);
@@ -3287,7 +3301,7 @@ function wire() {
     row.append("手合割", sel);
     const ans = await confirmDialog({
       title: "新しい棋譜を作成",
-      message: "初期局面から新しい棋譜を作成します。駒落ちは上手（後手）から指し始めます。",
+      message: "初期局面から新しい棋譜を作成します。駒落ちは上手（駒を落とす側）が先手になります。",
       extra: row,
       actions: [
         { label: "キャンセル", value: null },

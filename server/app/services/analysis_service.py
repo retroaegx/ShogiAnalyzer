@@ -1029,10 +1029,16 @@ class AnalysisService:
             if tok == "score":
                 if i + 2 < len(tokens):
                     score_type = tokens[i + 1]
+                    raw = tokens[i + 2]
                     try:
-                        score_value = int(tokens[i + 2])
+                        score_value = int(raw)
                     except ValueError:
                         score_value = 0
+                    if score_type == "mate" and raw in {"+", "-"}:
+                        # mate found, distance unknown
+                        score_value = 999 if raw == "+" else -999
+                    # "mate -0" (already mated) ends up as 0, which the client reads as
+                    # "the side to move is mated" 
                     if score_type in {"cp", "mate"}:
                         data["score_type"] = score_type
                         data["score_value"] = score_value

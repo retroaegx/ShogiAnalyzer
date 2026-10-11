@@ -64,6 +64,8 @@ function cloneParsed(p) {
 
 /** KIF move text (without ▲△), e.g. "７六歩(77)", "同　銀", "５五角打". */
 function kifBody(parsed, moveUsi, prevTo) {
+  if (moveUsi === "resign") return "投了";
+  if (moveUsi === "win") return "勝ち宣言";
   const mv = parseUsi(moveUsi);
   if (!mv?.ok) return moveUsi || "";
   const same = prevTo && prevTo.row === mv.toRow && prevTo.col === mv.toCol;
@@ -336,7 +338,8 @@ export function senteScore(line, sideToMove) {
   if (!line || (line.score_type !== "cp" && line.score_type !== "mate")) return null;
   const v = Number(line.score_value || 0);
   let cp;
-  if (line.score_type === "mate") cp = (v > 0 || Object.is(v, 0) ? 1 : -1) * (32000 - Math.min(Math.abs(v), 999));
+  // mate N > 0: the side to move mates; mate -N / mate 0 (the engine's "mate -0"): it is mated
+  if (line.score_type === "mate") cp = (v > 0 ? 1 : -1) * (32000 - Math.min(Math.abs(v), 999));
   else cp = v;
   return sideToMove === "gote" ? -cp : cp;
 }
@@ -352,8 +355,10 @@ export function formatScore(line, sideToMove) {
   const v = Number(line.score_value || 0);
   const s = sideToMove === "gote" ? -1 : 1;
   if (line.score_type === "mate") {
-    const senteWins = (v > 0 || Object.is(v, 0)) === (s > 0);
-    return `${senteWins ? "▲" : "△"}詰${Math.abs(v) || ""}`;
+    const senteWins = v > 0 === s > 0;
+    // 0: already mated; 999: mate found but the distance is unknown ("mate +" / "mate -")
+    const n = Math.abs(v);
+    return `${senteWins ? "▲" : "△"}詰${n && n < 999 ? n : ""}`;
   }
   if (line.score_type === "cp") {
     const x = v * s;

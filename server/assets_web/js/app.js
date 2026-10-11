@@ -27,11 +27,22 @@ import {
 
 const $ = (id) => document.getElementById(id);
 
+// UI themes (表示設定 → テーマ): colours / background of the whole screen, defined in app.css
+// under [data-theme]. The first one is the default. themeColor: the browser / app bar colour.
+const UI_THEMES = [
+  { id: "sumikin", name: "墨金", themeColor: "#070a11" },
+  { id: "aurora", name: "極光", themeColor: "#0d0a26" },
+  { id: "emerald", name: "翠苑", themeColor: "#05150f" },
+  { id: "sakura", name: "暁桜", themeColor: "#f6e2d6" },
+  { id: "pearl", name: "白金", themeColor: "#f5f1e8" },
+];
+
 const THEME_NAMES = {
   "theme.bg.wood": "木目",
   "theme.bg.sansui": "山水",
-  "theme.bg.neon_night": "ネオンナイト",
-  "theme.bg.white_gold": "ホワイトゴールド",
+  "theme.bg.fujitsuki": "藤月",
+  "theme.bg.neon_night": "ネオン\u200bナイト", // \u200b: where the name may wrap in a small tile
+  "theme.bg.white_gold": "ホワイト\u200bゴールド",
   "theme.piece.tsuge": "黄楊",
   "theme.piece.mokume": "杢目",
   "theme.piece.urushi": "漆黒",
@@ -149,6 +160,7 @@ const els = {
   exportCopy: $("exportCopy"),
   exportDownload: $("exportDownload"),
   dlgSettings: $("dlgSettings"),
+  uiThemeChoices: $("uiThemeChoices"),
   bgChoices: $("bgChoices"),
   pieceChoices: $("pieceChoices"),
   optCoordsSeg: $("optCoordsSeg"),
@@ -193,7 +205,7 @@ const state = {
   sessionId: null,
   ownerToken: null,
   flip: false,
-  opts: { coords: "overlay", evalBar: true, legal: true, lastMove: true, bestMove: true, nextMove: true, arrowLabels: true },
+  opts: { theme: UI_THEMES[0].id, coords: "overlay", evalBar: true, legal: true, lastMove: true, bestMove: true, nextMove: true, arrowLabels: true },
 
   theme: null,
   geom: null, // {natW, natH, rx, ry, rw, rh} in image px
@@ -282,6 +294,16 @@ function normalizeOpts() {
   if (state.opts.coords === true) state.opts.coords = "overlay";
   if (state.opts.coords === false) state.opts.coords = "off";
   if (!["overlay", "outside", "off"].includes(state.opts.coords)) state.opts.coords = "overlay";
+  // a theme that no longer exists: the default one
+  if (!UI_THEMES.some((t) => t.id === state.opts.theme)) state.opts.theme = UI_THEMES[0].id;
+}
+
+/** Put the chosen UI theme on the page (the graph is drawn on a canvas, so it is redrawn). */
+function applyUiTheme() {
+  const t = UI_THEMES.find((x) => x.id === state.opts.theme) || UI_THEMES[0];
+  document.documentElement.dataset.theme = t.id;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t.themeColor);
+  if (state.game) renderEvalGraph();
 }
 
 function fmtNum(n) {
@@ -653,6 +675,9 @@ function setGame(game) {
   const ui = game.ui_state || {};
   if ("analysis_enabled" in ui) state.analysis.enabled = Boolean(ui.analysis_enabled);
   if (ui.analysis_multipv) state.analysis.multipv = clamp(Number(ui.analysis_multipv) || 1, 1, 5);
+
+  // another game (新規 / 貼り付け / 読込 / 開く) starts from 先手's side again
+  if (prevGame && prevGame !== game.game_id) state.flip = false;
 
   if (prevNode !== game.current_node_id || prevGame !== game.game_id) {
     if (closePromotion) closePromotion(null);
@@ -1101,6 +1126,15 @@ function moveLabel(anchor, normal, dist, text, cls, primary, score = null, owner
  * Arrow (shaft + head) for a move, or a marker for a drop, with a small label.
  * kind: "best" | "best sub" | "next" | "branch"; score: optional {text, cls} for candidates
  */
+// Arrow animations: a light streak runs from the moving piece to the destination (a ripple for
+// drops). The overlay is rebuilt on every analysis update, so each animation starts at the phase
+// of a shared clock and keeps running smoothly; only arrows that were not shown before fade in.
+const ARROW_FLOW_MS = 1300;
+let arrowClipSeq = 0;
+let shownArrowKeys = new Set();
+let drawnArrowKeys = new Set();
+const flowPhase = (el, ms = ARROW_FLOW_MS) => (el.style.animationDelay = `${-(performance.now() % ms).toFixed(0)}ms`);
+
 function overlayShape(usi, kind, weight = 1, labelText = "", score = null, owner = null) {
   const t = moveTarget(usi);
   if (!t || !state.geom) return null;
@@ -1108,6 +1142,9 @@ function overlayShape(usi, kind, weight = 1, labelText = "", score = null, owner
   const to = toView(t.row, t.col);
   const p1 = cellCenter(to.vr, to.vc);
   const g = svgEl("g", { class: kind });
+  const key = `${kind}:${usi}`;
+  drawnArrowKeys.add(key);
+  const fresh = !shownArrowKeys.has(key);
   const labelCls = `lab-${kind.split(" ")[0]}${kind.includes("sub") ? " lab-sub" : ""}`;
   const primary = kind === "best" || kind === "next";
 
@@ -1116,7 +1153,12 @@ function overlayShape(usi, kind, weight = 1, labelText = "", score = null, owner
     const type = String(usi[0] || "");
     const name = { P: "歩", L: "香", N: "桂", S: "銀", G: "金", B: "角", R: "飛" }[type] || "打";
     const r = cell * 0.34 * Math.max(weight, 0.8);
-    g.setAttribute("class", `mk ${kind}`);
+    g.setAttribute("class", `mk ${kind}${fresh ? " enter" : ""}`);
+    if (kind !== "branch") {
+      const ripple = svgEl("circle", { class: "ripple", cx: p1.x, cy: p1.y, r, "stroke-width": cell * 0.035 });
+      flowPhase(ripple);
+      g.appendChild(ripple);
+    }
     g.appendChild(svgEl("circle", { cx: p1.x, cy: p1.y, r, "stroke-width": cell * 0.05 }));
     const text = svgEl("text", { x: p1.x, y: p1.y, "font-size": r * 1.2, "stroke-width": cell * 0.045 });
     // oriented like the dropping side's pieces (upside down for the side at the top)
@@ -1160,6 +1202,23 @@ function overlayShape(usi, kind, weight = 1, labelText = "", score = null, owner
       ...(kind === "branch" ? { "stroke-dasharray": `${cell * 0.1} ${cell * 0.07}` } : {}),
     }),
   );
+  if (fresh) g.classList.add("enter");
+  if (kind !== "branch") {
+    // the streak: a short dash along the arrow's center line, cut to the arrow's outline
+    const id = `arclip${++arrowClipSeq}`;
+    const clip = svgEl("clipPath", { id });
+    clip.appendChild(svgEl("path", { d }));
+    g.appendChild(clip);
+    const flow = svgEl("path", {
+      class: "flow",
+      d: `M ${start.x.toFixed(1)} ${start.y.toFixed(1)} L ${tip.x.toFixed(1)} ${tip.y.toFixed(1)}`,
+      "clip-path": `url(#${id})`,
+      "stroke-width": (headW * 1.3).toFixed(1),
+      pathLength: 100,
+    });
+    flowPhase(flow);
+    g.appendChild(flow);
+  }
 
   if (labelText || score) {
     // beside the middle of the shaft, on the upper side (right side for vertical moves)
@@ -1177,6 +1236,8 @@ function renderOverlay() {
   svg.innerHTML = "";
   overlayLabels = [];
   overlayObstacles = [];
+  shownArrowKeys = drawnArrowKeys;
+  drawnArrowKeys = new Set();
   if (!state.game || !state.geom) return;
   const cur = state.game.current_node_id;
   // collect every arrow first, so each label can keep off all of them
@@ -1774,6 +1835,31 @@ function renderAnalysis() {
 
 // ---------- eval graph ----------
 let graphGeom = null;
+// while dragging on the graph: the ply under the pointer (the marker follows it at once)
+let graphSeekPly = null;
+
+/** The eval graph's colours, from the UI theme's CSS variables (fallbacks: the 墨金 theme). */
+function graphPalette(css) {
+  const v = (name, fb) => css.getPropertyValue(name).trim() || fb;
+  return {
+    line: v("--g-line", "#f3cf86"),
+    up: v("--g-up-rgb", "240,198,116"),
+    down: v("--g-down-rgb", "130,155,230"),
+    grid: v("--g-grid-rgb", "227,178,90"),
+    label: v("--g-label-rgb", "154,161,173"),
+    // themes on busy backgrounds: labels at least this opaque, with a dark shadow
+    labelMin: parseFloat(v("--g-label-min", "0")) || 0,
+    labelShadow: v("--g-label-shadow", ""),
+    plate: v("--g-plate-rgb", "255,255,255"),
+    dot: v("--g-dot", "#f6dc9c"),
+    cur: v("--g-cur", "#fff1cf"),
+    pin: v("--g-pin", "#f6dc9c"),
+    pinLit: v("--g-pin-lit", "#d9a646"),
+    pinInk: v("--g-pin-ink", "#3a2606"),
+    discTop: v("--g-disc-top", "rgba(46,52,72,0.98)"),
+    discBottom: v("--g-disc-bottom", "rgba(10,14,26,0.98)"),
+  };
+}
 
 function renderEvalGraph() {
   const cv = els.evalGraph;
@@ -1788,8 +1874,10 @@ function renderEvalGraph() {
   const H = rect.height;
   ctx.clearRect(0, 0, W, H);
 
-  const css = getComputedStyle(document.documentElement);
+  const css = getComputedStyle(cv);
   const accent = css.getPropertyValue("--accent").trim() || "#e3b25a";
+  // colours follow the UI theme (CSS variables; the fallbacks are the 墨金 theme's)
+  const g = graphPalette(css);
 
   const line = state.mainLine;
   const n = Math.max(line.length - 1, 1);
@@ -1826,20 +1914,22 @@ function renderEvalGraph() {
   graphGeom = { n, x0, x1 };
 
   // background: sente half, grid lines with values (±lim, ±lim/2, 0)
-  ctx.fillStyle = "rgba(255,255,255,0.025)";
+  ctx.fillStyle = `rgba(${g.plate},0.025)`;
   ctx.fillRect(x0, padY, x1 - x0, y(0) - padY);
   ctx.lineWidth = 1;
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   for (const v of compact ? [lim, 0, -lim] : [lim, lim / 2, 0, -lim / 2, -lim]) {
     const gy = Math.round(y(v)) + 0.5;
-    ctx.strokeStyle = v === 0 ? "rgba(227,178,90,0.32)" : "rgba(227,178,90,0.11)";
+    ctx.strokeStyle = v === 0 ? `rgba(${g.grid},0.32)` : `rgba(${g.grid},0.11)`;
     ctx.beginPath();
     ctx.moveTo(x0, gy);
     ctx.lineTo(x1, gy);
     ctx.stroke();
-    ctx.fillStyle = v === 0 ? "rgba(154,161,173,0.85)" : "rgba(154,161,173,0.7)";
+    ctx.fillStyle = `rgba(${g.label},${Math.max(v === 0 ? 0.85 : 0.7, g.labelMin)})`;
+    labelShadow(ctx, g, true);
     ctx.fillText(fmt(v), gutter - 5, gy);
+    labelShadow(ctx, g, false);
   }
   ctx.textBaseline = "alphabetic";
 
@@ -1851,10 +1941,10 @@ function renderEvalGraph() {
     const mid = y(0);
     const grad = ctx.createLinearGradient(0, padY, 0, yBottom);
     const midStop = clamp((mid - padY) / Math.max(yBottom - padY, 1), 0, 1);
-    grad.addColorStop(0, "rgba(240,198,116,0.46)");
-    grad.addColorStop(midStop, "rgba(240,198,116,0.05)");
-    grad.addColorStop(midStop, "rgba(130,155,230,0.05)");
-    grad.addColorStop(1, "rgba(130,155,230,0.38)");
+    grad.addColorStop(0, `rgba(${g.up},0.46)`);
+    grad.addColorStop(midStop, `rgba(${g.up},0.05)`);
+    grad.addColorStop(midStop, `rgba(${g.down},0.05)`);
+    grad.addColorStop(1, `rgba(${g.down},0.38)`);
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.moveTo(pts[0][0], mid);
@@ -1863,17 +1953,17 @@ function renderEvalGraph() {
     ctx.closePath();
     ctx.fill();
 
-    ctx.strokeStyle = "#f3cf86";
+    ctx.strokeStyle = g.line;
     ctx.lineWidth = 1.8;
     ctx.lineJoin = "round";
-    ctx.shadowColor = "rgba(240,198,116,0.75)";
+    ctx.shadowColor = `rgba(${g.up},0.75)`;
     ctx.shadowBlur = 8;
     ctx.beginPath();
     pts.forEach(([px, py], k) => (k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
     ctx.stroke();
     ctx.shadowBlur = 0;
     if (pts.length < 40) {
-      ctx.fillStyle = "#f6dc9c";
+      ctx.fillStyle = g.dot;
       for (const [px, py] of pts) {
         ctx.beginPath();
         ctx.arc(px, py, 1.8, 0, Math.PI * 2);
@@ -1881,7 +1971,7 @@ function renderEvalGraph() {
       }
     }
   } else {
-    ctx.fillStyle = "rgba(154,161,173,0.7)";
+    ctx.fillStyle = `rgba(${g.label},0.7)`;
     ctx.font = "12px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.font = font;
@@ -1889,20 +1979,21 @@ function renderEvalGraph() {
   }
 
   // current ply marker
-  const cx = x(curPly());
+  const shownPly = graphSeekPly ?? curPly();
+  const cx = x(shownPly);
   ctx.strokeStyle = accent;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(cx, padY);
   ctx.lineTo(cx, yBottom);
   ctx.stroke();
-  const curPt = pts.find((p) => p[2] === curPly());
+  const curPt = pts.find((p) => p[2] === shownPly);
   if (curPt) {
-    ctx.fillStyle = "rgba(240,198,116,0.28)";
+    ctx.fillStyle = `rgba(${g.up},0.28)`;
     ctx.beginPath();
     ctx.arc(curPt[0], curPt[1], 8, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#fff1cf";
+    ctx.fillStyle = g.cur;
     ctx.strokeStyle = accent;
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -1911,8 +2002,11 @@ function renderEvalGraph() {
     ctx.stroke();
   }
 
+  drawGraphBranches(ctx, { pal: g, x, pts, y, padY, yBottom, x0, fs, font, compact, axisTop: showAxis ? H - Math.max(8, fs - 2) - 2 : H });
+
   // labels
-  ctx.fillStyle = "rgba(154,161,173,0.75)";
+  ctx.fillStyle = `rgba(${g.label},${Math.max(0.75, g.labelMin)})`;
+  labelShadow(ctx, g, true);
   ctx.font = font;
   ctx.textAlign = "left";
   if (!compact) {
@@ -1926,19 +2020,223 @@ function renderEvalGraph() {
     const step = n <= 60 ? 10 : n <= 150 ? 20 : 50;
     ctx.textBaseline = "bottom";
     ctx.textAlign = "center";
-    ctx.fillStyle = "rgba(154,161,173,0.7)";
+    ctx.fillStyle = `rgba(${g.label},${Math.max(0.7, g.labelMin)})`;
     ctx.font = `${Math.max(8, fs - 2)}px system-ui, sans-serif`;
     for (let i = step; i <= n; i += step) ctx.fillText(String(i), clamp(x(i), x0 + 8, x1 - 8), H);
   }
+  labelShadow(ctx, g, false);
   ctx.textBaseline = "alphabetic";
 }
 
-function onGraphClick(e) {
-  if (!graphGeom || !state.mainLine.length) return;
-  const rect = els.evalGraph.getBoundingClientRect();
-  const t = (e.clientX - rect.left - graphGeom.x0) / (graphGeom.x1 - graphGeom.x0);
-  const i = clamp(Math.round(t * graphGeom.n), 0, state.mainLine.length - 1);
-  jump(state.mainLine[i]);
+function labelShadow(ctx, g, on) {
+  ctx.shadowColor = on && g.labelShadow ? g.labelShadow : "transparent";
+  ctx.shadowBlur = on && g.labelShadow ? 3 : 0;
+  ctx.shadowOffsetY = on && g.labelShadow ? 1 : 0;
+}
+
+/**
+ * Branch pins for the line shown: at every move that has other moves beside it, a short gold stem
+ * rises from just above the evaluation line to a small round badge with a fork glyph (and the
+ * number of other moves when more than one). The stem starts a little off the line, so nothing
+ * covers it; with no room above, the pin hangs below the line instead. Pins at nearby moves are
+ * staggered so they don't overlap; the current move's pin is lit.
+ */
+function drawGraphBranches(ctx, g) {
+  const line = state.mainLine;
+  if (!state.game || line.length < 2) return;
+  const R = g.compact ? 6 : 8.5; // badge radius
+  const gap = 3; // between the line and the stem
+  const stem0 = g.compact ? 5 : 8;
+  // the evaluation line's height at a ply (between analysed points: straight, as drawn)
+  const lineY = (i) => {
+    const p = g.pts;
+    if (!p.length) return g.y(0);
+    if (i <= p[0][2]) return p[0][1];
+    for (let k = 1; k < p.length; k++) {
+      if (i <= p[k][2]) {
+        const [, ya, ia] = p[k - 1];
+        const [, yb, ib] = p[k];
+        return ya + ((yb - ya) * (i - ia)) / Math.max(ib - ia, 1);
+      }
+    }
+    return p[p.length - 1][1];
+  };
+  const top = g.padY + 1;
+  const bottom = Math.min(g.yBottom, g.axisTop) - 1;
+  ctx.font = g.font;
+  const capW = g.compact ? 0 : ctx.measureText("☖後手").width + 10;
+  const caps = g.compact
+    ? []
+    : [
+        { x0: g.x0, x1: g.x0 + capW, y0: g.padY + 2, y1: g.padY + 2 + g.fs }, // ☗先手
+        { x0: g.x0, x1: g.x0 + capW, y0: g.yBottom - 2 - g.fs, y1: g.yBottom - 2 }, // ☖後手
+      ];
+  const perPly = (g.x(line.length - 1) - g.x0) / Math.max(line.length - 1, 1);
+
+  const pins = [];
+  const placed = [];
+  const hits = (bx, cy) => [...placed, ...caps].some((b) => bx + R > b.x0 && bx - R < b.x1 && cy + R > b.y0 && cy - R < b.y1);
+  for (let i = 1; i < line.length; i++) {
+    const parent = node(line[i])?.parent_id;
+    const others = (state.game.children_index?.[parent] || []).length - 1;
+    if (others < 1) continue;
+    const bx = g.x(i);
+    // the line's extent across the badge's width
+    const d = (R + 1) / Math.max(perPly, 0.01);
+    const ys = [lineY(i - d), lineY(i), lineY(i + d)];
+    const lineTop = Math.min(...ys);
+    const lineBottom = Math.max(...ys);
+    let pin = null;
+    for (let k = 0; k < 4 && !pin; k++) {
+      const len = stem0 + k * (R * 2 + 2);
+      for (const dir of [-1, 1]) {
+        const from = dir < 0 ? lineTop - gap : lineBottom + gap;
+        const cy = from + dir * (len + R);
+        if (cy - R < top || cy + R > bottom || hits(bx, cy)) continue;
+        pin = { i, bx, from, cy, dir, others };
+        break;
+      }
+    }
+    if (!pin) continue; // no free spot (very crowded / tiny graph): leave the line readable
+    placed.push({ x0: bx - R - 1, x1: bx + R + 1, y0: pin.cy - R - 1, y1: pin.cy + R + 1 });
+    pins.push(pin);
+  }
+
+  const pal = g.pal;
+  const gold = pal.pin;
+  for (const p of pins) {
+    const cur = line[p.i] === state.game.current_node_id;
+    const edge = p.cy - p.dir * R; // where the stem meets the badge
+    ctx.save();
+    // stem: fades in from the line towards the badge
+    const sg = ctx.createLinearGradient(0, p.from, 0, edge);
+    sg.addColorStop(0, `rgba(${pal.up},0)`);
+    sg.addColorStop(1, cur ? pal.cur : `rgba(${pal.up},0.75)`);
+    ctx.strokeStyle = sg;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(p.bx, p.from);
+    ctx.lineTo(p.bx, edge);
+    ctx.stroke();
+    // badge: dark glass disc with a gold ring and a soft glow
+    ctx.shadowColor = cur ? `rgba(${pal.up},0.95)` : `rgba(${pal.up},0.55)`;
+    ctx.shadowBlur = cur ? 12 : 7;
+    const fill = ctx.createRadialGradient(p.bx - R * 0.35, p.cy - R * 0.45, R * 0.1, p.bx, p.cy, R);
+    if (cur) {
+      fill.addColorStop(0, pal.cur);
+      fill.addColorStop(1, pal.pinLit);
+    } else {
+      fill.addColorStop(0, pal.discTop);
+      fill.addColorStop(1, pal.discBottom);
+    }
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.arc(p.bx, p.cy, R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = cur ? pal.cur : gold;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    // branch glyph (as in a version-control branch icon): a trunk with a dot at each end and a
+    // limb curving off it to a third dot, growing away from the line
+    const s = R * 0.48;
+    const fwd = p.dir; // -1: the pin stands above the line, so the glyph grows upwards
+    const ink = cur ? pal.pinInk : gold;
+    const tx = p.bx - s * 0.55;
+    const yNear = p.cy - fwd * s;
+    const yFar = p.cy + fwd * s;
+    const lx = p.bx + s * 0.75;
+    const ly = p.cy + fwd * s * 0.35;
+    ctx.strokeStyle = ink;
+    ctx.fillStyle = ink;
+    ctx.lineWidth = g.compact ? 1 : 1.25;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(tx, yNear);
+    ctx.lineTo(tx, yFar);
+    ctx.moveTo(tx, p.cy - fwd * s * 0.35);
+    ctx.quadraticCurveTo(lx, p.cy - fwd * s * 0.2, lx, ly);
+    ctx.stroke();
+    const dot = g.compact ? 1.2 : 1.55;
+    for (const [dx, dy] of [[tx, yNear], [tx, yFar], [lx, ly]]) {
+      ctx.beginPath();
+      ctx.arc(dx, dy, dot, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // number of other moves, as a tiny tag beside the badge
+    if (p.others > 1 && !g.compact) {
+      const t = String(p.others);
+      ctx.font = `700 ${Math.max(8, g.fs - 3)}px system-ui, sans-serif`;
+      const tw = ctx.measureText(t).width + 6;
+      const tx = p.bx + R * 0.55;
+      const ty = p.cy - R * 0.95;
+      ctx.fillStyle = cur ? pal.cur : pal.pinLit;
+      ctx.beginPath();
+      ctx.roundRect(tx, ty - 5, tw, 10, 5);
+      ctx.fill();
+      ctx.fillStyle = pal.pinInk;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(t, tx + tw / 2, ty + 0.5);
+    }
+    ctx.restore();
+  }
+}
+
+/**
+ * The graph works as a seek bar: press anywhere on it and the position moves there, keep the
+ * button / finger down and drag to scrub through the moves, let go to settle. Only the horizontal
+ * position counts, and once pressed the pointer may wander off the graph (captured).
+ */
+function wireGraphSeek() {
+  const cv = els.evalGraph;
+  let seek = null; // { id, line, target, sentAt, timer }
+  const plyAt = (clientX) => {
+    const rect = cv.getBoundingClientRect();
+    const t = (clientX - rect.left - graphGeom.x0) / (graphGeom.x1 - graphGeom.x0);
+    return clamp(Math.round(t * graphGeom.n), 0, seek.line.length - 1);
+  };
+  // the board follows while dragging, at most every 90 ms; the last spot is always sent
+  const send = () => {
+    clearTimeout(seek.timer);
+    seek.timer = null;
+    seek.sentAt = performance.now();
+    jump(seek.line[seek.target]);
+  };
+  const moveTo = (clientX) => {
+    const i = plyAt(clientX);
+    if (i === seek.target) return;
+    seek.target = i;
+    graphSeekPly = i;
+    renderEvalGraph();
+    const wait = 90 - (performance.now() - seek.sentAt);
+    if (wait <= 0) send();
+    else if (!seek.timer) seek.timer = setTimeout(send, wait);
+  };
+  const end = (e) => {
+    if (!seek || e.pointerId !== seek.id) return;
+    if (seek.timer) send();
+    seek = null;
+    graphSeekPly = null;
+    cv.classList.remove("seeking");
+    renderEvalGraph();
+  };
+  cv.addEventListener("pointerdown", (e) => {
+    if (seek || (e.pointerType === "mouse" && e.button !== 0)) return;
+    if (!graphGeom || !state.mainLine.length || kifuLocked()) return;
+    e.preventDefault();
+    cv.setPointerCapture(e.pointerId);
+    cv.classList.add("seeking");
+    // the line as it is now: jumping back inside it keeps it, so the moves under the bar stay put
+    seek = { id: e.pointerId, line: [...state.mainLine], target: -1, sentAt: 0, timer: null };
+    moveTo(e.clientX);
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (seek && e.pointerId === seek.id) moveTo(e.clientX);
+  });
+  cv.addEventListener("pointerup", end);
+  cv.addEventListener("pointercancel", end);
+  cv.addEventListener("lostpointercapture", end);
 }
 
 // ---------- kifu ----------
@@ -2369,6 +2667,26 @@ async function setupThemeChoices() {
   const pieceSets = cfg.piece_sets || [];
 
   const draw = () => {
+    // UI themes: a small mock-up of the screen in each theme's own colours
+    els.uiThemeChoices.innerHTML = "";
+    for (const t of UI_THEMES) {
+      const b = el("button", `theme-opt${t.id === state.opts.theme ? " on" : ""}`);
+      b.type = "button";
+      const th = el("span", "thumb");
+      const mock = el("span", "ui-mock");
+      mock.dataset.theme = t.id;
+      for (const part of ["m-save", "m-board", "m-card", "m-title", "m-score", "m-bar", "m-line"]) mock.appendChild(el("i", part));
+      th.appendChild(mock);
+      b.append(th, el("span", null, t.name));
+      b.addEventListener("click", () => {
+        state.opts.theme = t.id;
+        saveOpts();
+        applyUiTheme();
+        draw();
+      });
+      els.uiThemeChoices.appendChild(b);
+    }
+
     const curBg = lsGet(THEME_LS_KEYS.backgroundSet) || bgSets[0]?.name;
     const curPs = lsGet(THEME_LS_KEYS.pieceSet) || pieceSets[0]?.name;
     els.bgChoices.innerHTML = "";
@@ -2668,7 +2986,8 @@ function wireDrawerSwipe() {
       if (!isMobile() || e.touches.length !== 1 || openDialogEl) return;
       const t = e.touches[0];
       const open = document.body.classList.contains("kifu-open");
-      const fromEdge = !open && t.clientX > window.innerWidth - 24;
+      // (not on the graph: dragging there seeks through the moves)
+      const fromEdge = !open && t.clientX > window.innerWidth - 24 && e.target !== els.evalGraph;
       const onDrawer = open && els.kifuCard.contains(e.target);
       start = fromEdge || onDrawer ? { x: t.clientX, y: t.clientY, open } : null;
     },
@@ -2806,6 +3125,7 @@ async function fetchServerSettings() {
 /** After a reconnect: pick up changes made on another device. */
 async function syncSettingsFromServer() {
   if (!(await fetchServerSettings())) return;
+  applyUiTheme();
   syncOptControls();
   await loadTheme();
   setupThemeChoices();
@@ -2886,7 +3206,7 @@ function wire() {
     sendWs("analysis:set_multipv", { multipv: v });
   });
 
-  els.evalGraph.addEventListener("click", onGraphClick);
+  wireGraphSeek();
 
   // title: label + pencil -> rename popup. The same popup asks for a name on the first save
   // of a kifu that still has its automatic name (kif_YYYYMMDD_hhmmss).
@@ -3297,7 +3617,9 @@ async function setupLogout() {
 
 async function main() {
   loadOpts();
+  applyUiTheme();
   await fetchServerSettings();
+  applyUiTheme();
   ensureSquares();
   renderCoords();
   wire();

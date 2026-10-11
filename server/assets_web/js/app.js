@@ -1359,6 +1359,7 @@ function renderOverlay() {
   const cur = state.game.current_node_id;
   // collect every arrow first, so each label can keep off all of them
   const specs = []; // [usi, kind, weight, name, score]
+  let nextSpec = null; // the 指し手 arrow: its label merges into a candidate's on the same move
 
   // next moves stored in the kifu: the next move of the displayed line (指し手) + other branches
   if (state.opts.nextMove) {
@@ -1368,7 +1369,9 @@ function renderOverlay() {
       if (!n.move_usi) return;
       const isNext = n.node_id === nextId;
       const name = state.opts.arrowLabels ? (isNext ? "指し手" : "分岐") : "";
-      specs.push([n.move_usi, isNext ? "next" : "branch", isNext ? 1 : 0.7, name, null]);
+      const spec = [n.move_usi, isNext ? "next" : "branch", isNext ? 1 : 0.7, name, null];
+      if (isNext) nextSpec = spec;
+      specs.push(spec);
     });
   }
 
@@ -1387,7 +1390,12 @@ function renderOverlay() {
       // 成 / 不成 of the engine's move, small beside the evaluation
       score.promo = promotionMark(first);
       // with labels OFF the pill keeps only the evaluation
-      const name = state.opts.arrowLabels ? (i === 0 ? "候補手" : `候補${seen.size}`) : "";
+      let name = state.opts.arrowLabels ? (i === 0 ? "候補手" : `候補${seen.size}`) : "";
+      // the kifu's next move is this candidate: one pill 「指・候N +123」 instead of two
+      if (nextSpec && nextSpec[0] === first) {
+        if (name) name = `指・候${seen.size}`;
+        nextSpec[3] = "";
+      }
       specs.push([first, i === 0 ? "best" : "best sub", i === 0 ? 1 : 0.6, name, score]);
     });
   }

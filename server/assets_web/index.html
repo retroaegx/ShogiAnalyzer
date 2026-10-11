@@ -7,8 +7,8 @@
   <title>Shogi Analyzer</title>
   <!-- app install (PWA) / icons -->
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png?v=2">
-  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png?v=2">
+  <link rel="icon" type="image/webp" sizes="32x32" href="/icons/favicon-32.webp?v=3">
+  <link rel="icon" type="image/webp" sizes="16x16" href="/icons/favicon-16.webp?v=3">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,6 +18,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Shippori+Mincho+B1:wght@600;700;800&display=swap">
   <link rel="stylesheet" href="/app.css">
+  <!-- the chosen UI theme before the first paint (no flash of the default colours) -->
+  <script>try { var t = JSON.parse(localStorage.getItem("shogi_analyzer_view_opts") || "{}").theme; if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
 </head>
 <body>
   <!-- icon sprite -->
@@ -53,8 +55,8 @@
     <!-- ===== Top bar ===== -->
     <header class="topbar">
       <div class="brand" aria-label="Shogi Analyzer">
-        <span class="brand-mark" aria-hidden="true">将</span>
-        <span class="brand-name">Shogi<b>Analyzer</b></span>
+        <img class="brand-mark" src="/icons/icon-192.webp?v=3" alt="" aria-hidden="true" width="34" height="34">
+        <span class="brand-name"><span class="bn-word">Shogi<b>Analyzer</b></span><span class="bn-rule"></span></span>
       </div>
 
       <div class="title-field">
@@ -275,6 +277,8 @@
     <div class="dialog wide" id="dlgSettings" role="dialog" aria-modal="true" aria-labelledby="dlgSettingsTitle" hidden>
       <header class="dialog-head"><h3 id="dlgSettingsTitle">表示設定</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
       <div class="dialog-body">
+        <div class="set-title">テーマ</div>
+        <div class="theme-grid ui-themes" id="uiThemeChoices"></div>
         <div class="set-title">盤</div>
         <div class="theme-grid" id="bgChoices"></div>
         <div class="set-title">駒</div>
@@ -376,7 +380,7 @@
 
   <!-- phones / tablets only, when not opened as an installed app -->
   <div class="install-card" id="installCard" role="dialog" aria-labelledby="installTitle" hidden>
-    <img class="install-icon" src="/icons/icon-192.png?v=2" alt="">
+    <img class="install-icon" src="/icons/icon-192.webp?v=3" alt="">
     <div class="install-text">
       <div class="install-title" id="installTitle">アプリとして追加しませんか？</div>
       <div class="install-body" id="installBody"></div>

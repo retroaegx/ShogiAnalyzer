@@ -1038,7 +1038,7 @@ textarea.field.mono { font-size: 12px; }
   /* stands: one slim box aligned with the board, side mark inside it */
   .stand {
     flex-direction: row; align-items: center; gap: 0;
-    height: calc(var(--cell) * .82); /* fixed: capturing a piece must not move the board */
+    height: calc(var(--cell) * var(--stand-k, .82)); /* set by layoutBoard; capturing a piece must not move the board */
     min-height: 0;
     padding: 1px 6px;
     border-radius: 9px;
@@ -1056,7 +1056,7 @@ textarea.field.mono { font-size: 12px; }
   .stand.to-move .stand-pieces { border: 0; }
   .stand-bottom .stand-pieces { justify-content: flex-end; }
   /* fits inside the stand row (row height minus its padding and border): corners are never cut */
-  .hand-piece { width: calc(var(--cell) * .82 - 6px); height: calc(var(--cell) * .82 - 6px); flex: none; }
+  .hand-piece { width: calc(var(--cell) * min(var(--stand-k, .82), 1) - 6px); height: calc(var(--cell) * min(var(--stand-k, .82), 1) - 6px); flex: none; }
   .stands-side .hand-piece { width: calc(var(--cell) * .74); height: calc(var(--cell) * .74); }
   .hand-piece .cnt { min-width: 15px; height: 15px; padding: 0 4px; font-size: 10px; right: -1px; bottom: -1px; }
   .stand-empty { display: none; }
@@ -1941,8 +1941,9 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
 }
 /* phones: top bar and panels scale with the screen (--ui-zoom from layoutBoard) */
 @media (max-width: 900px) {
-  .topbar, .navbar, .analysis-card { zoom: var(--ui-zoom, 1); }
-  .app { grid-template-rows: calc(var(--topbar-h) * var(--ui-zoom, 1)) minmax(0, 1fr); }
+  .navbar, .analysis-card { zoom: var(--ui-zoom, 1); }
+  .topbar { zoom: var(--top-zoom, 1); }
+  .app { grid-template-rows: calc(var(--topbar-h) * var(--top-zoom, 1)) minmax(0, 1fr); }
 }
 /* 候補手 pull-down: only on short phones (phone-compact, set by layoutBoard) */
 .mpv-sel { display: none; }
@@ -1962,4 +1963,14 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   :is(.navbar, .analysis-card, .graph-card, .stand) { border-radius: 0; border-left-width: 0; border-right-width: 0; }
   .graph-wrap { padding-left: 0; padding-right: 0; }
   .graph { border-radius: 0; }
+}
+/* phones: the panels touch (no gaps, no bottom margin); the nav bar keeps only a thin inner margin */
+@media (max-width: 900px) {
+  .main { gap: 0; padding-top: 0; padding-bottom: env(safe-area-inset-bottom); }
+  .board-area { gap: 0; }
+  .board-stage { row-gap: 0; }
+  .side { gap: 0; }
+  .navbar { padding: 4px 6px 0; gap: 4px; }
+  .mini-eval { padding: 4px 2px 4px; }
+  .analysis-card .analysis-ctl { padding-top: 4px; padding-bottom: 4px; }
 }

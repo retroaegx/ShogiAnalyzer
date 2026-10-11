@@ -881,6 +881,14 @@ function placeMiniEval(inCtl) {
 // phones: smallest scale of the top bar / panels, and the least graph height worth showing
 const PHONE_ZOOM_MIN = 0.62;
 const PHONE_GRAPH_MIN = 76;
+// tall phones: the graph stops growing at this share of the screen width; the height beyond that
+// makes the stands taller (up to PHONE_STAND_MAX of a square instead of 0.82)
+const PHONE_GRAPH_MAX_W = 0.3;
+const PHONE_STAND_K = 0.82;
+const PHONE_STAND_MAX = 1.35;
+const PHONE_ZOOM_MAX = 1.35;
+// the top bar grows less than the panels (its title must not get cut)
+const PHONE_TOP_ZOOM_MAX = 1.1;
 
 function layoutBoard() {
   const g = state.geom;
@@ -898,11 +906,13 @@ function layoutBoard() {
   const coordK = coordsOutside ? cellPerBs * coordRatio : 0;
 
   let bs;
+  let phoneStandK = PHONE_STAND_K;
   if (mobile) {
-    // Phone: nothing scrolls. The board takes the full screen width; the top bar and the panels
-    // under it (move buttons, 候補手 row) scale down with CSS zoom until board, stands, panels and
-    // a readable graph all fit (the board may give up a little width for the graph). Screens too
-    // short for that (iPhone SE in the browser…) drop the graph instead.
+    // Phone: nothing scrolls and the panels touch. The board takes the full screen width; the top
+    // bar and the panels under it (move buttons, 候補手 row) scale down with CSS zoom until board,
+    // stands, panels and a readable graph all fit. Screens too short for that (iPhone SE in the
+    // browser…) drop the graph instead. Height to spare goes to taller stands, then (tall phones)
+    // to larger panels; the graph itself stops at PHONE_GRAPH_MAX_W of the width.
     const main = els.boardArea.parentElement;
     const ana = document.querySelector(".analysis-card");
     // short phones (iPhone SE…): one row less. The 解析 summary moves from under the move buttons
@@ -911,40 +921,61 @@ function layoutBoard() {
     root.classList.toggle("phone-compact", compact);
     placeMiniEval(compact);
     els.boardStage.classList.remove("stands-side");
-    const fit = (zoom, graph) => {
+    const setZoom = (zoom) => {
       root.style.setProperty("--ui-zoom", zoom.toFixed(3));
-      root.classList.toggle("phone-no-graph", !graph);
+      root.style.setProperty("--top-zoom", Math.min(zoom, PHONE_TOP_ZOOM_MAX).toFixed(3));
+    };
+    const fit = (zoom, graphH, standK) => {
+      setZoom(zoom);
+      root.classList.toggle("phone-no-graph", !graphH);
       const ms = getComputedStyle(main);
       const mainH = main.clientHeight - parseFloat(ms.paddingTop) - parseFloat(ms.paddingBottom);
-      const gap = parseFloat(ms.rowGap) || 6;
       const navH = els.boardArea.querySelector(".navbar").getBoundingClientRect().height || 54;
-      const anaH = ana ? ana.getBoundingClientRect().height + gap : 0;
-      const availW = main.clientWidth; // edge to edge: the stage ignores main's side padding (app.css)
-      const availH = mainH - navH - 4 - anaH - (graph ? PHONE_GRAPH_MIN + gap : 0);
+      const anaH = ana ? ana.getBoundingClientRect().height : 0;
+      const availW = main.clientWidth;
+      // panels touch each other (no gaps on phones); 2px of slack against rounding
+      const availH = mainH - navH - anaH - graphH - 2;
       const coordPx = coordsOutside ? Math.max(coordMin, Math.min(coordMax, (availW * cellPerBs * coordRatio) / (1 + coordK))) : 0;
-      // stands above / below the board, rows fixed at 0.82 of a square (app.css)
-      const fitH = (availH - 8 - coordPx) / (g.natH / g.natW + 2 * cellPerBs * 0.82);
-      return { bs: Math.min(availW - coordPx, fitH), full: fitH >= availW - coordPx, w: availW - coordPx };
+      const w = availW - coordPx;
+      const denom = g.natH / g.natW + 2 * cellPerBs * standK;
+      const fitH = (availH - coordPx) / denom;
+      // spare: height left once the full-width board, its stands and the graph are placed
+      return { bs: Math.min(w, fitH), full: fitH >= w, w, spare: Math.max(0, (fitH - w) * denom) };
     };
-    // largest zoom (1 … PHONE_ZOOM_MIN) at which the board is full width
-    const best = (graph) => {
-      let r = fit(1, graph);
-      if (r.full) return { ...r, zoom: 1 };
-      r = fit(PHONE_ZOOM_MIN, graph);
-      if (!r.full) return { ...r, zoom: PHONE_ZOOM_MIN };
-      let lo = PHONE_ZOOM_MIN, hi = 1;
+    // largest zoom in lo…hi at which the board is full width
+    const best = (lo, hi, graphH, standK) => {
+      let r = fit(hi, graphH, standK);
+      if (r.full) return { ...r, zoom: hi };
+      r = fit(lo, graphH, standK);
+      if (!r.full) return { ...r, zoom: lo };
       for (let i = 0; i < 7; i++) {
         const mid = (lo + hi) / 2;
-        if (fit(mid, graph).full) lo = mid;
+        if (fit(mid, graphH, standK).full) lo = mid;
         else hi = mid;
       }
-      return { ...fit(lo, graph), zoom: lo };
+      return { ...fit(lo, graphH, standK), zoom: lo };
     };
-    let r = best(true);
-    if (r.bs < r.w * 0.9) r = best(false); // the graph only when the board stays nearly full width
+    const graphMax = Math.round(main.clientWidth * PHONE_GRAPH_MAX_W);
+    let r = best(PHONE_ZOOM_MIN, 1, PHONE_GRAPH_MIN, PHONE_STAND_K);
+    // the graph only when the board stays (nearly) full width
+    const graph = r.bs >= r.w * 0.95;
+    if (!graph) r = best(PHONE_ZOOM_MIN, 1, 0, PHONE_STAND_K);
+    let toStands = graph ? Math.max(0, PHONE_GRAPH_MIN + r.spare - graphMax) : r.spare;
+    if (graph && r.zoom >= 1 && fit(1, graphMax, PHONE_STAND_MAX).full) {
+      // tall phones (Pro Max…): stands at their largest and the graph at its cap still leave
+      // room, so the top bar and panels grow (up to PHONE_ZOOM_MAX) instead of the graph
+      r = best(1, PHONE_ZOOM_MAX, graphMax, PHONE_STAND_MAX);
+      toStands = Infinity;
+    }
     bs = r.bs;
+    const cellPx = Math.floor(bs) * cellPerBs;
+    phoneStandK = clamp(PHONE_STAND_K + toStands / 2 / cellPx, PHONE_STAND_K, PHONE_STAND_MAX);
+    // fit() left its last trial values behind: apply the chosen ones
+    setZoom(r.zoom);
+    root.classList.toggle("phone-no-graph", !graph);
   } else {
     root.style.setProperty("--ui-zoom", "1");
+    root.style.setProperty("--top-zoom", "1");
     root.classList.remove("phone-no-graph", "phone-compact");
     placeMiniEval(false);
     const area = els.boardArea.getBoundingClientRect();
@@ -968,6 +999,7 @@ function layoutBoard() {
   root.style.setProperty("--cov-x", `${Math.max(rightMargin * 0.84, covFont * 1.1)}px`);
   root.style.setProperty("--cov-y", `${Math.max(g.ry * scale * 0.84, covFont * 1.05)}px`);
   root.style.setProperty("--bs", `${bs}px`);
+  root.style.setProperty("--stand-k", phoneStandK.toFixed(3));
   root.style.setProperty("--cell", `${cell}px`);
   root.style.setProperty("--coord", `${coord}px`);
   root.style.setProperty("--rl", `${g.rx * scale}px`);

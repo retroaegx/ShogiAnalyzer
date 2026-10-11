@@ -1930,30 +1930,9 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
 
 #dlgConfirmExtra { margin-top: 14px; }
 
-/* 駒台: a wooden tray like the board (nearly square corners, raised rim) inside a squarer panel,
-   not a rounded glass pill */
+/* 駒台: squarer corners (the default panels were too round for a piece stand) */
 .stand { border-radius: 6px; }
-.stand-pieces,
-:is([data-theme="sakura"], [data-theme="pearl"]) .stand-pieces {
-  border-radius: 3px;
-  border: 1px solid rgba(58, 32, 12, .75);
-  background:
-    linear-gradient(180deg, rgba(255, 244, 222, .16), rgba(255, 244, 222, 0) 35%, rgba(40, 20, 5, .14)),
-    repeating-linear-gradient(90deg, rgba(120, 72, 30, 0) 0 7px, rgba(120, 72, 30, .07) 7px 8px, rgba(120, 72, 30, 0) 8px 19px),
-    linear-gradient(90deg, #c38d55, #d6a56c 45%, #c99459 70%, #bd8650);
-  box-shadow: inset 0 0 0 2px rgba(255, 226, 180, .22), inset 0 3px 7px rgba(50, 25, 5, .38), 0 1px 0 rgba(255, 255, 255, .08);
-}
-.stand.to-move .stand-pieces { border-color: rgba(var(--acc-rgb), .9); box-shadow: inset 0 0 0 2px rgba(255, 226, 180, .22), inset 0 3px 7px rgba(50, 25, 5, .38), 0 0 0 1px rgba(var(--acc-rgb), .55); }
-.stand-empty { color: rgba(70, 40, 15, .7); }
-.hand-piece:not(:disabled):hover { background: rgba(255, 240, 210, .22); }
-@media (max-width: 900px) {
-  .stand { padding: 2px 3px; }
-  .stand-pieces,
-  :is([data-theme="sakura"], [data-theme="pearl"]) .stand-pieces { align-self: stretch; padding: 0 2px; }
-  .stand-bottom .stand-pieces { padding: 0 2px; }
-  .stand-label { padding: 0 6px 0 3px; margin-right: 3px; }
-  .stand-bottom .stand-label { padding: 0 3px 0 6px; margin: 0 0 0 3px; }
-}
+.stand-pieces { border-radius: 4px; }
 /* phones: layoutBoard fits everything on the screen; screens too short for a readable graph drop it */
 @media (max-width: 900px) { .phone-no-graph .graph-card { display: none; } }
 /* phones: stands as wide as the board */

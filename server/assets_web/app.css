@@ -1956,9 +1956,8 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
 }
 /* phones: layoutBoard fits everything on the screen; screens too short for a readable graph drop it */
 @media (max-width: 900px) { .phone-no-graph .graph-card { display: none; } }
-/* phones: board and stands edge to edge (main keeps its side padding for the panels below) */
+/* phones: stands as wide as the board */
 @media (max-width: 900px) {
-  .board-stage { margin: 0 -4px; }
   .stand-top, .stand-bottom { margin: 0; }
 }
 /* phones: top bar and panels scale with the screen (--ui-zoom from layoutBoard) */
@@ -1977,4 +1976,11 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   .phone-compact .analysis-ctl .mini-eval { flex: 1 1 auto; width: auto; padding: 0; border-top: 0; gap: 6px; }
   .phone-compact .analysis-ctl :is(.mini-depth, .mini-best) { display: none; }
   .phone-compact .analysis-ctl .mini-verdict { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+/* phones: every panel runs edge to edge (no side padding, square ends without side borders) */
+@media (max-width: 900px) {
+  .main { padding-left: 0; padding-right: 0; }
+  :is(.navbar, .analysis-card, .graph-card, .stand) { border-radius: 0; border-left-width: 0; border-right-width: 0; }
+  .graph-wrap { padding-left: 0; padding-right: 0; }
+  .graph { border-radius: 0; }
 }

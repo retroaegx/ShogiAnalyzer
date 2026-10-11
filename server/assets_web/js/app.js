@@ -3679,7 +3679,6 @@ function wire() {
   new ResizeObserver(keepCurrentMoveVisible).observe(els.moveList);
 }
 
-// Logout buttons only when password protection is on (SHOGI_ANALYZER_PASSWORD=TRUE).
 // ---------- version / update notice (GitHub releases) ----------
 function renderUpdate(st) {
   if (!st) return;
@@ -3857,23 +3856,6 @@ function setupInstallSuggestion() {
   setTimeout(show, 6000);
 }
 
-async function setupLogout() {
-  try {
-    const st = await fetch("/api/auth/status", { cache: "no-store" }).then((r) => r.json());
-    const on = Boolean(st.required && st.configured);
-    for (const e of document.querySelectorAll(".logout-item")) e.hidden = !on;
-  } catch {
-    // status unavailable: keep the buttons hidden
-  }
-  $("logoutBtn").addEventListener("click", async () => {
-    try {
-      await fetch("/api/logout", { method: "POST" });
-    } finally {
-      location.replace("/login");
-    }
-  });
-}
-
 async function main() {
   loadOpts();
   applyUiTheme();
@@ -3882,7 +3864,6 @@ async function main() {
   ensureSquares();
   renderCoords();
   wire();
-  setupLogout();
   setupUpdateNotice();
   // installable as an app (PWA): needs https (public address) or localhost
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});

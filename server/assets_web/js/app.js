@@ -1847,6 +1847,9 @@ function graphPalette(css) {
     down: v("--g-down-rgb", "130,155,230"),
     grid: v("--g-grid-rgb", "227,178,90"),
     label: v("--g-label-rgb", "154,161,173"),
+    // themes on busy backgrounds: labels at least this opaque, with a dark shadow
+    labelMin: parseFloat(v("--g-label-min", "0")) || 0,
+    labelShadow: v("--g-label-shadow", ""),
     plate: v("--g-plate-rgb", "255,255,255"),
     dot: v("--g-dot", "#f6dc9c"),
     cur: v("--g-cur", "#fff1cf"),
@@ -1923,8 +1926,10 @@ function renderEvalGraph() {
     ctx.moveTo(x0, gy);
     ctx.lineTo(x1, gy);
     ctx.stroke();
-    ctx.fillStyle = v === 0 ? `rgba(${g.label},0.85)` : `rgba(${g.label},0.7)`;
+    ctx.fillStyle = `rgba(${g.label},${Math.max(v === 0 ? 0.85 : 0.7, g.labelMin)})`;
+    labelShadow(ctx, g, true);
     ctx.fillText(fmt(v), gutter - 5, gy);
+    labelShadow(ctx, g, false);
   }
   ctx.textBaseline = "alphabetic";
 
@@ -2000,7 +2005,8 @@ function renderEvalGraph() {
   drawGraphBranches(ctx, { pal: g, x, pts, y, padY, yBottom, x0, fs, font, compact, axisTop: showAxis ? H - Math.max(8, fs - 2) - 2 : H });
 
   // labels
-  ctx.fillStyle = `rgba(${g.label},0.75)`;
+  ctx.fillStyle = `rgba(${g.label},${Math.max(0.75, g.labelMin)})`;
+  labelShadow(ctx, g, true);
   ctx.font = font;
   ctx.textAlign = "left";
   if (!compact) {
@@ -2014,11 +2020,18 @@ function renderEvalGraph() {
     const step = n <= 60 ? 10 : n <= 150 ? 20 : 50;
     ctx.textBaseline = "bottom";
     ctx.textAlign = "center";
-    ctx.fillStyle = `rgba(${g.label},0.7)`;
+    ctx.fillStyle = `rgba(${g.label},${Math.max(0.7, g.labelMin)})`;
     ctx.font = `${Math.max(8, fs - 2)}px system-ui, sans-serif`;
     for (let i = step; i <= n; i += step) ctx.fillText(String(i), clamp(x(i), x0 + 8, x1 - 8), H);
   }
+  labelShadow(ctx, g, false);
   ctx.textBaseline = "alphabetic";
+}
+
+function labelShadow(ctx, g, on) {
+  ctx.shadowColor = on && g.labelShadow ? g.labelShadow : "transparent";
+  ctx.shadowBlur = on && g.labelShadow ? 3 : 0;
+  ctx.shadowOffsetY = on && g.labelShadow ? 1 : 0;
 }
 
 /**

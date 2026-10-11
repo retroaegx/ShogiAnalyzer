@@ -1,7 +1,7 @@
 /* ============================================================
    Shogi Analyzer — UI
    ============================================================ */
-:root {
+:root, [data-theme] {
   color-scheme: dark;
 
   --bg: #0b0c0f;
@@ -1355,7 +1355,7 @@ textarea.field.mono { font-size: 12px; }
    Gold theme (deep navy + thin gold lines, wave header)
    Colours / borders / glow only: sizes and the board stay as they are.
    ============================================================ */
-:root {
+:root, [data-theme] {
   --bg: #070a11;
   --bg-glow: rgba(var(--acc-rgb), 0.06);
   --surface: #0d111a;
@@ -1499,7 +1499,7 @@ body {
    gold floral frame behind the analysis column. The board, pieces and
    coordinates stay as they are.
    ============================================================ */
-:root {
+:root, [data-theme] {
   --panel: rgba(var(--deep-rgb), .60);
   --panel-deep: rgba(var(--deep-rgb), .74);
   --panel-line: rgba(var(--hl-rgb), .30);
@@ -1617,7 +1617,7 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
    UI themes (表示設定 → テーマ). Every colour above comes from these variables;
    墨金 is the default (navy glass + gold). The board and pieces have their own setting.
    ============================================================ */
-:root {
+:root, [data-theme] {
   --app-bg: url("/img/bg-waves.webp?v=1");
   --theme-thumb: url("/img/themes/sumikin-thumb.webp?v=1");
   --analysis-frame: url("/img/frame-gold.webp?v=4");
@@ -1634,6 +1634,10 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   --seg-bg: #080c14;
   --acc-hi: #ffe7ad; --acc-pale: #fff3d6; --acc-mid: #eccb8a; --acc-deep: #c38d36;
   --card-shadow: inset 0 1px 0 rgba(var(--hl-rgb), .30), 0 0 22px -12px rgba(var(--acc-rgb), .45), 0 18px 40px -24px rgba(0, 0, 0, .95);
+  --g-line: #f3cf86; --g-up-rgb: 240, 198, 116; --g-down-rgb: 130, 155, 230; --g-grid-rgb: 227, 178, 90;
+  --g-label-rgb: 154, 161, 173; --g-plate-rgb: 255, 255, 255; --g-dot: #f6dc9c; --g-cur: #fff1cf;
+  --g-pin: #f6dc9c; --g-pin-lit: #d9a646; --g-pin-ink: #3a2606;
+  --g-disc-top: rgba(46, 52, 72, .98); --g-disc-bottom: rgba(10, 14, 26, .98);
 }
 
 /* ---------- 極光 (aurora: night sky, violet glass, teal light) ---------- */
@@ -1717,57 +1721,87 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   :is([data-theme="sakura"], [data-theme="pearl"]) .kifu-card { background: var(--panel-hi), rgba(var(--deep-rgb), .97); }
 }
 
-/* ---------- 暁桜 (sakura: sunrise peach glass, amber) ---------- */
+/* ---------- 暁桜 (sakura: sunrise, clear peach glass; the readouts sit on dark rose glass) ---------- */
 [data-theme="sakura"] {
   --app-bg: url("/img/themes/sakura.webp?v=1");
   --theme-thumb: url("/img/themes/sakura-thumb.webp?v=1");
-  --bg: #f4dccf;
-  --acc-rgb: 214, 130, 86;
-  --hl-rgb: 176, 104, 86;
-  --hi-rgb: 226, 150, 96;
-  --deep-rgb: 255, 245, 240;
-  --accent: #d98a52; --accent-2: #f1b47c; --accent-ink: #3b1c08; --accent-soft: rgba(214, 130, 86, .16);
-  --gold: #dd915a; --gold-hi: #9c4f22;
-  --surface: #fff4ef; --surface-2: #fbe7df; --surface-3: #f4d6ca;
-  --line: rgba(150, 84, 66, .16); --line-strong: rgba(150, 84, 66, .30);
-  --text: #3d2822; --muted: #7d5f56; --faint: #a6877d;
-  --panel: rgba(255, 244, 239, .58); --panel-deep: rgba(255, 246, 242, .74); --panel-line: rgba(196, 128, 104, .38);
-  --panel-hi: linear-gradient(180deg, rgba(255, 255, 255, .65), rgba(255, 255, 255, .12) 30%, transparent 55%);
-  --title-ink: #7a3b22; --acc-text: #7e3a12; --muted-2: #7a5d55; --text-strong: #2e1a14;
-  --btn-top: #fff9f6; --btn-top-hover: #ffffff; --btn-bot: #f6e2d9; --btn-bot-hover: #fae9e2;
-  --seg-bg: rgba(255, 248, 245, .85);
-  --acc-hi: #ffd7a8; --acc-pale: #fff0de; --acc-mid: #f4c08c; --acc-deep: #c4743c;
-  --g-line: #d7834c; --g-up-rgb: 222, 140, 84; --g-down-rgb: 196, 120, 160; --g-grid-rgb: 176, 104, 86;
-  --g-label-rgb: 128, 92, 82; --g-plate-rgb: 255, 255, 255; --g-dot: #c8723a; --g-cur: #fff6ea;
-  --g-pin: #b8602e; --g-pin-lit: #e39a5e; --g-pin-ink: #3b1c08;
-  --g-disc-top: rgba(255, 252, 248, .98); --g-disc-bottom: rgba(250, 226, 214, .98);
+  --bg: #f0c8b8;
+  --acc-rgb: 226, 150, 92;
+  --hl-rgb: 160, 96, 80;
+  --hi-rgb: 240, 178, 110;
+  --deep-rgb: 255, 236, 228;
+  --accent: #dd9156; --accent-2: #f3bd84; --accent-ink: #3b1c08; --accent-soft: rgba(226, 150, 92, .16);
+  --gold: #e09a58; --gold-hi: #96491c;
+  --surface: rgba(255, 238, 230, .55); --surface-2: rgba(255, 240, 233, .7); --surface-3: rgba(255, 246, 241, .85);
+  --line: rgba(140, 76, 62, .16); --line-strong: rgba(140, 76, 62, .28);
+  --text: #3a2420; --muted: #7a5850; --faint: #a3827a;
+  --panel: rgba(255, 228, 216, .26); --panel-deep: rgba(255, 232, 222, .32); --panel-line: rgba(255, 244, 238, .78);
+  --panel-hi: linear-gradient(180deg, rgba(255, 255, 255, .42), rgba(255, 255, 255, .08) 26%, transparent 50%);
+  --title-ink: #4a2a22; --acc-text: #7e3a12; --muted-2: #6e4c44; --text-strong: #2c1814;
+  --btn-top: rgba(255, 249, 246, .85); --btn-top-hover: rgba(255, 255, 255, .95); --btn-bot: rgba(250, 226, 216, .75); --btn-bot-hover: rgba(252, 234, 226, .85);
+  --seg-bg: rgba(255, 244, 240, .55);
+  --acc-hi: #ffd9a8; --acc-pale: #fff0de; --acc-mid: #f4c08c; --acc-deep: #c4743c;
+  --card-shadow: inset 0 1px 0 rgba(255, 255, 255, .85), inset 0 0 0 1px rgba(255, 255, 255, .18), 0 0 22px -8px rgba(255, 214, 190, .75), 0 14px 32px -20px rgba(110, 46, 36, .5);
+  --g-line: #f6c27a; --g-up-rgb: 246, 190, 116; --g-down-rgb: 150, 200, 255; --g-grid-rgb: 255, 214, 196;
+  --g-label-rgb: 255, 226, 216; --g-plate-rgb: 255, 255, 255; --g-dot: #a8d8ff; --g-cur: #fff6ea;
+  --g-pin: #ffd9a8; --g-pin-lit: #e0965a; --g-pin-ink: #3b1c08;
+  --g-disc-top: rgba(120, 82, 78, .98); --g-disc-bottom: rgba(70, 44, 44, .98);
 }
+[data-theme="sakura"] :is(.card, .navbar, .stand, .dialog) { -webkit-backdrop-filter: blur(7px) saturate(1.2); backdrop-filter: blur(7px) saturate(1.2); }
+[data-theme="sakura"] .dialog { background: var(--panel-hi), rgba(255, 238, 230, .9); }
+[data-theme="sakura"] .topbar { background: linear-gradient(180deg, rgba(255, 238, 230, .62), rgba(255, 232, 222, .30)); }
+/* depth / nodes, the candidate table and the graph: dark rose glass with light text, as in the sample */
+[data-theme="sakura"] :is(.eval-meta, .pv-list, .pv-head, .graph) {
+  --text: #fdf0ea; --text-strong: #ffffff; --muted: rgba(255, 226, 216, .74); --muted-2: rgba(255, 230, 222, .8); --faint: rgba(255, 220, 208, .55);
+  --hl-rgb: 255, 222, 208; --gold-hi: #ffd9a8; --surface-2: rgba(255, 255, 255, .16);
+}
+[data-theme="sakura"] .eval-meta,
+[data-theme="sakura"] .pv-head:not([hidden]) + .pv-list, [data-theme="sakura"] .pv-list { background: rgba(84, 54, 52, .56); border-color: rgba(255, 222, 208, .28); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+@media (min-width: 901px) { [data-theme="sakura"] .pv-head:not([hidden]) { background: rgba(84, 54, 52, .56); border-color: rgba(255, 222, 208, .28); } }
+[data-theme="sakura"] .graph { background: rgba(84, 54, 52, .56); box-shadow: inset 0 0 0 1px rgba(255, 222, 208, .26); }
+[data-theme="sakura"] .pv-list .pv-score.minus { color: #b9cbff; }
+[data-theme="sakura"] .pv-list .pv-idx { background: rgba(255, 255, 255, .16); color: #fff; }
+[data-theme="sakura"] .pv-list .pv:first-child { background: linear-gradient(90deg, rgba(255, 214, 180, .30), rgba(255, 214, 180, .10)); border-color: rgba(255, 220, 186, .75); }
+[data-theme="sakura"] .pv-list .pv:first-child .pv-idx { background: linear-gradient(180deg, #ffe7c4, #f0b070); color: #3b1c08; }
 
-/* ---------- 白金 (pearl: white frosted glass, warm gold) ---------- */
+/* ---------- 白金 (pearl: neutral white frosted glass, gold accents) ---------- */
 [data-theme="pearl"] {
   --app-bg: url("/img/themes/pearl.webp?v=1");
   --theme-thumb: url("/img/themes/pearl-thumb.webp?v=1");
-  --bg: #f2ede3;
-  --acc-rgb: 196, 146, 66;
-  --hl-rgb: 150, 120, 74;
-  --hi-rgb: 210, 164, 84;
-  --deep-rgb: 255, 253, 248;
-  --accent: #c9963f; --accent-2: #e8c27c; --accent-ink: #2e1f06; --accent-soft: rgba(196, 146, 66, .16);
-  --gold: #cf9d48; --gold-hi: #84561a;
-  --surface: #fdfbf6; --surface-2: #f4efe4; --surface-3: #ebe3d3;
-  --line: rgba(120, 96, 60, .15); --line-strong: rgba(120, 96, 60, .28);
-  --text: #2c2720; --muted: #6f675b; --faint: #9c9385;
-  --panel: rgba(255, 254, 250, .60); --panel-deep: rgba(255, 254, 250, .76); --panel-line: rgba(176, 140, 84, .36);
-  --panel-hi: linear-gradient(180deg, rgba(255, 255, 255, .75), rgba(255, 255, 255, .15) 30%, transparent 55%);
-  --title-ink: #6a4a18; --acc-text: #6b430e; --muted-2: #625b50; --text-strong: #1f1b15;
-  --btn-top: #ffffff; --btn-top-hover: #ffffff; --btn-bot: #f2ece1; --btn-bot-hover: #f7f2e9;
-  --seg-bg: rgba(255, 255, 255, .85);
-  --acc-hi: #ffe6b0; --acc-pale: #fff7e4; --acc-mid: #ecd096; --acc-deep: #a9782e;
-  --g-line: #c89338; --g-up-rgb: 206, 156, 66; --g-down-rgb: 120, 140, 190; --g-grid-rgb: 150, 120, 74;
-  --g-label-rgb: 112, 104, 92; --g-plate-rgb: 255, 255, 255; --g-dot: #b98530; --g-cur: #fffaf0;
-  --g-pin: #a77426; --g-pin-lit: #e0b45e; --g-pin-ink: #2e1f06;
-  --g-disc-top: rgba(255, 255, 255, .98); --g-disc-bottom: rgba(240, 233, 220, .98);
+  --bg: #ece9e5;
+  --acc-rgb: 204, 164, 92;
+  --hl-rgb: 118, 110, 100;
+  --hi-rgb: 214, 176, 102;
+  --deep-rgb: 249, 248, 246;
+  --accent: #c99a48; --accent-2: #e6c47e; --accent-ink: #2b2006; --accent-soft: rgba(204, 164, 92, .16);
+  --gold: #d1a552; --gold-hi: #84601f;
+  --surface: rgba(248, 247, 245, .7); --surface-2: rgba(240, 238, 235, .8); --surface-3: #e6e3df;
+  --line: rgba(70, 66, 60, .12); --line-strong: rgba(70, 66, 60, .22);
+  --text: #25221e; --muted: #67625b; --faint: #98938c;
+  --panel: rgba(246, 245, 243, .60); --panel-deep: rgba(248, 247, 245, .70); --panel-line: rgba(255, 255, 255, .9);
+  --panel-hi: linear-gradient(180deg, rgba(255, 255, 255, .7), rgba(255, 255, 255, .12) 28%, transparent 52%);
+  --title-ink: #24211d; --acc-text: #6b4a10; --muted-2: #5d5851; --text-strong: #1b1916;
+  --btn-top: #fdfdfc; --btn-top-hover: #ffffff; --btn-bot: #eeece9; --btn-bot-hover: #f4f3f1;
+  --seg-bg: rgba(236, 234, 231, .85);
+  --acc-hi: #fbe2ac; --acc-pale: #fdf3dc; --acc-mid: #ecd093; --acc-deep: #a67a2c;
+  --card-shadow: inset 0 1px 0 rgba(255, 255, 255, .95), 0 0 0 1px rgba(150, 142, 132, .18), 0 12px 30px -18px rgba(60, 54, 46, .4), 0 2px 6px -3px rgba(60, 54, 46, .14);
+  --g-line: #d4a24a; --g-up-rgb: 214, 170, 86; --g-down-rgb: 130, 160, 220; --g-grid-rgb: 118, 110, 100;
+  --g-label-rgb: 104, 99, 92; --g-plate-rgb: 255, 255, 255; --g-dot: #7fa2e0; --g-cur: #fffaf0;
+  --g-pin: #a67a2c; --g-pin-lit: #e3b862; --g-pin-ink: #2b2006;
+  --g-disc-top: rgba(255, 255, 255, .98); --g-disc-bottom: rgba(234, 232, 228, .98);
 }
+/* ON and the chosen count: dark bronze with white text, as in the sample */
+[data-theme="pearl"] .onoff button[data-v="on"].active,
+[data-theme="pearl"] .seg button.on { background: linear-gradient(180deg, #9c8460, #75603f); color: #fff; box-shadow: 0 2px 8px -3px rgba(70, 52, 24, .6); }
+
+/* piece stands: see-through glass like the panels (they were a solid colour) */
+.stand-pieces {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .01) 40%), rgba(var(--deep-rgb), .32);
+  border-color: rgba(var(--hl-rgb), .22);
+  box-shadow: inset 0 1px 0 rgba(var(--hl-rgb), .18);
+}
+:is([data-theme="sakura"], [data-theme="pearl"]) .stand-pieces { background: linear-gradient(180deg, rgba(255, 255, 255, .35), rgba(255, 255, 255, .05) 40%), rgba(var(--deep-rgb), .22); border-color: rgba(255, 255, 255, .65); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7); }
+@media (max-width: 900px) { .stand-pieces, :is([data-theme="sakura"], [data-theme="pearl"]) .stand-pieces { background: none; border: 0; box-shadow: none; } }
 
 /* every panel takes the theme's shadow */
 .card, .navbar, .stand, .dialog { box-shadow: var(--card-shadow); }

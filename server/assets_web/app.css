@@ -1656,7 +1656,7 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   --surface: #120f2c; --surface-2: #1a1640; --surface-3: #241e52;
   --line: rgba(222, 208, 255, .14); --line-strong: rgba(222, 208, 255, .28);
   --text: #f2efff; --muted: #c6c1e0; --faint: #b3aed2;
-  --panel: rgba(20, 16, 52, .66); --panel-deep: rgba(15, 12, 42, .78); --panel-line: rgba(214, 196, 255, .32);
+  --panel: rgba(22, 18, 58, .52); --panel-deep: rgba(16, 13, 44, .70); --panel-line: rgba(214, 196, 255, .32);
   --title-ink: #ece3ff; --acc-text: #efe7ff; --muted-2: #d3cfe8; --text-strong: #fbf9ff;
   --btn-top: #231d4c; --btn-top-hover: #2c2562; --btn-bot: #15123a; --btn-bot-hover: #1b1748;
   --seg-bg: #0d0b26;
@@ -1685,7 +1685,7 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   --surface: #0a1d17; --surface-2: #10271f; --surface-3: #17332a;
   --line: rgba(214, 236, 196, .13); --line-strong: rgba(214, 236, 196, .26);
   --text: #f1f6ee; --muted: #bfcdc4; --faint: #aebdb4;
-  --panel: rgba(5, 24, 18, .70); --panel-deep: rgba(4, 20, 15, .80); --panel-line: rgba(206, 232, 186, .30);
+  --panel: rgba(6, 28, 21, .56); --panel-deep: rgba(4, 22, 16, .74); --panel-line: rgba(206, 232, 186, .30);
   --title-ink: #f1e6c2; --acc-text: #ffeec0; --muted-2: #cad8cf; --text-strong: #fbfff6;
   --btn-top: #12302a; --btn-top-hover: #183a32; --btn-bot: #0a1f1a; --btn-bot-hover: #0e2721;
   --seg-bg: #05150f;
@@ -1695,10 +1695,9 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   --g-disc-top: rgba(28, 64, 50, .98); --g-disc-bottom: rgba(6, 22, 16, .98);
 }
 
-/* 極光 / 翠苑: busy, bright backgrounds of the same hue as the text. The glass blurs what is behind
-   it and the text gets a soft dark halo, so faint labels stay readable */
+/* 極光 / 翠苑: busy, bright backgrounds of the same hue as the text. The glass stays clear; the text
+   gets a soft dark halo, so faint labels stay readable */
 :is([data-theme="aurora"], [data-theme="emerald"]) :is(.card, .navbar, .stand, .dialog) {
-  -webkit-backdrop-filter: blur(10px) saturate(.9); backdrop-filter: blur(10px) saturate(.9);
   text-shadow: 0 1px 2px rgba(0, 0, 0, .55);
 }
 :is([data-theme="aurora"], [data-theme="emerald"]) .topbar { text-shadow: 0 1px 3px rgba(0, 0, 0, .7); }

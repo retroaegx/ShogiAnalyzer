@@ -194,6 +194,7 @@ const els = {
   dlgConfirm: $("dlgConfirm"),
   dlgConfirmTitle: $("dlgConfirmTitle"),
   dlgConfirmMsg: $("dlgConfirmMsg"),
+  dlgConfirmExtra: $("dlgConfirmExtra"),
   dlgConfirmActions: $("dlgConfirmActions"),
 
   toastHost: $("toastHost"),
@@ -347,10 +348,34 @@ function closeDialog(value) {
 }
 
 /** actions: [{label, value, primary?, img?}] -> resolves with value (null on dismiss). */
-function confirmDialog({ title, message, actions }) {
+// 新規 → 手合割 (same positions as HANDICAP_SFEN in server/app/core/kifu_common.py, which names the
+// handicap again from the start position on export); 平手 is the server's default start
+const HANDICAP_TAIL = "/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1";
+const HANDICAPS = [
+  ["平手", null],
+  ["香落ち", "lnsgkgsn1/1r5b1"],
+  ["右香落ち", "1nsgkgsnl/1r5b1"],
+  ["角落ち", "lnsgkgsnl/1r7"],
+  ["飛車落ち", "lnsgkgsnl/7b1"],
+  ["飛香落ち", "lnsgkgsn1/7b1"],
+  ["二枚落ち", "lnsgkgsnl/9"],
+  ["三枚落ち", "lnsgkgsn1/9"],
+  ["四枚落ち", "1nsgkgsn1/9"],
+  ["五枚落ち", "2sgkgsn1/9"],
+  ["左五枚落ち", "1nsgkgs2/9"],
+  ["六枚落ち", "2sgkgs2/9"],
+  ["左七枚落ち", "2sgkg3/9"],
+  ["右七枚落ち", "3gkgs2/9"],
+  ["八枚落ち", "3gkg3/9"],
+  ["十枚落ち", "4k4/9"],
+].map(([name, top]) => [name, top && top + HANDICAP_TAIL]);
+
+function confirmDialog({ title, message, extra, actions }) {
   els.dlgConfirmTitle.textContent = title || "";
   els.dlgConfirmMsg.textContent = message || "";
   els.dlgConfirmMsg.hidden = !message;
+  els.dlgConfirmExtra.replaceChildren(...(extra ? [extra] : []));
+  els.dlgConfirmExtra.hidden = !extra;
   els.dlgConfirmActions.innerHTML = "";
   for (const a of actions || [{ label: "OK", value: true, primary: true }]) {
     const b = el("button", `btn${a.primary ? " primary" : ""}${a.danger ? " danger" : ""}${a.img ? " piece-choice" : ""}`);
@@ -3254,20 +3279,24 @@ function wire() {
     if (sendWs("game:save", {})) toast("info", "サーバーに保存しました");
   });
   els.newGameBtn.addEventListener("click", async () => {
-    if (state.game?.dirty) {
-      if (!(await confirmDiscard("新しい棋譜を作成する"))) return;
-      sendWs("game:new", {});
-      return;
-    }
+    if (!(await confirmDiscard("新しい棋譜を作成する"))) return;
+    const sel = el("select", "field");
+    sel.id = "newGameHandicap";
+    for (const [name] of HANDICAPS) sel.append(new Option(name, name));
+    const row = el("label", "eng-inline");
+    row.append("手合割", sel);
     const ans = await confirmDialog({
       title: "新しい棋譜を作成",
-      message: "初期局面から新しい棋譜を作成します。",
+      message: "初期局面から新しい棋譜を作成します。駒落ちは上手（後手）から指し始めます。",
+      extra: row,
       actions: [
         { label: "キャンセル", value: null },
         { label: "作成", value: true, primary: true },
       ],
     });
-    if (ans) sendWs("game:new", {});
+    if (!ans) return;
+    const sfen = HANDICAPS.find(([name]) => name === sel.value)?.[1];
+    sendWs("game:new", sfen ? { initial_sfen: sfen } : {});
   });
   els.openBtn.addEventListener("click", openGameList);
   els.importBtn.addEventListener("click", () => showDialog(els.dlgImport));

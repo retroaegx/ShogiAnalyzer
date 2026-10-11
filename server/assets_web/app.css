@@ -1697,10 +1697,17 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
 
 /* 極光 / 翠苑: busy, bright backgrounds of the same hue as the text. The glass stays clear; the text
    gets a soft dark halo, so faint labels stay readable */
-:is([data-theme="aurora"], [data-theme="emerald"]) :is(.card, .navbar, .stand, .dialog) {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, .55);
-}
-:is([data-theme="aurora"], [data-theme="emerald"]) .topbar { text-shadow: 0 1px 3px rgba(0, 0, 0, .7); }
+:is([data-theme="aurora"], [data-theme="emerald"]) .app { text-shadow: 0 1px 2px rgba(0, 0, 0, .75), 0 0 6px rgba(0, 0, 0, .45); }
+/* no shadow on small text (it only blurs it) or on dark text over light buttons / badges */
+:is([data-theme="aurora"], [data-theme="emerald"]) :is(
+  small, .card-sub, .meta-depth, .eval-meta, .mini-depth, .ply-unit, .pv-head, .turn-chip, .coords, .update-meta, .stand-empty,
+  .analysis-card .card-head h2 .en, .brand-mark, .update-badge, .hand-piece .cnt,
+  .tb-btn.primary, .btn.primary, .onoff button.active, .seg button.on, .pv-idx, .pv-play:hover, .chip.on,
+  .mini-onoff.on, .kifu-btn.on, .nav-btn.flip-btn.on, .eval-verdict[data-side="sente"]
+) { text-shadow: none; }
+/* faint labels (後手 / 先手, kifu numbers, table heads, graph scale) in clear white */
+[data-theme="aurora"], [data-theme="emerald"] { --muted: #eef0f4; --muted-2: #f2f3f6; --faint: #dcdfe6; --g-label-rgb: 240, 242, 246; --g-label-min: .95; --g-label-shadow: rgba(0, 0, 0, .85); }
+:is([data-theme="aurora"], [data-theme="emerald"]) :is(.stand.to-move .stand-label, .stand.to-move .stand-label .mark) { color: var(--acc-text); }
 
 /* ---------- light themes: shared rules (dark text on pale frosted glass) ---------- */
 [data-theme="sakura"], [data-theme="pearl"] {

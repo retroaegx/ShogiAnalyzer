@@ -868,6 +868,10 @@ function isMobile() {
   return window.matchMedia("(max-width: 900px)").matches;
 }
 
+// phones: smallest scale of the top bar / panels, and the least graph height worth showing
+const PHONE_ZOOM_MIN = 0.62;
+const PHONE_GRAPH_MIN = 76;
+
 function layoutBoard() {
   const g = state.geom;
   if (!g) return;
@@ -883,31 +887,52 @@ function layoutBoard() {
   const coordsOutside = state.opts.coords === "outside";
   const coordK = coordsOutside ? cellPerBs * coordRatio : 0;
 
-  // phones: the top bar and the panels under the board scale with the screen (CSS zoom), so small
-  // screens (iPhone SE…) get smaller buttons and more room for the board; 390×780 and up is 1
-  const uiZoom = mobile ? clamp(Math.min(window.innerHeight / 780, window.innerWidth / 390), 0.72, 1) : 1;
-  root.style.setProperty("--ui-zoom", uiZoom.toFixed(3));
-  const area = els.boardArea.getBoundingClientRect();
-  const nav = els.boardArea.querySelector(".navbar").getBoundingClientRect().height || 54;
   let bs;
   if (mobile) {
-    // Phone: the board comes first and takes the full screen width when the height allows it;
-    // the graph grows into whatever height the board leaves.
+    // Phone: nothing scrolls. The board takes the full screen width; the top bar and the panels
+    // under it (move buttons, 候補手 row) scale down with CSS zoom until board, stands, panels and
+    // a readable graph all fit (the board may give up a little width for the graph). Screens too
+    // short for that (iPhone SE in the browser…) drop the graph instead.
     const main = els.boardArea.parentElement;
-    const ms = getComputedStyle(main);
-    const mainH = main.clientHeight - parseFloat(ms.paddingTop) - parseFloat(ms.paddingBottom);
-    // edge to edge: the board stage ignores main's side padding (app.css)
-    const availW = main.clientWidth;
-    // the board, its stands and the move buttons below always fit on the screen; the 候補手 row
-    // and the graph take what is left and scroll into view when the screen is short
-    const availH = mainH - nav - 4;
-    const coordPx = coordsOutside ? Math.max(coordMin, Math.min(coordMax, (availW * cellPerBs * coordRatio) / (1 + coordK))) : 0;
-    // stands always above / below the board (rows fixed at 0.82 of a square, see app.css):
-    // beside the board they were too narrow to tap and could not show many captured pieces
+    const ana = document.querySelector(".analysis-card");
     els.boardStage.classList.remove("stands-side");
-    const fitH = (availH - 8 - coordPx) / (g.natH / g.natW + 2 * cellPerBs * 0.82);
-    bs = Math.min(availW - coordPx, fitH);
+    const fit = (zoom, graph) => {
+      root.style.setProperty("--ui-zoom", zoom.toFixed(3));
+      root.classList.toggle("phone-no-graph", !graph);
+      const ms = getComputedStyle(main);
+      const mainH = main.clientHeight - parseFloat(ms.paddingTop) - parseFloat(ms.paddingBottom);
+      const gap = parseFloat(ms.rowGap) || 6;
+      const navH = els.boardArea.querySelector(".navbar").getBoundingClientRect().height || 54;
+      const anaH = ana ? ana.getBoundingClientRect().height + gap : 0;
+      const availW = main.clientWidth; // edge to edge: the stage ignores main's side padding (app.css)
+      const availH = mainH - navH - 4 - anaH - (graph ? PHONE_GRAPH_MIN + gap : 0);
+      const coordPx = coordsOutside ? Math.max(coordMin, Math.min(coordMax, (availW * cellPerBs * coordRatio) / (1 + coordK))) : 0;
+      // stands above / below the board, rows fixed at 0.82 of a square (app.css)
+      const fitH = (availH - 8 - coordPx) / (g.natH / g.natW + 2 * cellPerBs * 0.82);
+      return { bs: Math.min(availW - coordPx, fitH), full: fitH >= availW - coordPx, w: availW - coordPx };
+    };
+    // largest zoom (1 … PHONE_ZOOM_MIN) at which the board is full width
+    const best = (graph) => {
+      let r = fit(1, graph);
+      if (r.full) return { ...r, zoom: 1 };
+      r = fit(PHONE_ZOOM_MIN, graph);
+      if (!r.full) return { ...r, zoom: PHONE_ZOOM_MIN };
+      let lo = PHONE_ZOOM_MIN, hi = 1;
+      for (let i = 0; i < 7; i++) {
+        const mid = (lo + hi) / 2;
+        if (fit(mid, graph).full) lo = mid;
+        else hi = mid;
+      }
+      return { ...fit(lo, graph), zoom: lo };
+    };
+    let r = best(true);
+    if (r.bs < r.w * 0.9) r = best(false); // the graph only when the board stays nearly full width
+    bs = r.bs;
   } else {
+    root.style.setProperty("--ui-zoom", "1");
+    root.classList.remove("phone-no-graph");
+    const area = els.boardArea.getBoundingClientRect();
+    const nav = els.boardArea.querySelector(".navbar").getBoundingClientRect().height || 54;
     els.boardStage.classList.remove("stands-side");
     const standK = cellPerBs * 1.9; // matches --stand-w (fixed 2-column stands)
     const fixedW = (state.opts.evalBar ? 12 : 0) + 3 * 12;

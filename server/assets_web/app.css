@@ -1954,13 +1954,8 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   .stand-label { padding: 0 6px 0 3px; margin-right: 3px; }
   .stand-bottom .stand-label { padding: 0 3px 0 6px; margin: 0 0 0 3px; }
 }
-/* phones: the board keeps the full width (layoutBoard); if the graph would get smaller than this,
-   the page scrolls a little instead of squashing it */
-@media (max-width: 900px) {
-  .main { overflow-y: auto; overscroll-behavior: contain; }
-  .graph-card { min-height: 64px; }
-}
-@media (max-width: 900px) and (max-height: 599px) { .graph-card { min-height: 40px; } }
+/* phones: layoutBoard fits everything on the screen; screens too short for a readable graph drop it */
+@media (max-width: 900px) { .phone-no-graph .graph-card { display: none; } }
 /* phones: board and stands edge to edge (main keeps its side padding for the panels below) */
 @media (max-width: 900px) {
   .board-stage { margin: 0 -4px; }
@@ -1969,4 +1964,5 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
 /* phones: top bar and panels scale with the screen (--ui-zoom from layoutBoard) */
 @media (max-width: 900px) {
   .topbar, .navbar, .analysis-card { zoom: var(--ui-zoom, 1); }
+  .app { grid-template-rows: calc(var(--topbar-h) * var(--ui-zoom, 1)) minmax(0, 1fr); }
 }

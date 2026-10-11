@@ -1871,7 +1871,7 @@ function renderEvalGraph() {
   const H = rect.height;
   ctx.clearRect(0, 0, W, H);
 
-  const css = getComputedStyle(document.documentElement);
+  const css = getComputedStyle(cv);
   const accent = css.getPropertyValue("--accent").trim() || "#e3b25a";
   // colours follow the UI theme (CSS variables; the fallbacks are the 墨金 theme's)
   const g = graphPalette(css);

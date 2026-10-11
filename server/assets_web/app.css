@@ -1961,3 +1961,8 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   .graph-card { min-height: 64px; }
 }
 @media (max-width: 900px) and (max-height: 599px) { .graph-card { min-height: 40px; } }
+/* phones: board and stands edge to edge (main keeps its side padding for the panels below) */
+@media (max-width: 900px) {
+  .board-stage { margin: 0 -4px; }
+  .stand-top, .stand-bottom { margin: 0; }
+}

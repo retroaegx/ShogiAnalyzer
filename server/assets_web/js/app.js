@@ -887,26 +887,22 @@ function layoutBoard() {
   const nav = els.boardArea.querySelector(".navbar").getBoundingClientRect().height || 54;
   let bs;
   if (mobile) {
-    // Phone (no page scroll): the board comes first and takes the full width when the height
-    // allows it. Below it only a minimum is reserved (候補手/全解析 row + a small graph); the
-    // graph then grows into whatever height the board leaves.
+    // Phone: the board comes first and takes the full screen width when the height allows it;
+    // the graph grows into whatever height the board leaves.
     const main = els.boardArea.parentElement;
     const ms = getComputedStyle(main);
     const mainH = main.clientHeight - parseFloat(ms.paddingTop) - parseFloat(ms.paddingBottom);
-    const gap = parseFloat(ms.rowGap) || 6;
-    const ctlH = document.querySelector(".analysis-card")?.offsetHeight || 40;
-    // short screens (iPhone SE…): the graph gives way first so the stands can stay above / below
-    const graphMin = window.innerHeight < 640 ? 40 : 60;
-    const availW = area.width;
-    const availH = mainH - nav - 4 - (ctlH + gap + graphMin + gap);
+    // edge to edge: the board stage ignores main's side padding (app.css)
+    const availW = main.clientWidth;
+    // the board, its stands and the move buttons below always fit on the screen; the 候補手 row
+    // and the graph take what is left and scroll into view when the screen is short
+    const availH = mainH - nav - 4;
     const coordPx = coordsOutside ? Math.max(coordMin, Math.min(coordMax, (availW * cellPerBs * coordRatio) / (1 + coordK))) : 0;
     // stands always above / below the board (rows fixed at 0.82 of a square, see app.css):
     // beside the board they were too narrow to tap and could not show many captured pieces
     els.boardStage.classList.remove("stands-side");
-    // the board always takes the full width; only very short screens (iPhone SE…) shrink it to the
-    // height. When the graph would get too small for the full-width board, the page scrolls instead.
     const fitH = (availH - 8 - coordPx) / (g.natH / g.natW + 2 * cellPerBs * 0.82);
-    bs = window.innerHeight < 600 ? Math.min(availW - coordPx, fitH) : availW - coordPx;
+    bs = Math.min(availW - coordPx, fitH);
   } else {
     els.boardStage.classList.remove("stands-side");
     const standK = cellPerBs * 1.9; // matches --stand-w (fixed 2-column stands)

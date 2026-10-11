@@ -41,7 +41,6 @@
     <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
     <!-- flip: two pieces facing each other + rotation arrows -->
     <symbol id="i-flipboard" viewBox="0 0 24 24"><path d="M3.5 21v-6.2L6.7 12l3.2 2.8V21z"/><path d="M20.5 3v6.2L17.3 12l-3.2-2.8V3z"/><path d="M13 21.5c3.6 0 6.4-2.1 7.2-5.3"/><path d="M18.3 17.4l1.9-1.6 1.6 1.9"/><path d="M11 2.5c-3.6 0-6.4 2.1-7.2 5.3"/><path d="M5.7 6.6L3.8 8.2 2.2 6.3"/></symbol>
-    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5M15 8l4 4-4 4M19 12H9"/></symbol>
     <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2"/><circle cx="4.5" cy="12" r="1.2"/><circle cx="4.5" cy="18" r="1.2"/></symbol>
     <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></symbol>
     <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/></symbol>
@@ -304,8 +303,6 @@
           <span class="version-status" id="versionStatus"></span>
           <button class="btn" type="button" id="updateCheckBtn">更新を確認</button>
         </div>
-        <div class="set-title logout-item" hidden>アカウント</div>
-        <div class="logout-item" hidden><button class="btn" type="button" id="logoutBtn"><svg class="ico"><use href="#i-logout"/></svg>ログアウト</button></div>
       </div>
     </div>
 
@@ -365,7 +362,6 @@
         <button type="button" data-act="pasteBtn"><svg class="ico"><use href="#i-paste"/></svg><span>貼付</span></button>
         <button type="button" data-act="exportBtn"><svg class="ico"><use href="#i-export"/></svg><span>書出</span></button>
         <button type="button" data-act="settingsBtn"><svg class="ico"><use href="#i-settings"/></svg><span>表示設定</span></button>
-        <button type="button" data-act="logoutBtn" class="logout-item" hidden><svg class="ico"><use href="#i-logout"/></svg><span>ログアウト</span></button>
         <button type="button" data-act="engineSettingsBtn"><svg class="ico"><use href="#i-gear"/></svg><span>エンジン設定</span></button>
       </div>
     </div>

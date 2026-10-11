@@ -1835,8 +1835,9 @@ function renderMiniEval(best, cp, side) {
   const cur = node(state.game?.current_node_id);
   const first = shownLines().lines[0]?.pv_usi?.[0];
   els.miniBest.textContent = "";
+  els.miniEval.classList.toggle("batching", Boolean(state.batch));
   if (state.batch) {
-    els.miniBest.textContent = `全解析 ${Math.min(state.batch.index + 1, state.batch.total)}/${state.batch.total}`;
+    els.miniBest.append(el("small", null, "全解析"), `${Math.min(state.batch.index + 1, state.batch.total)}/${state.batch.total}`);
   } else if (first && state.game) {
     const text = shownMarks(kifPv([first], state.game.current_position_sfen, cur?.move_usi ? moveTarget(cur.move_usi) : null)[0]?.text || "");
     els.miniBest.append(el("small", null, "最善"), text);

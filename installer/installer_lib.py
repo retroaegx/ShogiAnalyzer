@@ -913,63 +913,64 @@ def ensure_engine_config(root: Path) -> dict[str, str]:
         ))
 
     print(tr("\n[installer] 解析エンジン（USI）が設定されていません。", "\n[installer] USI engine is not configured."))
-    if engines:
-        print(tr("[installer] ダウンロードできるエンジン（installer/manifest.json）:", "[installer] Download candidates (installer/manifest.json):"))
-        for i, e in enumerate(engines, 1):
-            print(f"  {i}) {e.get('name') or e.get('id')}")
+    # back to this menu whenever a download is declined / fails or a typed path is not found
+    while True:
+        if engines:
+            print(tr("[installer] ダウンロードする解析エンジンを選んでください（番号を入力して Enter。そのまま Enter で 1）:",
+                     "[installer] Choose the analysis engine to download (type a number and press Enter; Enter alone picks 1):"))
+            for i, e in enumerate(engines, 1):
+                print(f"  {i}) {e.get('name') or e.get('id')}")
         print(tr("  m) パスを入力して手持ちのエンジンを使う", "  m) manual path"))
         print(tr("  s) スキップ（解析なしで起動）", "  s) skip"))
         try:
             choice = input("> ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             choice = "s"
-        if not choice and engines:
+        if not choice:
             # クイックインストールの既定: 候補1を選ぶ（実際のDLは次の同意で確定）
-            choice = "1"
+            choice = "1" if engines else "m"
         if choice == "s":
+            print(tr("[installer] エンジンは未設定のままです。解析は使えません", "[installer] Engine remains unconfigured. analysis disabled"))
             return {}
-        if choice == "m" or not choice:
-            pass
-        else:
-            try:
-                idx = int(choice)
-                if 1 <= idx <= len(engines):
-                    exe = _download_engine_variant(root, engines[idx - 1])
-                    if exe and exe.exists():
-                        # Prefer eval dir under the engine folder if present.
-                        eval_dir = guess_eval_dir_from_exe(exe)
-                        cfg = {"engine_path": str(exe)}
-                        if eval_dir and eval_dir.exists():
-                            cfg["engine_eval_dir"] = str(eval_dir)
-                        _save_engine_config(root, cfg)
-                        env = {"SHOGI_ANALYZER_ENGINE_PATH": str(exe)}
-                        if eval_dir and eval_dir.exists():
-                            env["SHOGI_ANALYZER_ENGINE_EVAL_DIR"] = str(eval_dir)
-                        return env
-            except Exception:
-                pass
 
-    # Manual path flow.
-    try:
-        manual = input(tr(
-            "USIエンジン実行ファイルのパスを入力してください（例: C:\\path\\engine.exe）\n> ",
-            "Path to the USI engine executable (e.g. C:\\path\\engine.exe)\n> ",
-        )).strip().strip('"')
-    except (EOFError, KeyboardInterrupt):
-        manual = ""
-    if manual and Path(manual).exists():
-        eval_dir = guess_eval_dir_from_exe(Path(manual))
-        cfg = {"engine_path": manual}
+        if choice == "m":
+            try:
+                manual = input(tr(
+                    "USIエンジン実行ファイルのパスを入力してください（例: C:\\path\\engine.exe）\n> ",
+                    "Path to the USI engine executable (e.g. C:\\path\\engine.exe)\n> ",
+                )).strip().strip('"')
+            except (EOFError, KeyboardInterrupt):
+                manual = ""
+            if not (manual and Path(manual).exists()):
+                if manual:
+                    print(tr(f"[installer] ファイルが見つかりません: {manual}", f"[installer] File not found: {manual}"))
+                print(tr("[installer] もう一度選んでください。\n", "[installer] Please choose again.\n"))
+                continue
+            exe = Path(manual)
+        else:
+            idx = int(choice) if choice.isdigit() else 0
+            if not 1 <= idx <= len(engines):
+                print(tr(f"[installer] 「{choice}」は選べません。もう一度選んでください。\n", f'[installer] "{choice}" is not a choice. Please choose again.\n'))
+                continue
+            try:
+                exe = _download_engine_variant(root, engines[idx - 1])
+            except Exception as exc:
+                print(tr(f"[installer] エンジンの準備に失敗しました: {exc}", f"[installer] engine setup failed: {exc}"))
+                exe = None
+            if not (exe and exe.exists()):
+                print(tr("[installer] エンジンは用意されませんでした。もう一度選んでください。\n",
+                         "[installer] No engine was set up. Please choose again.\n"))
+                continue
+
+        # Prefer eval dir under the engine folder if present.
+        eval_dir = guess_eval_dir_from_exe(exe)
+        cfg = {"engine_path": str(exe)}
+        env = {"SHOGI_ANALYZER_ENGINE_PATH": str(exe)}
         if eval_dir and eval_dir.exists():
             cfg["engine_eval_dir"] = str(eval_dir)
-        _save_engine_config(root, cfg)
-        env = {"SHOGI_ANALYZER_ENGINE_PATH": manual}
-        if eval_dir and eval_dir.exists():
             env["SHOGI_ANALYZER_ENGINE_EVAL_DIR"] = str(eval_dir)
+        _save_engine_config(root, cfg)
         return env
-
-    print(tr("[installer] エンジンは未設定のままです。解析は使えません", "[installer] Engine remains unconfigured. analysis disabled"))
-    return {}
 
 
 def run_quick_tunnel(cloudflared: Path, port: int) -> tuple[subprocess.Popen | None, str | None]:

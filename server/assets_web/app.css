@@ -1038,7 +1038,7 @@ textarea.field.mono { font-size: 12px; }
   /* stands: one slim box aligned with the board, side mark inside it */
   .stand {
     flex-direction: row; align-items: center; gap: 0;
-    height: calc(var(--cell) * .82); /* fixed: capturing a piece must not move the board */
+    height: calc(var(--cell) * var(--stand-k, .82)); /* set by layoutBoard; capturing a piece must not move the board */
     min-height: 0;
     padding: 1px 6px;
     border-radius: 9px;
@@ -1056,7 +1056,7 @@ textarea.field.mono { font-size: 12px; }
   .stand.to-move .stand-pieces { border: 0; }
   .stand-bottom .stand-pieces { justify-content: flex-end; }
   /* fits inside the stand row (row height minus its padding and border): corners are never cut */
-  .hand-piece { width: calc(var(--cell) * .82 - 6px); height: calc(var(--cell) * .82 - 6px); flex: none; }
+  .hand-piece { width: calc(var(--cell) * min(var(--stand-k, .82), 1) - 6px); height: calc(var(--cell) * min(var(--stand-k, .82), 1) - 6px); flex: none; }
   .stands-side .hand-piece { width: calc(var(--cell) * .74); height: calc(var(--cell) * .74); }
   .hand-piece .cnt { min-width: 15px; height: 15px; padding: 0 4px; font-size: 10px; right: -1px; bottom: -1px; }
   .stand-empty { display: none; }
@@ -1749,8 +1749,8 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   --surface: rgba(255, 238, 230, .55); --surface-2: rgba(255, 240, 233, .7); --surface-3: rgba(255, 246, 241, .85);
   --line: rgba(140, 76, 62, .16); --line-strong: rgba(140, 76, 62, .28);
   --text: #2f1a16; --muted: #472b25; --faint: #573830;
-  --panel: rgba(255, 234, 225, .34); --panel-deep: rgba(255, 237, 229, .40); --panel-line: rgba(255, 244, 238, .78);
-  --panel-hi: linear-gradient(180deg, rgba(255, 255, 255, .42), rgba(255, 255, 255, .08) 26%, transparent 50%);
+  --panel: rgba(255, 234, 225, .26); --panel-deep: rgba(255, 237, 229, .32); --panel-line: rgba(255, 244, 238, .78);
+  --panel-hi: linear-gradient(180deg, rgba(255, 255, 255, .36), rgba(255, 255, 255, .06) 26%, transparent 50%);
   --title-ink: #42231b; --acc-text: #7a3510; --muted-2: #5a3b33; --text-strong: #2c1814;
   --btn-top: rgba(255, 249, 246, .85); --btn-top-hover: rgba(255, 255, 255, .95); --btn-bot: rgba(250, 226, 216, .75); --btn-bot-hover: rgba(252, 234, 226, .85);
   --seg-bg: rgba(255, 244, 240, .55);
@@ -1761,9 +1761,9 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   --g-pin: #ffd9a8; --g-pin-lit: #e0965a; --g-pin-ink: #3b1c08;
   --g-disc-top: rgba(120, 82, 78, .98); --g-disc-bottom: rgba(70, 44, 44, .98);
 }
-[data-theme="sakura"] :is(.card, .navbar, .stand, .dialog) { -webkit-backdrop-filter: blur(9px) saturate(1.2); backdrop-filter: blur(9px) saturate(1.2); }
+[data-theme="sakura"] :is(.card, .navbar, .stand, .dialog) { -webkit-backdrop-filter: blur(7px) saturate(1.2); backdrop-filter: blur(7px) saturate(1.2); }
 [data-theme="sakura"] .dialog { background: var(--panel-hi), rgba(255, 238, 230, .9); }
-[data-theme="sakura"] .topbar { background: linear-gradient(180deg, rgba(255, 238, 230, .62), rgba(255, 232, 222, .30)); }
+[data-theme="sakura"] .topbar { background: linear-gradient(180deg, rgba(255, 238, 230, .52), rgba(255, 232, 222, .22)); }
 /* depth / nodes, the candidate table and the graph: dark rose glass with light text, as in the sample */
 [data-theme="sakura"] :is(.eval-meta, .pv-list, .pv-head, .graph) {
   --text: #fff4ef; --text-strong: #ffffff; --muted: #f0d6cc; --muted-2: #f4ddd4; --faint: #dcbcb1;
@@ -1927,3 +1927,50 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
 :is([data-theme="sakura"], [data-theme="pearl"]) .install-card { background: linear-gradient(180deg, rgba(var(--acc-rgb), .10), transparent 45%), rgba(var(--deep-rgb), .97); }
 :is([data-theme="sakura"], [data-theme="pearl"]) .conn-overlay { background: rgba(60, 40, 30, .38); }
 
+
+#dlgConfirmExtra { margin-top: 14px; }
+
+/* 駒台: squarer corners (the default panels were too round for a piece stand) */
+.stand { border-radius: 6px; }
+.stand-pieces { border-radius: 4px; }
+/* phones: layoutBoard fits everything on the screen; screens too short for a readable graph drop it */
+@media (max-width: 900px) { .phone-no-graph .graph-card { display: none; } }
+/* phones: stands as wide as the board */
+@media (max-width: 900px) {
+  .stand-top, .stand-bottom { margin: 0; }
+}
+/* phones: top bar and panels scale with the screen (--ui-zoom from layoutBoard) */
+@media (max-width: 900px) {
+  .navbar, .analysis-card { zoom: var(--ui-zoom, 1); }
+  .topbar { zoom: var(--top-zoom, 1); }
+  .app { grid-template-rows: calc(var(--topbar-h) * var(--top-zoom, 1)) minmax(0, 1fr); }
+}
+/* 候補手 pull-down: only on short phones (phone-compact, set by layoutBoard) */
+.mpv-sel { display: none; }
+@media (max-width: 900px) {
+  .phone-compact #multipvSeg { display: none; }
+  .phone-compact .mpv-sel { display: block; width: auto; flex: none; height: 30px; padding: 0 6px; font-size: 14px; border-radius: 8px; appearance: auto; }
+  .phone-compact .analysis-ctl { gap: 8px; }
+  .phone-compact .analysis-ctl :is(.ctl-label, .btn-batch) { flex: none; white-space: nowrap; }
+  .phone-compact .analysis-ctl .mini-eval { min-width: 0; }
+  .phone-compact .analysis-ctl .mini-eval { flex: 1 1 auto; width: auto; padding: 0; border-top: 0; gap: 6px; }
+  .phone-compact .analysis-ctl :is(.mini-depth, .mini-best) { display: none; }
+  .phone-compact .analysis-ctl .mini-verdict { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+/* phones: every panel runs edge to edge (no side padding, square ends without side borders) */
+@media (max-width: 900px) {
+  .main { padding-left: 0; padding-right: 0; }
+  :is(.navbar, .analysis-card, .graph-card, .stand) { border-radius: 0; border-left-width: 0; border-right-width: 0; }
+  .graph-wrap { padding-left: 0; padding-right: 0; }
+  .graph { border-radius: 0; }
+}
+/* phones: the panels touch (no gaps, no bottom margin); the nav bar keeps only a thin inner margin */
+@media (max-width: 900px) {
+  .main { gap: 0; padding-top: 0; padding-bottom: env(safe-area-inset-bottom); }
+  .board-area { gap: 0; }
+  .board-stage { row-gap: 0; }
+  .side { gap: 0; }
+  .navbar { padding: 4px 6px 0; gap: 4px; }
+  .mini-eval { padding: 4px 2px 4px; }
+  .analysis-card .analysis-ctl { padding-top: 4px; padding-bottom: 4px; }
+}

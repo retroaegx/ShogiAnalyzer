@@ -102,6 +102,10 @@ const els = {
   turnChip: $("turnChip"),
 
   multipvSeg: $("multipvSeg"),
+  multipvSel: $("multipvSel"),
+  analysisCtl: document.querySelector(".analysis-ctl"),
+  miniEval: $("miniEval"),
+  navbar: document.querySelector(".board-area .navbar"),
   analysisOnOff: $("analysisOnOff"),
   engineSettingsBtn: $("engineSettingsBtn"),
   analyzeAllBtn: $("analyzeAllBtn"),
@@ -194,6 +198,7 @@ const els = {
   dlgConfirm: $("dlgConfirm"),
   dlgConfirmTitle: $("dlgConfirmTitle"),
   dlgConfirmMsg: $("dlgConfirmMsg"),
+  dlgConfirmExtra: $("dlgConfirmExtra"),
   dlgConfirmActions: $("dlgConfirmActions"),
 
   toastHost: $("toastHost"),
@@ -347,10 +352,34 @@ function closeDialog(value) {
 }
 
 /** actions: [{label, value, primary?, img?}] -> resolves with value (null on dismiss). */
-function confirmDialog({ title, message, actions }) {
+// 新規 → 手合割 (same positions as HANDICAP_SFEN in server/app/core/kifu_common.py, which names the
+// handicap again from the start position on export); 平手 is the server's default start
+const HANDICAP_TAIL = "/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1";
+const HANDICAPS = [
+  ["平手", null],
+  ["香落ち", "lnsgkgsn1/1r5b1"],
+  ["右香落ち", "1nsgkgsnl/1r5b1"],
+  ["角落ち", "lnsgkgsnl/1r7"],
+  ["飛車落ち", "lnsgkgsnl/7b1"],
+  ["飛香落ち", "lnsgkgsn1/7b1"],
+  ["二枚落ち", "lnsgkgsnl/9"],
+  ["三枚落ち", "lnsgkgsn1/9"],
+  ["四枚落ち", "1nsgkgsn1/9"],
+  ["五枚落ち", "2sgkgsn1/9"],
+  ["左五枚落ち", "1nsgkgs2/9"],
+  ["六枚落ち", "2sgkgs2/9"],
+  ["左七枚落ち", "2sgkg3/9"],
+  ["右七枚落ち", "3gkgs2/9"],
+  ["八枚落ち", "3gkg3/9"],
+  ["十枚落ち", "4k4/9"],
+].map(([name, top]) => [name, top && top + HANDICAP_TAIL]);
+
+function confirmDialog({ title, message, extra, actions }) {
   els.dlgConfirmTitle.textContent = title || "";
   els.dlgConfirmMsg.textContent = message || "";
   els.dlgConfirmMsg.hidden = !message;
+  els.dlgConfirmExtra.replaceChildren(...(extra ? [extra] : []));
+  els.dlgConfirmExtra.hidden = !extra;
   els.dlgConfirmActions.innerHTML = "";
   for (const a of actions || [{ label: "OK", value: true, primary: true }]) {
     const b = el("button", `btn${a.primary ? " primary" : ""}${a.danger ? " danger" : ""}${a.img ? " piece-choice" : ""}`);
@@ -748,10 +777,24 @@ function firstChild(id) {
   const ids = state.game?.children_index?.[id];
   return Array.isArray(ids) && ids.length ? ids[0] : null;
 }
+// 駒落ち: 上手 (the SFEN's gote) moves first, so on screen it is 先手 (☗/▲) and the evaluation is
+// from its side. Only the handicap start positions swap; any other position keeps the SFEN's sides.
+function handicapGame() {
+  const key = (sfen) => String(sfen || "").split(/\s+/).slice(0, 3).join(" ");
+  const start = key(state.game?.initial_sfen);
+  return HANDICAPS.some(([, sfen]) => sfen && key(sfen) === start);
+}
+/** SFEN side ("sente" = b) -> the side shown as 先手/後手. */
+function shownSide(side) {
+  return handicapGame() ? (side === "sente" ? "gote" : "sente") : side;
+}
+function shownMarks(text) {
+  return handicapGame() ? String(text).replace(/^[▲△]/, (m) => (m === "▲" ? "△" : "▲")) : text;
+}
 function sideToMoveOf(n) {
-  if (!n) return "sente";
+  if (!n) return shownSide("sente");
   const parts = String(n.position_sfen || "").split(/\s+/);
-  return parts[1] === "w" ? "gote" : "sente";
+  return shownSide(parts[1] === "w" ? "gote" : "sente");
 }
 function curPly() {
   return Math.max(0, (state.game?.current_path_node_ids?.length || 1) - 1);
@@ -778,7 +821,7 @@ function nodeLabel(n) {
   const parent = n.parent_id ? node(n.parent_id) : null;
   if (!parent) return n.move_usi;
   const prevTo = parent.move_usi ? moveTarget(parent.move_usi) : null;
-  return kifMove(parent.position_sfen, n.move_usi, prevTo);
+  return shownMarks(kifMove(parent.position_sfen, n.move_usi, prevTo));
 }
 
 // ---------- theme / geometry ----------
@@ -829,6 +872,24 @@ function isMobile() {
   return window.matchMedia("(max-width: 900px)").matches;
 }
 
+function placeMiniEval(inCtl) {
+  const mini = els.miniEval;
+  if (inCtl && mini.parentElement !== els.analysisCtl) els.analysisCtl.insertBefore(mini, els.analyzeAllBtn);
+  else if (!inCtl && mini.parentElement !== els.navbar) els.navbar.appendChild(mini);
+}
+
+// phones: smallest scale of the top bar / panels, and the least graph height worth showing
+const PHONE_ZOOM_MIN = 0.62;
+const PHONE_GRAPH_MIN = 76;
+// tall phones: the graph stops growing at this share of the screen width; the height beyond that
+// makes the stands taller (up to PHONE_STAND_MAX of a square instead of 0.82)
+const PHONE_GRAPH_MAX_W = 0.3;
+const PHONE_STAND_K = 0.82;
+const PHONE_STAND_MAX = 1.35;
+const PHONE_ZOOM_MAX = 1.35;
+// the top bar grows less than the panels (its title must not get cut)
+const PHONE_TOP_ZOOM_MAX = 1.1;
+
 function layoutBoard() {
   const g = state.geom;
   if (!g) return;
@@ -844,28 +905,81 @@ function layoutBoard() {
   const coordsOutside = state.opts.coords === "outside";
   const coordK = coordsOutside ? cellPerBs * coordRatio : 0;
 
-  const area = els.boardArea.getBoundingClientRect();
-  const nav = els.boardArea.querySelector(".navbar").getBoundingClientRect().height || 54;
   let bs;
+  let phoneStandK = PHONE_STAND_K;
   if (mobile) {
-    // Phone (no page scroll): the board comes first and takes the full width when the height
-    // allows it. Below it only a minimum is reserved (候補手/全解析 row + a small graph); the
-    // graph then grows into whatever height the board leaves.
+    // Phone: nothing scrolls and the panels touch. The board takes the full screen width; the top
+    // bar and the panels under it (move buttons, 候補手 row) scale down with CSS zoom until board,
+    // stands, panels and a readable graph all fit. Screens too short for that (iPhone SE in the
+    // browser…) drop the graph instead. Height to spare goes to taller stands, then (tall phones)
+    // to larger panels; the graph itself stops at PHONE_GRAPH_MAX_W of the width.
     const main = els.boardArea.parentElement;
-    const ms = getComputedStyle(main);
-    const mainH = main.clientHeight - parseFloat(ms.paddingTop) - parseFloat(ms.paddingBottom);
-    const gap = parseFloat(ms.rowGap) || 6;
-    const ctlH = document.querySelector(".analysis-card")?.offsetHeight || 40;
-    // short screens (iPhone SE…): the graph gives way first so the stands can stay above / below
-    const graphMin = window.innerHeight < 640 ? 40 : 60;
-    const availW = area.width;
-    const availH = mainH - nav - 4 - (ctlH + gap + graphMin + gap);
-    const coordPx = coordsOutside ? Math.max(coordMin, Math.min(coordMax, (availW * cellPerBs * coordRatio) / (1 + coordK))) : 0;
-    // stands always above / below the board (rows fixed at 0.82 of a square, see app.css):
-    // beside the board they were too narrow to tap and could not show many captured pieces
+    const ana = document.querySelector(".analysis-card");
+    // short phones (iPhone SE…): one row less. The 解析 summary moves from under the move buttons
+    // into the 候補手 row, where 候補手 becomes a pull-down.
+    const compact = window.innerHeight < 700;
+    root.classList.toggle("phone-compact", compact);
+    placeMiniEval(compact);
     els.boardStage.classList.remove("stands-side");
-    bs = Math.min(availW - coordPx, (availH - 8 - coordPx) / (g.natH / g.natW + 2 * cellPerBs * 0.82));
+    const setZoom = (zoom) => {
+      root.style.setProperty("--ui-zoom", zoom.toFixed(3));
+      root.style.setProperty("--top-zoom", Math.min(zoom, PHONE_TOP_ZOOM_MAX).toFixed(3));
+    };
+    const fit = (zoom, graphH, standK) => {
+      setZoom(zoom);
+      root.classList.toggle("phone-no-graph", !graphH);
+      const ms = getComputedStyle(main);
+      const mainH = main.clientHeight - parseFloat(ms.paddingTop) - parseFloat(ms.paddingBottom);
+      const navH = els.boardArea.querySelector(".navbar").getBoundingClientRect().height || 54;
+      const anaH = ana ? ana.getBoundingClientRect().height : 0;
+      const availW = main.clientWidth;
+      // panels touch each other (no gaps on phones); 2px of slack against rounding
+      const availH = mainH - navH - anaH - graphH - 2;
+      const coordPx = coordsOutside ? Math.max(coordMin, Math.min(coordMax, (availW * cellPerBs * coordRatio) / (1 + coordK))) : 0;
+      const w = availW - coordPx;
+      const denom = g.natH / g.natW + 2 * cellPerBs * standK;
+      const fitH = (availH - coordPx) / denom;
+      // spare: height left once the full-width board, its stands and the graph are placed
+      return { bs: Math.min(w, fitH), full: fitH >= w, w, spare: Math.max(0, (fitH - w) * denom) };
+    };
+    // largest zoom in lo…hi at which the board is full width
+    const best = (lo, hi, graphH, standK) => {
+      let r = fit(hi, graphH, standK);
+      if (r.full) return { ...r, zoom: hi };
+      r = fit(lo, graphH, standK);
+      if (!r.full) return { ...r, zoom: lo };
+      for (let i = 0; i < 7; i++) {
+        const mid = (lo + hi) / 2;
+        if (fit(mid, graphH, standK).full) lo = mid;
+        else hi = mid;
+      }
+      return { ...fit(lo, graphH, standK), zoom: lo };
+    };
+    const graphMax = Math.round(main.clientWidth * PHONE_GRAPH_MAX_W);
+    let r = best(PHONE_ZOOM_MIN, 1, PHONE_GRAPH_MIN, PHONE_STAND_K);
+    // the graph only when the board stays (nearly) full width
+    const graph = r.bs >= r.w * 0.95;
+    if (!graph) r = best(PHONE_ZOOM_MIN, 1, 0, PHONE_STAND_K);
+    let toStands = graph ? Math.max(0, PHONE_GRAPH_MIN + r.spare - graphMax) : r.spare;
+    if (graph && r.zoom >= 1 && fit(1, graphMax, PHONE_STAND_MAX).full) {
+      // tall phones (Pro Max…): stands at their largest and the graph at its cap still leave
+      // room, so the top bar and panels grow (up to PHONE_ZOOM_MAX) instead of the graph
+      r = best(1, PHONE_ZOOM_MAX, graphMax, PHONE_STAND_MAX);
+      toStands = Infinity;
+    }
+    bs = r.bs;
+    const cellPx = Math.floor(bs) * cellPerBs;
+    phoneStandK = clamp(PHONE_STAND_K + toStands / 2 / cellPx, PHONE_STAND_K, PHONE_STAND_MAX);
+    // fit() left its last trial values behind: apply the chosen ones
+    setZoom(r.zoom);
+    root.classList.toggle("phone-no-graph", !graph);
   } else {
+    root.style.setProperty("--ui-zoom", "1");
+    root.style.setProperty("--top-zoom", "1");
+    root.classList.remove("phone-no-graph", "phone-compact");
+    placeMiniEval(false);
+    const area = els.boardArea.getBoundingClientRect();
+    const nav = els.boardArea.querySelector(".navbar").getBoundingClientRect().height || 54;
     els.boardStage.classList.remove("stands-side");
     const standK = cellPerBs * 1.9; // matches --stand-w (fixed 2-column stands)
     const fixedW = (state.opts.evalBar ? 12 : 0) + 3 * 12;
@@ -885,6 +999,7 @@ function layoutBoard() {
   root.style.setProperty("--cov-x", `${Math.max(rightMargin * 0.84, covFont * 1.1)}px`);
   root.style.setProperty("--cov-y", `${Math.max(g.ry * scale * 0.84, covFont * 1.05)}px`);
   root.style.setProperty("--bs", `${bs}px`);
+  root.style.setProperty("--stand-k", phoneStandK.toFixed(3));
   root.style.setProperty("--cell", `${cell}px`);
   root.style.setProperty("--coord", `${coord}px`);
   root.style.setProperty("--rl", `${g.rx * scale}px`);
@@ -1328,10 +1443,10 @@ function renderStands() {
   const topOwner = state.flip ? "sente" : "gote";
   const bottomOwner = state.flip ? "gote" : "sente";
 
-  els.standTopMark.textContent = topOwner === "sente" ? "☗" : "☖";
-  els.standTopName.textContent = topOwner === "sente" ? "先手" : "後手";
-  els.standBottomMark.textContent = bottomOwner === "sente" ? "☗" : "☖";
-  els.standBottomName.textContent = bottomOwner === "sente" ? "先手" : "後手";
+  els.standTopMark.textContent = shownSide(topOwner) === "sente" ? "☗" : "☖";
+  els.standTopName.textContent = shownSide(topOwner) === "sente" ? "先手" : "後手";
+  els.standBottomMark.textContent = shownSide(bottomOwner) === "sente" ? "☗" : "☖";
+  els.standBottomName.textContent = shownSide(bottomOwner) === "sente" ? "先手" : "後手";
   els.standTop.classList.toggle("to-move", turn === topOwner);
   els.standBottom.classList.toggle("to-move", turn === bottomOwner);
 
@@ -1723,7 +1838,7 @@ function renderMiniEval(best, cp, side) {
   if (state.batch) {
     els.miniBest.textContent = `全解析 ${Math.min(state.batch.index + 1, state.batch.total)}/${state.batch.total}`;
   } else if (first && state.game) {
-    const text = kifPv([first], state.game.current_position_sfen, cur?.move_usi ? moveTarget(cur.move_usi) : null)[0]?.text || "";
+    const text = shownMarks(kifPv([first], state.game.current_position_sfen, cur?.move_usi ? moveTarget(cur.move_usi) : null)[0]?.text || "");
     els.miniBest.append(el("small", null, "最善"), text);
   }
 }
@@ -1742,6 +1857,8 @@ function renderAnalysis() {
     b.classList.toggle("on", Number(b.dataset.v) === a.multipv);
     b.disabled = !canUse;
   }
+  els.multipvSel.value = String(a.multipv);
+  els.multipvSel.disabled = !canUse;
   els.engineSettingsBtn.disabled = !a.available;
 
   // 全解析 progress / button
@@ -1806,7 +1923,7 @@ function renderAnalysis() {
       const s = senteScore(line, side);
       li.appendChild(el("span", "pv-idx", String(line.pv_index ?? 1)));
       li.appendChild(el("span", `pv-score ${s == null ? "" : s >= 0 ? "plus" : "minus"}`, formatScore(line, side)));
-      const moves = kifPv((line.pv_usi || []).slice(0, 14), state.game.current_position_sfen, prevTo);
+      const moves = kifPv((line.pv_usi || []).slice(0, 14), state.game.current_position_sfen, prevTo).map((m) => ({ ...m, text: shownMarks(m.text) }));
       const mv = el("span", "pv-moves");
       if (moves.length) {
         mv.appendChild(el("b", null, moves[0].text));
@@ -2429,7 +2546,7 @@ function renderControls() {
   els.plySlider.style.setProperty("--p", `${max ? (ply / max) * 100 : 0}%`);
   els.plyNow.textContent = String(ply);
   els.plyMax.textContent = String(max);
-  const turn = state.parsed?.currentPlayer;
+  const turn = shownSide(state.parsed?.currentPlayer);
   els.turnChip.textContent = turn === "gote" ? "☖後手番" : "☗先手番";
   els.turnChip.classList.toggle("gote", turn === "gote");
   els.flipBtn.classList.toggle("on", state.flip);
@@ -3195,6 +3312,9 @@ function wire() {
   });
   els.engineSettingsBtn.addEventListener("click", openEngineSettings);
   els.miniOnOff.addEventListener("click", () => setAnalysisEnabled(!state.analysis.enabled));
+  els.multipvSel.addEventListener("change", () => {
+    els.multipvSeg.querySelector(`button[data-v="${els.multipvSel.value}"]`)?.click();
+  });
   els.multipvSeg.addEventListener("click", (e) => {
     const b = e.target.closest("button[data-v]");
     if (!b || b.disabled) return;
@@ -3254,20 +3374,24 @@ function wire() {
     if (sendWs("game:save", {})) toast("info", "サーバーに保存しました");
   });
   els.newGameBtn.addEventListener("click", async () => {
-    if (state.game?.dirty) {
-      if (!(await confirmDiscard("新しい棋譜を作成する"))) return;
-      sendWs("game:new", {});
-      return;
-    }
+    if (!(await confirmDiscard("新しい棋譜を作成する"))) return;
+    const sel = el("select", "field");
+    sel.id = "newGameHandicap";
+    for (const [name] of HANDICAPS) sel.append(new Option(name, name));
+    const row = el("label", "eng-inline");
+    row.append("手合割", sel);
     const ans = await confirmDialog({
       title: "新しい棋譜を作成",
-      message: "初期局面から新しい棋譜を作成します。",
+      message: "初期局面から新しい棋譜を作成します。駒落ちは上手（駒を落とす側）が先手になります。",
+      extra: row,
       actions: [
         { label: "キャンセル", value: null },
         { label: "作成", value: true, primary: true },
       ],
     });
-    if (ans) sendWs("game:new", {});
+    if (!ans) return;
+    const sfen = HANDICAPS.find(([name]) => name === sel.value)?.[1];
+    sendWs("game:new", sfen ? { initial_sfen: sfen } : {});
   });
   els.openBtn.addEventListener("click", openGameList);
   els.importBtn.addEventListener("click", () => showDialog(els.dlgImport));

@@ -1655,15 +1655,15 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   --gold: #b38eff; --gold-hi: #dccbff;
   --surface: #120f2c; --surface-2: #1a1640; --surface-3: #241e52;
   --line: rgba(222, 208, 255, .14); --line-strong: rgba(222, 208, 255, .28);
-  --text: #eeeaff; --muted: #a9a3c9; --faint: #7a7499;
-  --panel: rgba(22, 18, 58, .52); --panel-deep: rgba(16, 13, 44, .70); --panel-line: rgba(214, 196, 255, .32);
-  --title-ink: #ece3ff; --acc-text: #efe7ff; --muted-2: #c4bedf; --text-strong: #fbf9ff;
+  --text: #f2efff; --muted: #c6c1e0; --faint: #a19cc0;
+  --panel: rgba(20, 16, 52, .66); --panel-deep: rgba(15, 12, 42, .78); --panel-line: rgba(214, 196, 255, .32);
+  --title-ink: #ece3ff; --acc-text: #efe7ff; --muted-2: #d3cfe8; --text-strong: #fbf9ff;
   --btn-top: #231d4c; --btn-top-hover: #2c2562; --btn-bot: #15123a; --btn-bot-hover: #1b1748;
   --seg-bg: #0d0b26;
   --acc-hi: #e6d9ff; --acc-pale: #f1eaff; --acc-mid: #c6aaff; --acc-deep: #7c58d6;
   --card-shadow: inset 0 1px 0 rgba(236, 228, 255, .30), 0 0 26px -12px rgba(120, 230, 220, .35), 0 18px 40px -24px rgba(0, 0, 0, .95);
   --g-line: #cdb6ff; --g-up-rgb: 186, 150, 255; --g-down-rgb: 90, 220, 210; --g-grid-rgb: 196, 170, 255;
-  --g-label-rgb: 176, 170, 210; --g-dot: #e3d6ff; --g-cur: #f4eeff;
+  --g-label-rgb: 198, 193, 224; --g-dot: #e3d6ff; --g-cur: #f4eeff;
   --g-pin: #dccbff; --g-pin-lit: #9a74f0; --g-pin-ink: #1d0f40;
   --g-disc-top: rgba(52, 42, 100, .98); --g-disc-bottom: rgba(16, 12, 40, .98);
 }
@@ -1684,16 +1684,24 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   --deep-rgb: 3, 18, 13;
   --surface: #0a1d17; --surface-2: #10271f; --surface-3: #17332a;
   --line: rgba(214, 236, 196, .13); --line-strong: rgba(214, 236, 196, .26);
-  --text: #edf3ea; --muted: #a0b3a7; --faint: #6f8378;
-  --panel: rgba(6, 28, 21, .56); --panel-deep: rgba(4, 22, 16, .74); --panel-line: rgba(206, 232, 186, .30);
-  --title-ink: #f1e6c2; --acc-text: #ffeec0; --muted-2: #b7c9be; --text-strong: #fbfff6;
+  --text: #f1f6ee; --muted: #bfcdc4; --faint: #98a99f;
+  --panel: rgba(5, 24, 18, .70); --panel-deep: rgba(4, 20, 15, .80); --panel-line: rgba(206, 232, 186, .30);
+  --title-ink: #f1e6c2; --acc-text: #ffeec0; --muted-2: #cad8cf; --text-strong: #fbfff6;
   --btn-top: #12302a; --btn-top-hover: #183a32; --btn-bot: #0a1f1a; --btn-bot-hover: #0e2721;
   --seg-bg: #05150f;
   --card-shadow: inset 0 1px 0 rgba(220, 245, 205, .26), 0 0 26px -12px rgba(80, 200, 140, .35), 0 18px 40px -24px rgba(0, 0, 0, .95);
   --g-line: #f0cf86; --g-up-rgb: 236, 200, 116; --g-down-rgb: 90, 200, 150; --g-grid-rgb: 214, 236, 196;
-  --g-label-rgb: 160, 182, 168;
+  --g-label-rgb: 186, 203, 193;
   --g-disc-top: rgba(28, 64, 50, .98); --g-disc-bottom: rgba(6, 22, 16, .98);
 }
+
+/* 極光 / 翠苑: busy, bright backgrounds of the same hue as the text. The glass blurs what is behind
+   it and the text gets a soft dark halo, so faint labels stay readable */
+:is([data-theme="aurora"], [data-theme="emerald"]) :is(.card, .navbar, .stand, .dialog) {
+  -webkit-backdrop-filter: blur(10px) saturate(.9); backdrop-filter: blur(10px) saturate(.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .55);
+}
+:is([data-theme="aurora"], [data-theme="emerald"]) .topbar { text-shadow: 0 1px 3px rgba(0, 0, 0, .7); }
 
 /* ---------- light themes: shared rules (dark text on pale frosted glass) ---------- */
 [data-theme="sakura"], [data-theme="pearl"] {

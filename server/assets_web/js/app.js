@@ -883,6 +883,10 @@ function layoutBoard() {
   const coordsOutside = state.opts.coords === "outside";
   const coordK = coordsOutside ? cellPerBs * coordRatio : 0;
 
+  // phones: the top bar and the panels under the board scale with the screen (CSS zoom), so small
+  // screens (iPhone SE…) get smaller buttons and more room for the board; 390×780 and up is 1
+  const uiZoom = mobile ? clamp(Math.min(window.innerHeight / 780, window.innerWidth / 390), 0.72, 1) : 1;
+  root.style.setProperty("--ui-zoom", uiZoom.toFixed(3));
   const area = els.boardArea.getBoundingClientRect();
   const nav = els.boardArea.querySelector(".navbar").getBoundingClientRect().height || 54;
   let bs;

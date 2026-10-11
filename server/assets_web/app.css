@@ -1643,8 +1643,8 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
 /* ---------- 極光 (aurora: night sky, violet glass, teal light) ---------- */
 [data-theme="aurora"] {
   color-scheme: dark;
-  --app-bg: url("/img/themes/aurora.webp?v=1");
-  --theme-thumb: url("/img/themes/aurora-thumb.webp?v=1");
+  --app-bg: url("/img/themes/aurora.webp?v=2");
+  --theme-thumb: url("/img/themes/aurora-thumb.webp?v=2");
   --analysis-frame: none;
   --bg: #0a0820;
   --acc-rgb: 178, 142, 255;
@@ -1675,8 +1675,8 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
 /* ---------- 翠苑 (emerald: deep forest green glass, gold) ---------- */
 [data-theme="emerald"] {
   color-scheme: dark;
-  --app-bg: url("/img/themes/emerald.webp?v=1");
-  --theme-thumb: url("/img/themes/emerald-thumb.webp?v=1");
+  --app-bg: url("/img/themes/emerald.webp?v=2");
+  --theme-thumb: url("/img/themes/emerald-thumb.webp?v=2");
   --bg: #04120d;
   --acc-rgb: 226, 184, 98;
   --hl-rgb: 214, 236, 196;
@@ -1710,35 +1710,36 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
 :is([data-theme="aurora"], [data-theme="emerald"]) :is(.stand.to-move .stand-label, .stand.to-move .stand-label .mark) { color: var(--acc-text); }
 
 /* ---------- light themes: shared rules (dark text on pale frosted glass) ---------- */
-[data-theme="sakura"], [data-theme="pearl"] {
+[data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"] {
   color-scheme: light;
   --analysis-frame: none;
   --card-shadow: inset 0 1px 0 rgba(255, 255, 255, .85), 0 10px 30px -18px rgba(90, 50, 30, .45), 0 2px 6px -3px rgba(90, 50, 30, .18);
 }
 [data-theme="sakura"] :is(.card, .navbar, .stand, .dialog),
-[data-theme="pearl"] :is(.card, .navbar, .stand, .dialog) {
+[data-theme="pearl"] :is(.card, .navbar, .stand, .dialog),
+[data-theme="frost"] :is(.card, .navbar, .stand, .dialog) {
   -webkit-backdrop-filter: blur(14px) saturate(1.15); backdrop-filter: blur(14px) saturate(1.15);
 }
-[data-theme="sakura"] .topbar, [data-theme="pearl"] .topbar {
+[data-theme="sakura"] .topbar, [data-theme="pearl"] .topbar, [data-theme="frost"] .topbar {
   background: linear-gradient(180deg, rgba(var(--deep-rgb), .82), rgba(var(--deep-rgb), .45));
   -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
 }
-:is([data-theme="sakura"], [data-theme="pearl"]) :is(.title-label, .card-head h2, .eval-score.plus, .mini-score) { text-shadow: none; }
-:is([data-theme="sakura"], [data-theme="pearl"]) .mini-onoff i { background: rgba(var(--hl-rgb), .35); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .18); }
-:is([data-theme="sakura"], [data-theme="pearl"]) .mini-onoff i::after { background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
-:is([data-theme="sakura"], [data-theme="pearl"]) .mini-onoff { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8), 0 2px 6px rgba(90, 50, 30, .18); }
-:is([data-theme="sakura"], [data-theme="pearl"]) .mini-onoff.on { background: linear-gradient(180deg, var(--acc-pale), var(--acc-mid)); color: var(--accent-ink); }
-:is([data-theme="sakura"], [data-theme="pearl"]) .wr-bar { background: rgba(var(--hl-rgb), .22); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .12); }
-:is([data-theme="sakura"], [data-theme="pearl"]) .pv-idx { background: rgba(var(--hl-rgb), .22); }
-:is([data-theme="sakura"], [data-theme="pearl"]) .dialog-backdrop { background: rgba(60, 40, 30, .32); }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) :is(.title-label, .card-head h2, .eval-score.plus, .mini-score) { text-shadow: none; }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) .mini-onoff i { background: rgba(var(--hl-rgb), .35); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .18); }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) .mini-onoff i::after { background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) .mini-onoff { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8), 0 2px 6px rgba(90, 50, 30, .18); }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) .mini-onoff.on { background: linear-gradient(180deg, var(--acc-pale), var(--acc-mid)); color: var(--accent-ink); }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) .wr-bar { background: rgba(var(--hl-rgb), .22); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .12); }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) .pv-idx { background: rgba(var(--hl-rgb), .22); }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) .dialog-backdrop { background: rgba(60, 40, 30, .32); }
 @media (max-width: 900px) {
-  :is([data-theme="sakura"], [data-theme="pearl"]) .kifu-card { background: var(--panel-hi), rgba(var(--deep-rgb), .97); }
+  :is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) .kifu-card { background: var(--panel-hi), rgba(var(--deep-rgb), .97); }
 }
 
 /* ---------- 暁桜 (sakura: sunrise, clear peach glass; the readouts sit on dark rose glass) ---------- */
 [data-theme="sakura"] {
-  --app-bg: url("/img/themes/sakura.webp?v=1");
-  --theme-thumb: url("/img/themes/sakura-thumb.webp?v=1");
+  --app-bg: url("/img/themes/sakura.webp?v=2");
+  --theme-thumb: url("/img/themes/sakura-thumb.webp?v=2");
   --bg: #f0c8b8;
   --acc-rgb: 226, 150, 92;
   --hl-rgb: 160, 96, 80;
@@ -1761,9 +1762,9 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   --g-pin: #ffd9a8; --g-pin-lit: #e0965a; --g-pin-ink: #3b1c08;
   --g-disc-top: rgba(120, 82, 78, .98); --g-disc-bottom: rgba(70, 44, 44, .98);
 }
-[data-theme="sakura"] :is(.card, .navbar, .stand, .dialog) { -webkit-backdrop-filter: blur(7px) saturate(1.2); backdrop-filter: blur(7px) saturate(1.2); }
+[data-theme="sakura"] :is(.card, .navbar, .stand, .dialog) { -webkit-backdrop-filter: blur(1px) saturate(1.2); backdrop-filter: blur(1px) saturate(1.2); }
 [data-theme="sakura"] .dialog { background: var(--panel-hi), rgba(255, 238, 230, .9); }
-[data-theme="sakura"] .topbar { background: linear-gradient(180deg, rgba(255, 238, 230, .52), rgba(255, 232, 222, .22)); }
+[data-theme="sakura"] .topbar { background: linear-gradient(180deg, rgba(255, 238, 230, .52), rgba(255, 232, 222, .22)); -webkit-backdrop-filter: blur(1px); backdrop-filter: blur(1px); }
 /* depth / nodes, the candidate table and the graph: dark rose glass with light text, as in the sample */
 [data-theme="sakura"] :is(.eval-meta, .pv-list, .pv-head, .graph) {
   --text: #fff4ef; --text-strong: #ffffff; --muted: #f0d6cc; --muted-2: #f4ddd4; --faint: #dcbcb1;
@@ -1780,8 +1781,8 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
 
 /* ---------- 白金 (pearl: neutral white frosted glass, gold accents) ---------- */
 [data-theme="pearl"] {
-  --app-bg: url("/img/themes/pearl.webp?v=1");
-  --theme-thumb: url("/img/themes/pearl-thumb.webp?v=1");
+  --app-bg: url("/img/themes/pearl.webp?v=2");
+  --theme-thumb: url("/img/themes/pearl-thumb.webp?v=2");
   --bg: #ece9e5;
   --acc-rgb: 204, 164, 92;
   --hl-rgb: 118, 110, 100;
@@ -1814,8 +1815,8 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   border-color: rgba(var(--hl-rgb), .22);
   box-shadow: inset 0 1px 0 rgba(var(--hl-rgb), .18);
 }
-:is([data-theme="sakura"], [data-theme="pearl"]) .stand-pieces { background: linear-gradient(180deg, rgba(255, 255, 255, .35), rgba(255, 255, 255, .05) 40%), rgba(var(--deep-rgb), .22); border-color: rgba(255, 255, 255, .65); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7); }
-@media (max-width: 900px) { .stand-pieces, :is([data-theme="sakura"], [data-theme="pearl"]) .stand-pieces { background: none; border: 0; box-shadow: none; } }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) .stand-pieces { background: linear-gradient(180deg, rgba(255, 255, 255, .35), rgba(255, 255, 255, .05) 40%), rgba(var(--deep-rgb), .22); border-color: rgba(255, 255, 255, .65); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7); }
+@media (max-width: 900px) { .stand-pieces, :is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) .stand-pieces { background: none; border: 0; box-shadow: none; } }
 
 /* every panel takes the theme's shadow */
 .card, .navbar, .stand, .dialog { box-shadow: var(--card-shadow); }
@@ -1854,22 +1855,22 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
 }
 
 /* light themes: scores and the turn chip were light-on-dark */
-:is([data-theme="sakura"], [data-theme="pearl"]) :is(.pv-score.plus, .mv-eval.plus, .mini-score.plus) { color: var(--text-strong); }
-:is([data-theme="sakura"], [data-theme="pearl"]) :is(.pv-score.minus, .mv-eval.minus, .mini-score.minus, .eval-score.minus) { color: #3553a6; text-shadow: none; }
-:is([data-theme="sakura"], [data-theme="pearl"]) .turn-chip { background: rgba(var(--hl-rgb), .16); color: var(--text); }
-:is([data-theme="sakura"], [data-theme="pearl"]) .turn-chip.gote { background: #3a2c26; border-color: transparent; color: #fbf3ee; }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) :is(.pv-score.plus, .mv-eval.plus, .mini-score.plus) { color: var(--text-strong); }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) :is(.pv-score.minus, .mv-eval.minus, .mini-score.minus, .eval-score.minus) { color: #3553a6; text-shadow: none; }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) .turn-chip { background: rgba(var(--hl-rgb), .16); color: var(--text); }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) .turn-chip.gote { background: #3a2c26; border-color: transparent; color: #fbf3ee; }
 
 
 /* light themes: status / accent colours dark enough for pale glass; disabled controls less washed out */
-:is([data-theme="sakura"], [data-theme="pearl"]) { --bad: #c3343b; --good: #23885a; --warn: #a8690c; }
-:is([data-theme="sakura"], [data-theme="pearl"]) :is(.stand.to-move .stand-label, .stand.to-move .stand-label .mark) { color: var(--acc-text); }
-:is([data-theme="sakura"], [data-theme="pearl"]) button:disabled { opacity: .55; }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) { --bad: #c3343b; --good: #23885a; --warn: #a8690c; }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) :is(.stand.to-move .stand-label, .stand.to-move .stand-label .mark) { color: var(--acc-text); }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) button:disabled { opacity: .55; }
 
 /* ---------- brand (PC top-left): home-screen icon + gold Mincho wordmark ---------- */
 :root, [data-theme] {
   --brand-ink: linear-gradient(180deg, #fffaf0 0%, var(--acc-pale) 25%, var(--acc-hi) 55%, var(--gold) 100%);
 }
-:is([data-theme="sakura"], [data-theme="pearl"]) {
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) {
   --brand-ink: linear-gradient(180deg, var(--gold) 0%, var(--acc-deep) 45%, var(--gold-hi) 100%);
 }
 .brand { gap: 12px; padding-right: 16px; margin-right: 4px; position: relative; }
@@ -1894,7 +1895,7 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   height: 1px; width: 100%;
   background: linear-gradient(90deg, rgba(var(--hi-rgb), .9), rgba(var(--hi-rgb), .35) 60%, transparent);
 }
-:is([data-theme="sakura"], [data-theme="pearl"]) .bn-word { filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .7)); }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) .bn-word { filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .7)); }
 @media (max-width: 900px) {
   .brand { padding-right: 0; margin-right: 0; }
   .brand::after { content: none; }
@@ -1923,9 +1924,9 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
 /* pop-ups (toast, update notice, connection screen, install suggestion): solid glass in the theme's
    own colours, so the text never sits on a see-through or mismatched background */
 .toast { background: var(--panel-hi), rgba(var(--deep-rgb), .96); color: var(--text); border-color: var(--panel-line); box-shadow: var(--card-shadow), 0 16px 40px -10px rgba(0, 0, 0, .55); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
-:is([data-theme="sakura"], [data-theme="pearl"]) :is(.update-popup, .conn-card) { background: var(--panel-hi), rgba(var(--deep-rgb), .97); }
-:is([data-theme="sakura"], [data-theme="pearl"]) .install-card { background: linear-gradient(180deg, rgba(var(--acc-rgb), .10), transparent 45%), rgba(var(--deep-rgb), .97); }
-:is([data-theme="sakura"], [data-theme="pearl"]) .conn-overlay { background: rgba(60, 40, 30, .38); }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) :is(.update-popup, .conn-card) { background: var(--panel-hi), rgba(var(--deep-rgb), .97); }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) .install-card { background: linear-gradient(180deg, rgba(var(--acc-rgb), .10), transparent 45%), rgba(var(--deep-rgb), .97); }
+:is([data-theme="sakura"], [data-theme="pearl"], [data-theme="frost"]) .conn-overlay { background: rgba(60, 40, 30, .38); }
 
 
 #dlgConfirmExtra { margin-top: 14px; }
@@ -1983,3 +1984,71 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
   .phone-compact .analysis-ctl .mini-eval.batching .mini-verdict { display: none; }
   .phone-compact .analysis-ctl .mini-eval.batching .mini-best small { display: none; }
 }
+
+/* ---------- 蒼雪 (frost: snowy forest, clear white-blue glass, blue accents) ---------- */
+[data-theme="frost"] {
+  --app-bg: url("/img/themes/frost.webp?v=1");
+  --theme-thumb: url("/img/themes/frost-thumb.webp?v=1");
+  --bg: #cfe2f5;
+  --acc-rgb: 47, 116, 221;
+  --hl-rgb: 60, 88, 128;
+  --hi-rgb: 110, 168, 240;
+  --deep-rgb: 244, 249, 255;
+  --accent: #2f74dd; --accent-2: #6aa4f0; --accent-ink: #0b2a55; --accent-soft: rgba(47, 116, 221, .14);
+  --gold: #2f74dd; --gold-hi: #1d4f9c;
+  --surface: rgba(248, 251, 255, .7); --surface-2: rgba(238, 245, 253, .8); --surface-3: #e2ecf8;
+  --line: rgba(40, 70, 110, .13); --line-strong: rgba(40, 70, 110, .24);
+  --text: #142235; --muted: #3c4d63; --faint: #55667c;
+  --panel: rgba(244, 249, 255, .55); --panel-deep: rgba(246, 250, 255, .66); --panel-line: rgba(255, 255, 255, .9);
+  --panel-hi: linear-gradient(180deg, rgba(255, 255, 255, .7), rgba(255, 255, 255, .12) 28%, transparent 52%);
+  --title-ink: #13243a; --acc-text: #1a56b0; --muted-2: #45566c; --text-strong: #0d1a2c;
+  --btn-top: #fbfdff; --btn-top-hover: #ffffff; --btn-bot: #e6eef8; --btn-bot-hover: #eef4fb;
+  --seg-bg: rgba(228, 237, 248, .85);
+  --acc-hi: #cfe2ff; --acc-pale: #eaf3ff; --acc-mid: #a9c9f5; --acc-deep: #2a62c0;
+  --card-shadow: inset 0 1px 0 rgba(255, 255, 255, .95), 0 0 0 1px rgba(120, 150, 190, .2), 0 12px 30px -18px rgba(20, 50, 90, .4), 0 2px 6px -3px rgba(20, 50, 90, .14);
+  --g-line: #2f74dd; --g-up-rgb: 47, 116, 221; --g-down-rgb: 130, 146, 170; --g-grid-rgb: 60, 88, 128;
+  --g-label-rgb: 70, 85, 105; --g-plate-rgb: 255, 255, 255; --g-dot: #2f74dd; --g-cur: #f4f9ff;
+  --g-pin: #2a62c0; --g-pin-lit: #6aa4f0; --g-pin-ink: #ffffff;
+  --g-disc-top: rgba(255, 255, 255, .98); --g-disc-bottom: rgba(226, 236, 248, .98);
+}
+/* the chosen tab / count, ON and the best candidate's number: solid blue with white text, as in the sample */
+[data-theme="frost"] .onoff button[data-v="on"].active,
+[data-theme="frost"] .seg button.on,
+[data-theme="frost"] .pv:first-child .pv-idx { background: linear-gradient(180deg, #3d82ea, #2462c8); color: #fff; box-shadow: 0 2px 8px -3px rgba(24, 70, 150, .6); }
+[data-theme="frost"] .wr-bar i { background: linear-gradient(90deg, #6aa4f0, #2f74dd 60%, #1d55b8); }
+[data-theme="frost"] .pv:first-child { background: linear-gradient(90deg, rgba(47, 116, 221, .14), rgba(47, 116, 221, .04)); border-color: rgba(47, 116, 221, .55); }
+[data-theme="frost"] .turn-chip.gote { background: #1d2c42; color: #f2f7ff; }
+:is([data-theme="frost"]) :is(.dialog-backdrop, .conn-overlay) { background: rgba(20, 40, 70, .32); }
+
+/* 暁桜: black see-through glass (the background is a bright, washed-out picture), light text */
+[data-theme="sakura"] {
+  color-scheme: dark;
+  --deep-rgb: 22, 14, 16;
+  --hl-rgb: 255, 222, 208;
+  --surface: rgba(24, 14, 16, .5); --surface-2: rgba(30, 18, 20, .58); --surface-3: rgba(40, 26, 28, .7);
+  --line: rgba(255, 222, 208, .16); --line-strong: rgba(255, 222, 208, .3);
+  --text: #fff4ef; --muted: #f0d6cc; --faint: #dcbcb1;
+  --panel: rgba(16, 10, 12, .45); --panel-deep: rgba(16, 10, 12, .55); --panel-line: rgba(255, 222, 208, .28);
+  --panel-hi: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .02) 26%, transparent 50%);
+  --title-ink: #ffe9df; --acc-text: #ffd9a8; --muted-2: #f4ddd4; --text-strong: #ffffff; --gold-hi: #ffd9a8;
+  --btn-top: rgba(44, 28, 30, .62); --btn-top-hover: rgba(58, 38, 40, .7); --btn-bot: rgba(22, 14, 16, .62); --btn-bot-hover: rgba(30, 20, 22, .7);
+  --seg-bg: rgba(16, 10, 12, .5);
+  --card-shadow: inset 0 1px 0 rgba(255, 236, 228, .14), 0 14px 32px -20px rgba(0, 0, 0, .7);
+}
+[data-theme="sakura"] .topbar { background: linear-gradient(180deg, rgba(16, 10, 12, .55), rgba(16, 10, 12, .3)); }
+[data-theme="sakura"] .dialog { background: var(--panel-hi), rgba(30, 18, 20, .92); }
+[data-theme="sakura"] .stand-pieces { background: rgba(16, 10, 12, .25); border-color: rgba(255, 222, 208, .2); box-shadow: none; }
+[data-theme="sakura"] :is(.pv-score.minus, .mv-eval.minus, .mini-score.minus, .eval-score.minus) { color: #b9cbff; }
+[data-theme="sakura"] .mini-onoff { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 2px 6px rgba(0, 0, 0, .3); }
+
+/* 白金: clearer glass (the new background is calm enough to show through) */
+[data-theme="pearl"] {
+  --surface: rgba(248, 247, 245, .45); --surface-2: rgba(240, 238, 235, .55); --surface-3: rgba(230, 227, 223, .7);
+  --panel: rgba(246, 245, 243, .28); --panel-deep: rgba(248, 247, 245, .36);
+  --panel-hi: linear-gradient(180deg, rgba(255, 255, 255, .45), rgba(255, 255, 255, .08) 28%, transparent 52%);
+  --btn-top: rgba(253, 253, 252, .7); --btn-top-hover: rgba(255, 255, 255, .85); --btn-bot: rgba(238, 236, 233, .6); --btn-bot-hover: rgba(244, 243, 241, .75);
+  --seg-bg: rgba(236, 234, 231, .5);
+}
+[data-theme="pearl"] :is(.card, .navbar, .stand, .dialog) { -webkit-backdrop-filter: blur(2px) saturate(1.1); backdrop-filter: blur(2px) saturate(1.1); }
+[data-theme="pearl"] .topbar { background: linear-gradient(180deg, rgba(249, 248, 246, .55), rgba(249, 248, 246, .25)); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+[data-theme="pearl"] .dialog { background: var(--panel-hi), rgba(249, 248, 246, .9); }

@@ -1858,9 +1858,48 @@ body { background: var(--bg) var(--app-bg) center / cover no-repeat; }
 :is([data-theme="sakura"], [data-theme="pearl"]) :is(.pv-score.minus, .mv-eval.minus, .mini-score.minus, .eval-score.minus) { color: #3553a6; text-shadow: none; }
 :is([data-theme="sakura"], [data-theme="pearl"]) .turn-chip { background: rgba(var(--hl-rgb), .16); color: var(--text); }
 :is([data-theme="sakura"], [data-theme="pearl"]) .turn-chip.gote { background: #3a2c26; border-color: transparent; color: #fbf3ee; }
-:is([data-theme="sakura"], [data-theme="pearl"]) .brand-name { color: var(--muted); }
+
 
 /* light themes: status / accent colours dark enough for pale glass; disabled controls less washed out */
 :is([data-theme="sakura"], [data-theme="pearl"]) { --bad: #c3343b; --good: #23885a; --warn: #a8690c; }
 :is([data-theme="sakura"], [data-theme="pearl"]) :is(.stand.to-move .stand-label, .stand.to-move .stand-label .mark) { color: var(--acc-text); }
 :is([data-theme="sakura"], [data-theme="pearl"]) button:disabled { opacity: .55; }
+
+/* ---------- brand (PC top-left): home-screen icon + gold Mincho wordmark ---------- */
+:root, [data-theme] {
+  --brand-ink: linear-gradient(180deg, #fffaf0 0%, var(--acc-pale) 25%, var(--acc-hi) 55%, var(--gold) 100%);
+}
+:is([data-theme="sakura"], [data-theme="pearl"]) {
+  --brand-ink: linear-gradient(180deg, var(--gold) 0%, var(--acc-deep) 45%, var(--gold-hi) 100%);
+}
+.brand { gap: 12px; padding-right: 16px; margin-right: 4px; position: relative; }
+.brand::after { /* hairline between the brand and the game title */
+  content: ""; position: absolute; right: 0; top: 8px; bottom: 8px; width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(var(--hi-rgb), .55), transparent);
+}
+.brand-mark { /* the home-screen icon */
+  width: 34px; height: 34px; padding: 0; display: block; object-fit: contain;
+  background: none; clip-path: none; border-radius: 9px;
+  filter: drop-shadow(0 0 6px rgba(var(--acc-rgb), .45)) drop-shadow(0 2px 3px rgba(0, 0, 0, .45));
+}
+@media (min-width: 1281px) { .brand-name { display: flex; flex-direction: column; gap: 3px; line-height: 1; } }
+.bn-word {
+  font-family: var(--font-kifu); font-size: 18.5px; font-weight: 800; letter-spacing: .05em;
+  background: var(--brand-ink); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .6)) drop-shadow(0 0 8px rgba(var(--acc-rgb), .35));
+  text-shadow: none;
+}
+.bn-word b { font-weight: 800; margin-left: .28em; color: transparent; text-shadow: none; }
+.bn-rule { /* thin gold line fading out to the right */
+  height: 1px; width: 100%;
+  background: linear-gradient(90deg, rgba(var(--hi-rgb), .9), rgba(var(--hi-rgb), .35) 60%, transparent);
+}
+:is([data-theme="sakura"], [data-theme="pearl"]) .bn-word { filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .7)); }
+@media (max-width: 900px) {
+  .brand { padding-right: 0; margin-right: 0; }
+  .brand::after { content: none; }
+  .brand-mark { width: 30px; height: 30px; }
+}
+
+/* 極光 / 翠苑: darker plate behind the evaluation graph */
+:is([data-theme="aurora"], [data-theme="emerald"]) .graph { background: rgba(var(--deep-rgb), .58); }

@@ -600,6 +600,7 @@ function connectWs() {
         setConn("connected", "接続済み");
         state.isOwner = true;
         setTimeout(takeSharedKifu, 0);
+        setTimeout(showAppNotices, 1500);
         state.sessionId = payload.session_id || null;
         state.ownerToken = payload.owner_token || null;
         state.analysis.available = Boolean(payload.server_capabilities?.analysis);
@@ -3691,6 +3692,52 @@ function renderUpdate(st) {
     $("updateMeta").textContent = `現在 ${cur} → 最新 ${st.latest_version}${when ? ` ・ 確認 ${when}` : ""}`;
     $("updateLink").href = st.release_url || st.release_page_url || "#";
   }
+}
+
+// ---------- installed app (Android): one-time notices after an update ----------
+// The page itself is always the latest, but the installed app's own settings (share target,
+// icons, name…) change only when Chrome refreshes the app or it is reinstalled. A change there
+// gets an entry here; each one is shown once, when the server runs that version or later.
+const APP_NOTICES = [
+  {
+    version: "1.1.7",
+    title: "共有から棋譜を読み込めるようになりました",
+    message:
+      "ほかのアプリの「共有」から、棋譜の文字や .kif などのファイルを ShogiAnalyzer に送れるようになりました。共有メニューに ShogiAnalyzer が出ない場合は、ホーム画面のアプリを一度削除して入れ直してください。",
+  },
+];
+const APP_NOTICE_KEY = "shogi_analyzer_app_notice_seen";
+const versionParts = (v) => String(v || "").replace(/^v/i, "").split(".").map((n) => parseInt(n, 10) || 0);
+function versionAtLeast(v, min) {
+  const a = versionParts(v);
+  const b = versionParts(min);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
+  }
+  return true;
+}
+let appNoticeShown = false;
+async function showAppNotices() {
+  if (appNoticeShown || openDialogEl) return;
+  const installed = window.matchMedia("(display-mode: standalone)").matches;
+  if (!installed || !/Android/i.test(navigator.userAgent)) return;
+  let current = "";
+  try {
+    current = (await fetch("/api/app/update_status", { cache: "no-store" }).then((r) => r.json())).current_version;
+  } catch {
+    return;
+  }
+  const seen = (lsGet(APP_NOTICE_KEY) || "").split(",").filter(Boolean);
+  const due = APP_NOTICES.filter((n) => !seen.includes(n.version) && versionAtLeast(current, n.version));
+  if (!due.length || openDialogEl) return;
+  appNoticeShown = true;
+  lsSet(APP_NOTICE_KEY, [...seen, ...due.map((n) => n.version)].join(","));
+  const last = due[due.length - 1];
+  await confirmDialog({
+    title: last.title,
+    message: due.map((n) => n.message).join("\n\n"),
+    actions: [{ label: "OK", value: true, primary: true }],
+  });
 }
 
 async function setupUpdateNotice() {

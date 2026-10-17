@@ -128,11 +128,13 @@ const els = {
 
   newGameBtn: $("newGameBtn"),
   openBtn: $("openBtn"),
+  loadBtn: $("loadBtn"),
   importBtn: $("importBtn"),
   exportBtn: $("exportBtn"),
   shareBtn: $("shareBtn"),
   saveBtn: $("saveBtn"),
   settingsBtn: $("settingsBtn"),
+  licenseBtn: $("licenseBtn"),
   menuBtn: $("menuBtn"),
   miniOnOff: $("miniOnOff"),
   miniScore: $("miniScore"),
@@ -166,6 +168,8 @@ const els = {
   shareStatus: $("shareStatus"),
   shareText: $("shareText"),
   shareSave: $("shareSave"),
+  shareCopy: $("shareCopy"),
+  shareNote: $("shareNote"),
   shareNative: $("shareNative"),
   shareX: $("shareX"),
   shareBsky: $("shareBsky"),
@@ -903,7 +907,7 @@ function shareDefaultText() {
 
 const canShareFiles = () => {
   try {
-    return Boolean(navigator.canShare?.({ files: [new File([""], "a.png", { type: "image/png" })] }));
+    return Boolean(navigator.canShare?.({ files: [new File([""], "a.webp", { type: "image/webp" })] }));
   } catch {
     return false;
   }
@@ -919,7 +923,9 @@ async function openShare() {
   els.shareStatus.textContent = "画像を作成しています…";
   els.shareText.value = shareDefaultText();
   els.shareNative.hidden = !canShareFiles();
-  for (const b of [els.shareSave, els.shareNative, els.shareX, els.shareBsky]) b.disabled = true;
+  els.shareCopy.hidden = !canCopyImage();
+  els.shareNote.hidden = true;
+  for (const b of [els.shareSave, els.shareCopy, els.shareNative, els.shareX, els.shareBsky]) b.disabled = true;
   showDialog(els.dlgShare);
   try {
     const res = await fetch("/api/share", {
@@ -944,7 +950,15 @@ async function openShare() {
     if (old.startsWith("blob:")) URL.revokeObjectURL(old);
     els.shareImg.hidden = false;
     els.shareStatus.hidden = true;
-    for (const b of [els.shareSave, els.shareNative, els.shareX, els.shareBsky]) b.disabled = false;
+    // without password protection the picture can only be saved, not posted
+    els.shareSave.disabled = false;
+    els.shareCopy.disabled = false;
+    for (const b of [els.shareNative, els.shareX, els.shareBsky]) b.disabled = !made.protected;
+    els.shareNote.classList.toggle("off", !made.protected);
+    els.shareNote.textContent = made.protected
+      ? "投稿の URL から誰でも画像を見られます。公開したくないときは URL を消し、画像をコピーして貼り付けてください。"
+      : `パスワード保護が無効のため共有できません（画像の${canCopyImage() ? "保存・コピー" : "保存"}のみ）。`;
+    els.shareNote.hidden = false;
   } catch (e) {
     if (seq === shareSeq) els.shareStatus.textContent = `画像を作成できませんでした（${e.message || e}）`;
   }
@@ -953,7 +967,7 @@ async function openShare() {
 function shareFileName() {
   const d = new Date();
   const p = (n) => String(n).padStart(2, "0");
-  return `shogi_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.png`;
+  return `shogi_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.webp`;
 }
 
 function saveShareImage() {
@@ -967,10 +981,25 @@ function saveShareImage() {
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
 }
 
+async function pngOf(blob) {
+  const bmp = await createImageBitmap(blob);
+  const canvas = el("canvas");
+  canvas.width = bmp.width;
+  canvas.height = bmp.height;
+  canvas.getContext("2d").drawImage(bmp, 0, 0);
+  bmp.close();
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("png"))), "image/png"));
+}
+
+// writing a picture to the clipboard: https or localhost only
+const canCopyImage = () => window.isSecureContext && Boolean(navigator.clipboard?.write) && typeof ClipboardItem !== "undefined";
+
 async function copyShareImage() {
-  if (!window.isSecureContext || !navigator.clipboard?.write || typeof ClipboardItem === "undefined") return false;
+  if (!canCopyImage()) return false;
   try {
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": shareBlob })]);
+    // the clipboard takes PNG only: the WebP is converted in the browser (given as a promise, so
+    // Safari still sees the write inside the click)
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": pngOf(shareBlob) })]);
     return true;
   } catch {
     return false;
@@ -1002,7 +1031,7 @@ async function postShare(site) {
 async function shareNatively() {
   if (!shareBlob) return;
   try {
-    await navigator.share({ files: [new File([shareBlob], shareFileName(), { type: "image/png" })], text: els.shareText.value.trim() });
+    await navigator.share({ files: [new File([shareBlob], shareFileName(), { type: "image/webp" })], text: els.shareText.value.trim() });
   } catch (e) {
     if (e?.name !== "AbortError") toast("error", "共有できませんでした");
   }
@@ -2850,7 +2879,7 @@ function renderControls() {
   els.saveBtn.disabled = !owner;
   els.saveBtn.classList.toggle("dirty", Boolean(state.game?.dirty));
   els.saveBtn.title = state.game?.dirty ? "保存されていない変更があります — サーバーに保存 (Ctrl+S)" : "サーバーに保存 (Ctrl+S)";
-  for (const b of [els.newGameBtn, els.openBtn, els.importBtn, els.pasteBtn]) b.disabled = !canNav;
+  for (const b of [els.newGameBtn, els.loadBtn, els.openBtn, els.importBtn, els.pasteBtn]) b.disabled = !canNav;
   els.plySlider.disabled = !canNav;
   document.body.classList.toggle("batch-lock", Boolean(state.batch));
 
@@ -3801,6 +3830,11 @@ function wire() {
   });
   els.shareBtn.addEventListener("click", openShare);
   els.shareSave.addEventListener("click", saveShareImage);
+  els.shareCopy.addEventListener("click", async () => {
+    if (!shareBlob) return;
+    if (await copyShareImage()) toast("info", "画像をコピーしました");
+    else toast("error", "画像をコピーできませんでした");
+  });
   els.shareNative.addEventListener("click", shareNatively);
   els.shareX.addEventListener("click", () => postShare("x"));
   els.shareBsky.addEventListener("click", () => postShare("bsky"));
@@ -3809,21 +3843,52 @@ function wire() {
     refreshExport();
   });
   els.settingsBtn.addEventListener("click", () => showDialog(els.dlgSettings));
-  $("licenseBtn").addEventListener("click", () => showDialog($("dlgLicense")));
+  els.licenseBtn.addEventListener("click", () => showDialog($("dlgLicense")));
   els.engineSave.addEventListener("click", saveEngineSettings);
 
   // phone: actions live in a bottom sheet; each entry forwards to the toolbar button
-  els.menuBtn.addEventListener("click", () => showDialog(els.dlgMenu));
-  els.dlgMenu.addEventListener("click", (e) => {
+  // 読み込み: ファイルアップロード / クリップボードから読み込み on a layer above the menu, over the
+  // 読み込み button; a tap outside them closes only that layer
+  const menuLoadLayer = $("menuLoadLayer");
+  const menuLoadPop = $("menuLoadPop");
+  const setMenuLoad = (open) => {
+    menuLoadLayer.hidden = !open;
+    if (!open) return;
+    const r = $("menuLoad").getBoundingClientRect();
+    const w = menuLoadPop.offsetWidth;
+    menuLoadPop.style.top = "auto";
+    menuLoadPop.style.bottom = `${Math.round(window.innerHeight - r.top + 6)}px`;
+    menuLoadPop.style.left = `${Math.max(12, Math.min(Math.round(r.right - w), window.innerWidth - w - 12))}px`;
+  };
+  $("menuLoad").addEventListener("click", () => setMenuLoad(true));
+  menuLoadLayer.addEventListener("click", (e) => {
     const b = e.target.closest("button[data-act]");
-    if (!b) return;
-    const target = $(b.dataset.act);
+    setMenuLoad(false);
+    if (b) runMenuAct(b.dataset.act);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !menuLoadLayer.hidden) {
+      e.stopImmediatePropagation();
+      setMenuLoad(false);
+    }
+  }, true);
+  window.addEventListener("resize", () => setMenuLoad(false));
+  els.menuBtn.addEventListener("click", () => {
+    setMenuLoad(false);
+    showDialog(els.dlgMenu);
+  });
+  const runMenuAct = (act) => {
+    const target = $(act);
     closeDialog(null);
     if (!target || target.disabled) {
       toast("warning", state.batch ? "全解析中は操作できません" : "今は使えません");
       return;
     }
     target.click();
+  };
+  els.dlgMenu.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-act]");
+    if (b) runMenuAct(b.dataset.act);
   });
 
   // phone: the kifu card is a drawer sliding in from the right
@@ -4057,6 +4122,37 @@ async function showAppNotices() {
   });
 }
 
+/** PC: 読み込み ▾ opens ファイルアップロード / クリップボードから読み込み (棋譜一覧 is its own button). */
+function setupLoadMenu() {
+  const pop = $("loadPop");
+  const btn = els.loadBtn;
+  // the top bar is its own stacking context (blur): keep the list outside so it sits above the board
+  document.body.appendChild(pop);
+  const setOpen = (open) => {
+    pop.hidden = !open;
+    if (open) {
+      const r = btn.getBoundingClientRect();
+      pop.style.top = `${Math.round(r.bottom + 6)}px`;
+      pop.style.left = `${Math.max(12, Math.min(Math.round(r.left), window.innerWidth - pop.offsetWidth - 12))}px`;
+    }
+    btn.setAttribute("aria-expanded", String(open));
+  };
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setOpen(pop.hidden);
+  });
+  pop.addEventListener("click", (e) => {
+    if (e.target.closest("button")) setOpen(false);
+  });
+  document.addEventListener("click", (e) => {
+    if (!pop.hidden && !e.target.closest("#loadPop")) setOpen(false);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !pop.hidden) setOpen(false);
+  });
+  window.addEventListener("resize", () => setOpen(false));
+}
+
 async function setupUpdateNotice() {
   const popup = $("updatePopup");
   const badge = $("updateBadge");
@@ -4174,6 +4270,7 @@ async function main() {
   ensureSquares();
   renderCoords();
   wire();
+  setupLoadMenu();
   setupUpdateNotice();
   // installable as an app (PWA): needs https (public address) or localhost
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});

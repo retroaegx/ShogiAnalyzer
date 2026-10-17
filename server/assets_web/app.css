@@ -191,6 +191,24 @@ button:disabled { cursor: not-allowed; opacity: 0.4; }
 .tb-btn.primary { background: var(--accent); color: var(--accent-ink); font-weight: 650; margin-left: 4px; }
 .tb-btn.primary:hover:not(:disabled) { background: var(--accent-2); color: var(--accent-ink); }
 .tb-btn.icon-only { padding: 0 9px; }
+/* PC: 読み込み ▾ — loading a kifu from a file or the clipboard (on phones they are in the ⋯ menu) */
+.load-menu { display: flex; flex: none; }
+.tb-btn .caret { width: 13px; height: 13px; margin-left: -3px; }
+.load-pop {
+  /* fixed (placed under the button by JS): the top bar is its own stacking context */
+  position: fixed; top: 60px; left: 12px; z-index: 300; min-width: 240px;
+  display: flex; flex-direction: column; gap: 2px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: 0 24px 50px -12px rgba(0, 0, 0, .8);
+}
+.load-pop[hidden] { display: none; }
+.load-item {
+  display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px;
+  border: 0; border-radius: 8px; background: transparent; color: var(--text);
+  font-size: 13px; font-weight: 600; text-align: left; white-space: nowrap; cursor: pointer;
+}
+.load-item:hover:not(:disabled) { background: var(--surface-2); }
+.load-item .ico { color: var(--accent); }
+.load-item:disabled { opacity: .45; cursor: default; }
 
 /* ============================================================
    Main layout
@@ -855,6 +873,9 @@ body.batch-lock .board-grid, body.batch-lock .board-grid .sq.mine { cursor: not-
 .share-preview { display: grid; place-items: center; min-height: 160px; border-radius: var(--radius-sm); background: rgba(0, 0, 0, .18); overflow: hidden; }
 .share-preview img { display: block; width: 100%; height: auto; }
 .share-foot { flex-wrap: wrap; }
+#dlgShare { width: min(580px, 100%); } /* the five buttons fit on one line */
+.dialog-body .share-note { margin-top: 8px; font-size: 13px; color: var(--muted); }
+.dialog-body .share-note.off { color: var(--bad); font-weight: 650; }
 .icon-btn { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; border: 0; background: transparent; color: var(--muted); }
 .icon-btn:hover { background: var(--surface-2); color: var(--text); }
 
@@ -1002,6 +1023,12 @@ textarea.field.mono { font-size: 12px; }
 }
 .menu-grid button:active { background: var(--surface-3); }
 .menu-grid .ico { width: 22px; height: 22px; color: var(--accent); }
+.menu-grid span { text-align: center; word-break: keep-all; overflow-wrap: anywhere; } /* long names wrap at the <wbr> */
+/* 読み込み: its two choices on a layer above the menu; a tap outside them closes the layer */
+.menu-pop-layer { position: fixed; inset: 0; z-index: 290; }
+.menu-pop-layer[hidden] { display: none; }
+.menu-pop-layer .load-item { height: 48px; font-size: 14px; }
+.menu-pop-layer .load-item .ico { width: 20px; height: 20px; }
 
 @media (max-width: 900px) {
   :root { --gap: 8px; --topbar-h: 46px; }
@@ -1010,9 +1037,10 @@ textarea.field.mono { font-size: 12px; }
   body { overflow: hidden; }
   .app { height: 100dvh; overflow: hidden; }
 
-  /* top bar: logo · title · status dot · 保存 · ⋯ */
+  /* top bar: title · status dot · 保存 · ⋯ (no logo) */
   .topbar { gap: 6px; padding: 0 8px; }
-  .brand-mark { width: 26px; height: 26px; font-size: 15px; }
+  .brand { display: none; }
+  .load-menu { display: none; }
   .brand-name { display: none; }
   .title-field { min-width: 0; }
   .title-field { gap: 5px; }

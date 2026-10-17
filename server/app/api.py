@@ -17,7 +17,7 @@ from .core.import_kif import import_kif_game
 from .core.import_kif2 import import_kif2_game
 from .core.import_usi import detect_format, import_usi_game, normalize_usi_text
 from .services.state_store import RuntimeState, StateStore, default_game_title
-from .services.share_image import ShareImageError, create_share, share_file, share_page
+from .services.share_image import SHARE_TYPES, ShareImageError, create_share, share_file, share_page
 from .services.update_checker import check_update_now, get_update_status, read_current_version
 
 
@@ -179,7 +179,8 @@ async def share_create(request: Request):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     sid = made["id"]
     public = (os.environ.get("SHOGI_ANALYZER_PUBLIC_URL") or "").strip().rstrip("/")
-    return {"id": sid, "path": f"/s/{sid}", "image": f"/s/{sid}.png", "public_url": public}
+    # posting is offered only with password protection on (without it the whole app is open)
+    return {"id": sid, "path": f"/s/{sid}", "image": f"/s/{sid}.webp", "public_url": public, "protected": auth.required()}
 
 
 def _base_url(request: Request) -> str:
@@ -189,21 +190,32 @@ def _base_url(request: Request) -> str:
     return f"{proto}://{host}"
 
 
-# share links: open without logging in (see main.py)
-@router.get("/s/{sid}.png", include_in_schema=False)
-async def share_link_image(sid: str):
-    path = share_file(sid)
-    if path is None:
+def _share_picture(sid: str, ext: str, card: bool) -> FileResponse:
+    path = share_file(sid, card=card)
+    if path is None or path.suffix != ext:
         raise HTTPException(status_code=404)
-    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+    return FileResponse(path, media_type=SHARE_TYPES[ext], headers={"Cache-Control": "public, max-age=86400"})
+
+
+# share links: open without logging in (see main.py); .png = links made before WebP
+@router.get("/s/{sid}.webp", include_in_schema=False)
+async def share_link_image(sid: str):
+    return _share_picture(sid, ".webp", card=False)
+
+
+@router.get("/s/{sid}.png", include_in_schema=False)
+async def share_link_image_png(sid: str):
+    return _share_picture(sid, ".png", card=False)
+
+
+@router.get("/s/{sid}/card.webp", include_in_schema=False)
+async def share_link_card(sid: str):
+    return _share_picture(sid, ".webp", card=True)
 
 
 @router.get("/s/{sid}/card.png", include_in_schema=False)
-async def share_link_card(sid: str):
-    path = share_file(sid, card=True)
-    if path is None:
-        raise HTTPException(status_code=404)
-    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+async def share_link_card_png(sid: str):
+    return _share_picture(sid, ".png", card=True)
 
 
 @router.get("/s/{sid}", include_in_schema=False)

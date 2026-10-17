@@ -230,6 +230,14 @@ def _scaled(url: str, w: int, h: int, rotate: bool) -> Image.Image:
     return im.rotate(180) if rotate else im
 
 
+@lru_cache(maxsize=4)
+def _cover(url: str, w: int, h: int) -> Image.Image:
+    """The image scaled to cover w x h (CSS background-size: cover); kept for the next share."""
+    src = _image(url)
+    sc = max(w / src.width, h / src.height)
+    return src.resize((math.ceil(src.width * sc), math.ceil(src.height * sc)), Image.LANCZOS)
+
+
 @lru_cache(maxsize=32)
 def _font(path: str, size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(path, max(1, size))
@@ -410,13 +418,11 @@ class _Renderer:
     def render(self) -> Image.Image:
         img = Image.new("RGBA", (self.W, self.H), _c(self.bg))
         if self.page_bg:  # body { background: var(--bg) var(--app-bg) center / cover }
-            src = _image(self.page_bg)
-            sc = max(self.W / src.width, self.H / src.height)
-            cover = src.resize((math.ceil(src.width * sc), math.ceil(src.height * sc)), Image.LANCZOS)
+            cover = _cover(self.page_bg, self.W, self.H)
             img.alpha_composite(cover, (round((self.W - cover.width) / 2), round((self.H - cover.height) / 2)))
         self.img = img
         self._header()
-        img.alpha_composite(_image(self.bg_set.get("background") or "").resize((self.board_w, self.board_h), Image.LANCZOS), (self.bx, self.by))
+        img.alpha_composite(_scaled(self.bg_set.get("background") or "", self.board_w, self.board_h, False), (self.bx, self.by))
         self._last_move_squares()
         self._pieces()
         self._coords()
@@ -531,15 +537,24 @@ class _Renderer:
         for sh in shadows:
             if sh["inset"]:
                 continue
-            layer = _layer(self.img.size)
             sp, dx, dy = sh["spread"] * u, sh["x"] * u, sh["y"] * u
-            ImageDraw.Draw(layer).rounded_rectangle((x0 - sp + dx, y0 - sp + dy, x1 + sp + dx, y1 + sp + dy), radius=max(0, radius + sp), fill=_c(sh["color"]))
-            layer = layer.filter(ImageFilter.GaussianBlur(max(0.1, sh["blur"] * u / 2)))
+            sigma = max(0.1, sh["blur"] * u / 2)
+            # only the area the blurred shadow can reach is drawn (blurring the whole picture is slow)
+            m = math.ceil(sigma * 3) + 2
+            ox = max(0, math.floor(min(x0, x0 - sp + dx)) - m)
+            oy = max(0, math.floor(min(y0, y0 - sp + dy)) - m)
+            ex = min(self.W, math.ceil(max(x1, x1 + sp + dx)) + m)
+            ey = min(self.H, math.ceil(max(y1, y1 + sp + dy)) + m)
+            if ex <= ox or ey <= oy:
+                continue
+            layer = _layer((ex - ox, ey - oy))
+            ImageDraw.Draw(layer).rounded_rectangle((x0 - sp + dx - ox, y0 - sp + dy - oy, x1 + sp + dx - ox, y1 + sp + dy - oy), radius=max(0, radius + sp), fill=_c(sh["color"]))
+            layer = layer.filter(ImageFilter.GaussianBlur(sigma))
             # an outer box-shadow is only drawn outside the box (it does not darken a see-through panel)
             hole = Image.new("L", layer.size, 255)
-            ImageDraw.Draw(hole).rounded_rectangle(box, radius=radius, fill=0)
+            ImageDraw.Draw(hole).rounded_rectangle((x0 - ox, y0 - oy, x1 - ox, y1 - oy), radius=radius, fill=0)
             layer.putalpha(Image.composite(layer.getchannel("A"), hole, hole))
-            self.img.alpha_composite(layer)
+            self.img.alpha_composite(layer, (ox, oy))
         w, h = max(1, round(x1 - x0)), max(1, round(y1 - y0))
         mask = Image.new("L", (w, h), 0)
         ImageDraw.Draw(mask).rounded_rectangle((0, 0, w - 1, h - 1), radius=radius, fill=255)
@@ -782,14 +797,15 @@ class _Renderer:
         self._put(layer, opacity=opacity)
 
 
-def _png(im: Image.Image) -> bytes:
+def _webp(im: Image.Image) -> bytes:
+    """WebP, quality 95: a fraction of the PNG's size and encoding time, no visible difference."""
     buf = io.BytesIO()
-    im.save(buf, format="PNG", optimize=True)
+    im.save(buf, format="WEBP", quality=95, method=2)
     return buf.getvalue()
 
 
 def render_share_image(data: dict[str, Any]) -> bytes:
-    return _png(_Renderer(data).render())
+    return _webp(_Renderer(data).render())
 
 
 # ---------- share links (link card on X / Bluesky) ----------
@@ -799,6 +815,8 @@ def render_share_image(data: dict[str, Any]) -> bytes:
 CARD_W, CARD_H = 1200, 628  # 1.91:1, the large link card: the whole picture fits without cropping
 KEEP_SHARES = 300
 SHARE_ID = re.compile(r"[A-Za-z0-9_-]{16}")
+SHARE_EXTS = (".webp", ".png")
+SHARE_TYPES = {".webp": "image/webp", ".png": "image/png"}
 
 
 def share_dir() -> Path:
@@ -820,8 +838,8 @@ def create_share(data: dict[str, Any]) -> dict[str, Any]:
     sid = secrets.token_urlsafe(12)
     folder = share_dir()
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / f"{sid}.png").write_bytes(_png(im))
-    (folder / f"{sid}.card.png").write_bytes(_png(_card(im, r.bg)))
+    (folder / f"{sid}.webp").write_bytes(_webp(im))
+    (folder / f"{sid}.card.webp").write_bytes(_webp(_card(im, r.bg)))
     meta = {"title": r.header_left, "description": r.header_right, "created": int(time.time())}
     (folder / f"{sid}.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
     _prune(folder)
@@ -833,20 +851,25 @@ def _prune(folder: Path) -> None:
     metas = sorted(folder.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
     for old in metas[KEEP_SHARES:]:
         sid = old.stem
-        for p in (old, folder / f"{sid}.png", folder / f"{sid}.card.png"):
+        for p in (old, *(folder / f"{sid}{kind}{ext}" for kind in ("", ".card") for ext in SHARE_EXTS)):
             p.unlink(missing_ok=True)
 
 
 def share_file(sid: str, card: bool = False) -> Path | None:
+    """The picture of a share link (.webp; links made before WebP have a .png)."""
     if not SHARE_ID.fullmatch(sid or ""):
         return None
-    p = share_dir() / f"{sid}{'.card' if card else ''}.png"
-    return p if p.is_file() else None
+    for ext in SHARE_EXTS:
+        p = share_dir() / f"{sid}{'.card' if card else ''}{ext}"
+        if p.is_file():
+            return p
+    return None
 
 
 def share_page(sid: str, base_url: str) -> str | None:
     """HTML of a share link: the card tags for X / Bluesky, and the picture for people who open it."""
-    if not share_file(sid):
+    pic, card_pic = share_file(sid), share_file(sid, card=True)
+    if not pic or not card_pic:
         return None
     try:
         meta = json.loads((share_dir() / f"{sid}.json").read_text(encoding="utf-8"))
@@ -856,15 +879,15 @@ def share_page(sid: str, base_url: str) -> str | None:
     title = meta.get("title") or "局面"
     desc = meta.get("description") or ""
     page = f"{base_url}/s/{sid}"
-    card = f"{base_url}/s/{sid}/card.png"
+    card = f"{base_url}/s/{sid}/card{card_pic.suffix}"
     return f"""<!doctype html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{e(title)}</title>
 <meta property="og:type" content="website"><meta property="og:url" content="{e(page)}">
 <meta property="og:title" content="{e(title)}"><meta property="og:description" content="{e(desc)}">
-<meta property="og:image" content="{e(card)}"><meta property="og:image:width" content="{CARD_W}"><meta property="og:image:height" content="{CARD_H}">
+<meta property="og:image" content="{e(card)}"><meta property="og:image:type" content="{SHARE_TYPES[card_pic.suffix]}"><meta property="og:image:width" content="{CARD_W}"><meta property="og:image:height" content="{CARD_H}">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{e(title)}">
 <meta name="twitter:description" content="{e(desc)}"><meta name="twitter:image" content="{e(card)}">
 <style>body{{margin:0;background:#0b0c0f;display:grid;place-items:center;min-height:100vh}}img{{max-width:100%;height:auto;display:block}}</style>
-</head><body><img src="/s/{e(sid)}.png" alt="{e(title)} {e(desc)}"></body></html>
+</head><body><img src="/s/{e(sid)}{pic.suffix}" alt="{e(title)} {e(desc)}"></body></html>
 """

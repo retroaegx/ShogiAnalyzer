@@ -51,7 +51,7 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def _require_login(request, call_next):
         path = request.url.path
-        if not auth.required() or path in open_paths or path.startswith(("/icons/", "/img/")) or auth.token_valid(request.cookies.get(auth.COOKIE_NAME)):
+        if not auth.required() or path in open_paths or path.startswith(("/icons/", "/img/", "/s/")) or auth.token_valid(request.cookies.get(auth.COOKIE_NAME)):
             return await call_next(request)
         if path.startswith("/api/"):
             return JSONResponse({"detail": "login required"}, status_code=401)

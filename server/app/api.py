@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import os
 import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
 
 from . import auth
 from .core.export_kif import export_game_to_kif
@@ -16,6 +17,7 @@ from .core.import_kif import import_kif_game
 from .core.import_kif2 import import_kif2_game
 from .core.import_usi import detect_format, import_usi_game, normalize_usi_text
 from .services.state_store import RuntimeState, StateStore, default_game_title
+from .services.share_image import ShareImageError, create_share, share_file, share_page
 from .services.update_checker import check_update_now, get_update_status, read_current_version
 
 
@@ -165,6 +167,51 @@ async def app_update_check():
 @router.get("/api/app/version")
 async def app_version():
     return {"version": read_current_version()}
+
+
+@router.post("/api/share")
+async def share_create(request: Request):
+    """Draw the shown position (from the data the page sends) and keep it behind a share link."""
+    data = await _read_json_or_empty(request)
+    try:
+        made = await asyncio.to_thread(create_share, data)
+    except ShareImageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    sid = made["id"]
+    public = (os.environ.get("SHOGI_ANALYZER_PUBLIC_URL") or "").strip().rstrip("/")
+    return {"id": sid, "path": f"/s/{sid}", "image": f"/s/{sid}.png", "public_url": public}
+
+
+def _base_url(request: Request) -> str:
+    # behind Cloudflare Tunnel the app is reached over http; the visitor used https
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme).split(",")[0].strip()
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+    return f"{proto}://{host}"
+
+
+# share links: open without logging in (see main.py)
+@router.get("/s/{sid}.png", include_in_schema=False)
+async def share_link_image(sid: str):
+    path = share_file(sid)
+    if path is None:
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@router.get("/s/{sid}/card.png", include_in_schema=False)
+async def share_link_card(sid: str):
+    path = share_file(sid, card=True)
+    if path is None:
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@router.get("/s/{sid}", include_in_schema=False)
+async def share_link_page(sid: str, request: Request):
+    page = share_page(sid, _base_url(request))
+    if page is None:
+        raise HTTPException(status_code=404)
+    return HTMLResponse(page, headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.get("/healthz")

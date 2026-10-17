@@ -12,3 +12,6 @@ py-cpuinfo>=9.0.0
 # KIF/KI2 parsing (move resolution)
 python-shogi>=1.1.1
 
+
+# share image (drawn on the server)
+Pillow>=10.0

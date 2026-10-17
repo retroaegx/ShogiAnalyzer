@@ -33,6 +33,7 @@
     <symbol id="i-open" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
     <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 19h16"/></symbol>
     <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M4 19h16"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.6M8.2 13.2l7.6 4.6"/></symbol>
     <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8 3v5h7V3M8 21v-7h8v7"/></symbol>
     <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
@@ -85,6 +86,7 @@
         <button id="importBtn" class="tb-btn" type="button" title="棋譜ファイル（KIF / KI2 / USI）を読み込み"><svg class="ico"><use href="#i-import"/></svg><span>読込</span></button>
         <button id="pasteBtn" class="tb-btn" type="button" title="クリップボードの棋譜を新しい棋譜として貼り付け"><svg class="ico"><use href="#i-paste"/></svg><span>貼付</span></button>
         <button id="exportBtn" class="tb-btn" type="button" title="KIF / KI2 / USI で書き出し"><svg class="ico"><use href="#i-export"/></svg><span>書出</span></button>
+        <button id="shareBtn" class="tb-btn" type="button" hidden title="この局面の画像を X / Bluesky に投稿"><svg class="ico"><use href="#i-share"/></svg><span>共有</span></button>
         <button id="saveBtn" class="tb-btn primary" type="button" title="サーバーに保存 (Ctrl+S)"><svg class="ico"><use href="#i-save"/></svg><span>保存</span></button>
         <button id="settingsBtn" class="tb-btn icon-only" type="button" title="表示設定" aria-label="表示設定"><svg class="ico"><use href="#i-settings"/></svg></button>
         <button id="menuBtn" class="tb-btn icon-only menu-btn" type="button" title="メニュー" aria-label="メニュー"><svg class="ico"><use href="#i-more"/></svg></button>
@@ -275,6 +277,20 @@
       <footer class="dialog-foot"><button class="btn" type="button" id="exportCopy">コピー</button><a class="btn primary" id="exportDownload" href="#" download>ダウンロード</a></footer>
     </div>
 
+    <div class="dialog" id="dlgShare" role="dialog" aria-modal="true" aria-labelledby="dlgShareTitle" hidden>
+      <header class="dialog-head"><h3 id="dlgShareTitle">局面を共有</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <div class="dialog-body">
+        <div class="share-preview"><img id="shareImg" alt="投稿する局面の画像" hidden><span id="shareStatus" class="muted"></span></div>
+        <textarea id="shareText" class="field" rows="2" aria-label="投稿する文"></textarea>
+      </div>
+      <footer class="dialog-foot share-foot">
+        <button class="btn" type="button" id="shareSave">画像を保存</button>
+        <button class="btn" type="button" id="shareNative" hidden>共有…</button>
+        <button class="btn primary" type="button" id="shareX">X に投稿</button>
+        <button class="btn primary" type="button" id="shareBsky">Bluesky に投稿</button>
+      </footer>
+    </div>
+
     <div class="dialog wide" id="dlgSettings" role="dialog" aria-modal="true" aria-labelledby="dlgSettingsTitle" hidden>
       <header class="dialog-head"><h3 id="dlgSettingsTitle">表示設定</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
       <div class="dialog-body">
@@ -302,6 +318,70 @@
           <b id="versionText">—</b>
           <span class="version-status" id="versionStatus"></span>
           <button class="btn" type="button" id="updateCheckBtn">更新を確認</button>
+        </div>
+        <div class="set-title">ライセンス</div>
+        <div><button class="btn" type="button" id="licenseBtn">ライセンス表記</button></div>
+      </div>
+    </div>
+
+    <div class="dialog wide" id="dlgLicense" role="dialog" aria-modal="true" aria-labelledby="dlgLicenseTitle" hidden>
+      <header class="dialog-head"><h3 id="dlgLicenseTitle">ライセンス表記</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <div class="dialog-body lic">
+        <div class="set-title">ShogiAnalyzer（本アプリ）</div>
+        <p>MIT License で公開しています。</p>
+        <pre class="lic-text">MIT License
+
+Copyright (c) 2026 retroaegx
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.</pre>
+
+        <div class="set-title">導入できるエンジン・評価関数</div>
+        <p class="lic-notice">以下のエンジン・評価関数は本アプリに同梱していません。初回起動時に、利用者が配布元の規約・ライセンスを確認して同意したうえで、配布元から直接ダウンロードするものです。本アプリはダウンロードしたエンジンを別のプログラムとして起動し、USI プロトコルで通信するだけなので、本アプリ本体はこれらのライセンス（GPLv3 など）による制限を受けません。ダウンロードしたファイルの利用・再配布は、それぞれの配布元のライセンスに従ってください。</p>
+
+        <div class="lic-item">
+          <b>1. やねうら王（つようら王11mini 対応版）＋ つようら王11mini</b>
+          <dl>
+            <dt>エンジン</dt><dd>やねうら王（作者: やねうらお）— GPLv3<br><a href="https://github.com/yaneurao/YaneuraOu/blob/master/LICENSE" target="_blank" rel="noopener">ライセンス条項</a> / <a href="https://yaneurao.fanbox.cc/posts/12761272" target="_blank" rel="noopener">配布ページ</a><br><small class="muted">Windows は配布元の実行ファイル（V9.90）、Linux は GitHub のソースからビルドします。</small></dd>
+            <dt>評価関数</dt><dd>つようら王11mini（やねうら王プロジェクト）— MIT License<br><a href="https://yaneurao.fanbox.cc/posts/12761272" target="_blank" rel="noopener">配布ページ</a><br><small class="muted">nn.bin・progress.bin が MIT License と明記されています。</small></dd>
+          </dl>
+        </div>
+        <div class="lic-item">
+          <b>2. AobaNNUE v1.1（作者: 山下宏）</b>
+          <dl>
+            <dt>エンジン・評価関数</dt><dd>GPLv3（GitHub リポジトリのライセンス）<br><a href="https://github.com/yssaya/AobaNNUE/blob/master/Copying.txt" target="_blank" rel="noopener">ライセンス条項</a> / <a href="https://github.com/yssaya/AobaNNUE/releases/tag/v1.1" target="_blank" rel="noopener">配布ページ</a><br><small class="muted">エンジンと評価関数は同じファイルで配布されています。評価関数単体のライセンス表記は配布物にありません。</small></dd>
+          </dl>
+        </div>
+        <div class="lic-item">
+          <b>3. やねうら王 V8.30 ＋ 水匠5</b>
+          <dl>
+            <dt>エンジン</dt><dd>やねうら王（作者: やねうらお）— GPLv3<br><a href="https://github.com/yaneurao/YaneuraOu/blob/master/LICENSE" target="_blank" rel="noopener">ライセンス条項</a> / <a href="https://github.com/yaneurao/YaneuraOu/releases/tag/v8.30git" target="_blank" rel="noopener">配布ページ</a></dd>
+            <dt>評価関数</dt><dd>水匠5（作者: たややん）<br><a href="https://github.com/yaneurao/YaneuraOu/releases/tag/suisho5" target="_blank" rel="noopener">配布ページ</a><br><small class="muted">配布ページにライセンスの記載はありません。利用条件は配布元に従ってください。</small></dd>
+          </dl>
+        </div>
+
+        <div class="set-title">外部公開用ツール</div>
+        <p class="lic-notice">cloudflared も本アプリに同梱していません。外部公開に Quick Tunnel を使うときに、配布元から直接ダウンロードするものです。本アプリは cloudflared を別のプログラムとして起動するだけなので、本アプリ本体はそのライセンス（Apache License 2.0）による制限を受けません。cloudflared の利用・再配布は、配布元のライセンスと Cloudflare の利用規約に従ってください。</p>
+        <div class="lic-item">
+          <b>cloudflared（Cloudflare, Inc.）</b>
+          <dl>
+            <dt>ツール</dt><dd>Apache License 2.0<br><a href="https://github.com/cloudflare/cloudflared/blob/master/LICENSE" target="_blank" rel="noopener">ライセンス条項</a> / <a href="https://github.com/cloudflare/cloudflared" target="_blank" rel="noopener">配布ページ</a></dd>
+          </dl>
         </div>
       </div>
     </div>
@@ -361,6 +441,7 @@
         <button type="button" data-act="importBtn"><svg class="ico"><use href="#i-import"/></svg><span>読込</span></button>
         <button type="button" data-act="pasteBtn"><svg class="ico"><use href="#i-paste"/></svg><span>貼付</span></button>
         <button type="button" data-act="exportBtn"><svg class="ico"><use href="#i-export"/></svg><span>書出</span></button>
+        <button type="button" data-act="shareBtn" hidden><svg class="ico"><use href="#i-share"/></svg><span>共有</span></button>
         <button type="button" data-act="settingsBtn"><svg class="ico"><use href="#i-settings"/></svg><span>表示設定</span></button>
         <button type="button" data-act="engineSettingsBtn"><svg class="ico"><use href="#i-gear"/></svg><span>エンジン設定</span></button>
       </div>

@@ -130,6 +130,7 @@ const els = {
   openBtn: $("openBtn"),
   importBtn: $("importBtn"),
   exportBtn: $("exportBtn"),
+  shareBtn: $("shareBtn"),
   saveBtn: $("saveBtn"),
   settingsBtn: $("settingsBtn"),
   menuBtn: $("menuBtn"),
@@ -160,6 +161,14 @@ const els = {
   dlgPaste: $("dlgPaste"),
   pasteTarget: $("pasteTarget"),
   dlgExport: $("dlgExport"),
+  dlgShare: $("dlgShare"),
+  shareImg: $("shareImg"),
+  shareStatus: $("shareStatus"),
+  shareText: $("shareText"),
+  shareSave: $("shareSave"),
+  shareNative: $("shareNative"),
+  shareX: $("shareX"),
+  shareBsky: $("shareBsky"),
   exportSeg: $("exportSeg"),
   exportPreview: $("exportPreview"),
   exportCopy: $("exportCopy"),
@@ -827,6 +836,178 @@ function nodeLabel(n) {
   return shownMarks(kifMove(parent.position_sfen, n.move_usi, prevTo));
 }
 
+// ---------- share (X / Bluesky): a picture of the shown position, drawn by the server ----------
+let shareBlob = null;
+let shareUrl = ""; // the link X / Bluesky show as a card with the picture ("" = no public address)
+let shareSeq = 0;
+
+/** What the board shows, as data for /api/share/image. */
+function sharePayload() {
+  const cur = node(state.game.current_node_id);
+  const side = sideToMoveOf(cur);
+  const best = currentBest();
+  const cp = best ? senteScore(best, side) : null;
+  const css = getComputedStyle(document.documentElement);
+  const v = (name) => css.getPropertyValue(name).trim();
+  const ply = curPly();
+  return {
+    sfen: state.game.current_position_sfen,
+    flip: state.flip,
+    handicap: handicapGame(),
+    coords: state.opts.coords,
+    last_move: state.opts.lastMove ? cur?.move_usi || null : null,
+    title: ply ? `${ply}手目 ${nodeLabel(cur)}` : "開始局面",
+    eval: best ? `評価値 ${formatScore(best, side)}${cp == null ? "" : ` ${verdict(cp)}`}` : "",
+    // the 指し手 under a candidate on the same move is left out (the pill says 「指・候N」)
+    arrows: overlaySpecs()
+      .filter(([, kind, , , , dup]) => !(dup && kind === "next"))
+      .map(([usi, kind, weight, name, score]) => ({ usi, kind, weight, name, score })),
+    background: lsGet(THEME_LS_KEYS.backgroundSet) || "",
+    pieces: lsGet(THEME_LS_KEYS.pieceSet) || "",
+    colors: { bg: v("--bg"), ink: v("--text"), muted: v("--muted"), accent: v("--accent"), accent_ink: v("--accent-ink") },
+    theme: shareTheme(v),
+  };
+}
+
+/** The UI theme as the page draws it now: its background image, the top bar and both stands (computed CSS). */
+function shareTheme(v) {
+  const bg = /url\("?([^")]+)"?\)/.exec(getComputedStyle(document.body).backgroundImage)?.[1];
+  const stand = (root) => {
+    const cs = getComputedStyle(root);
+    const label = getComputedStyle(root.querySelector(".stand-label"));
+    const mark = getComputedStyle(root.querySelector(".stand-label .mark"));
+    const pieces = getComputedStyle(root.querySelector(".stand-pieces"));
+    return {
+      bg: cs.backgroundColor, bg_image: cs.backgroundImage, border: cs.borderTopColor, radius: cs.borderTopLeftRadius, shadow: cs.boxShadow,
+      label: label.color, mark: mark.color,
+      pieces_bg: pieces.backgroundColor, pieces_bg_image: pieces.backgroundImage, pieces_border: pieces.borderTopColor,
+      pieces_radius: pieces.borderTopLeftRadius, pieces_shadow: pieces.boxShadow,
+    };
+  };
+  return {
+    background: bg ? new URL(bg, location.href).pathname : "",
+    faint: v("--faint"),
+    topbar: (() => {
+      const cs = getComputedStyle(document.querySelector(".topbar"));
+      return { bg: cs.backgroundColor, bg_image: cs.backgroundImage, border: cs.borderBottomColor };
+    })(),
+    stand_top: stand(els.standTop),
+    stand_bottom: stand(els.standBottom),
+  };
+}
+
+function shareDefaultText() {
+  const p = sharePayload();
+  return [p.title, p.eval].filter(Boolean).join("　");
+}
+
+const canShareFiles = () => {
+  try {
+    return Boolean(navigator.canShare?.({ files: [new File([""], "a.png", { type: "image/png" })] }));
+  } catch {
+    return false;
+  }
+};
+
+async function openShare() {
+  if (!state.game) return;
+  const seq = ++shareSeq;
+  shareBlob = null;
+  shareUrl = "";
+  els.shareImg.hidden = true;
+  els.shareStatus.hidden = false;
+  els.shareStatus.textContent = "画像を作成しています…";
+  els.shareText.value = shareDefaultText();
+  els.shareNative.hidden = !canShareFiles();
+  for (const b of [els.shareSave, els.shareNative, els.shareX, els.shareBsky]) b.disabled = true;
+  showDialog(els.dlgShare);
+  try {
+    const res = await fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sharePayload()),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const made = await res.json();
+    const img = await fetch(made.image, { cache: "no-store" });
+    if (!img.ok) throw new Error(`HTTP ${img.status}`);
+    const blob = await img.blob();
+    if (seq !== shareSeq) return;
+    shareBlob = blob;
+    // X / Bluesky read the card from the address they are given: the https address this page was
+    // opened at, else the fixed public address (.env); from http://localhost or the LAN there is none
+    const base = location.protocol === "https:" ? location.origin : made.public_url || "";
+    shareUrl = base ? `${base}${made.path}` : "";
+    const old = els.shareImg.src;
+    els.shareImg.src = URL.createObjectURL(blob);
+    if (old.startsWith("blob:")) URL.revokeObjectURL(old);
+    els.shareImg.hidden = false;
+    els.shareStatus.hidden = true;
+    for (const b of [els.shareSave, els.shareNative, els.shareX, els.shareBsky]) b.disabled = false;
+  } catch (e) {
+    if (seq === shareSeq) els.shareStatus.textContent = `画像を作成できませんでした（${e.message || e}）`;
+  }
+}
+
+function shareFileName() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  return `shogi_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.png`;
+}
+
+function saveShareImage() {
+  if (!shareBlob) return;
+  const a = el("a");
+  a.href = URL.createObjectURL(shareBlob);
+  a.download = shareFileName();
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+async function copyShareImage() {
+  if (!window.isSecureContext || !navigator.clipboard?.write || typeof ClipboardItem === "undefined") return false;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": shareBlob })]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Open the site's post screen with the text and the share link; the site shows the picture as the
+ * link's card. Without a public address the picture goes in through the clipboard (or a saved file).
+ */
+async function postShare(site) {
+  if (!shareBlob) return;
+  const text = els.shareText.value.trim();
+  if (shareUrl) {
+    const url = site === "x"
+      ? `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`
+      : `https://bsky.app/intent/compose?text=${encodeURIComponent(`${text}\n${shareUrl}`)}`;
+    window.open(url, "_blank", "noopener");
+    return;
+  }
+  const copied = await copyShareImage();
+  if (!copied) saveShareImage();
+  const url = site === "x" ? `https://x.com/intent/post?text=${encodeURIComponent(text)}` : `https://bsky.app/intent/compose?text=${encodeURIComponent(text)}`;
+  window.open(url, "_blank", "noopener");
+  toast("info", `公開アドレスがないため画像をリンクにできません。${copied ? "画像をコピーしました。投稿画面に貼り付けてください" : "画像を保存しました。投稿画面で添付してください"}`, 7000);
+}
+
+/** Phone / tablet: the system share sheet, with the picture attached (X / Bluesky apps). */
+async function shareNatively() {
+  if (!shareBlob) return;
+  try {
+    await navigator.share({ files: [new File([shareBlob], shareFileName(), { type: "image/png" })], text: els.shareText.value.trim() });
+  } catch (e) {
+    if (e?.name !== "AbortError") toast("error", "共有できませんでした");
+  }
+}
+
 // ---------- theme / geometry ----------
 async function loadTheme() {
   state.theme = await loadBoardTheme();
@@ -1284,6 +1465,8 @@ function overlayShape(usi, kind, weight = 1, labelText = "", score = null, owner
     text.textContent = name;
     g.appendChild(text);
     if (labelText || score) g.appendChild(moveLabel(p1, { x: 0, y: -1 }, r + cell * 0.04, labelText, labelCls, primary, score, owner));
+    // a marker is swept from the bottom of the screen to the top
+    g.sweep = { a: { x: p1.x, y: p1.y + r * 1.15 }, b: { x: p1.x, y: p1.y - r * 1.15 }, u: { x: 0, y: -1 }, n: { x: 1, y: 0 }, w: r * 1.2, outline: ["circle", { cx: p1.x, cy: p1.y, r: r * 1.05 }] };
     return g;
   }
 
@@ -1312,6 +1495,15 @@ function overlayShape(usi, kind, weight = 1, labelText = "", score = null, owner
     `L ${P(start, -shaftW / 2)}`,
     "Z",
   ].join(" ");
+  // an arrow is swept from its tail to its tip
+  g.sweep = {
+    a: { x: start.x - u.x * cell * 0.06, y: start.y - u.y * cell * 0.06 },
+    b: { x: tip.x + u.x * cell * 0.06, y: tip.y + u.y * cell * 0.06 },
+    u,
+    n,
+    w: headW,
+    outline: ["path", { d }],
+  };
   g.appendChild(
     svgEl("path", {
       class: "arrow",
@@ -1348,18 +1540,15 @@ function overlayShape(usi, kind, weight = 1, labelText = "", score = null, owner
   return g;
 }
 
-function renderOverlay() {
-  const svg = els.boardOverlay;
-  if (!svg) return;
-  svg.innerHTML = "";
-  overlayLabels = [];
-  overlayObstacles = [];
-  shownArrowKeys = drawnArrowKeys;
-  drawnArrowKeys = new Set();
-  if (!state.game || !state.geom) return;
+/**
+ * Arrows shown on the board: [usi, kind, weight, name, score, dup] (the overlay and the share
+ * image use the same list). dup: the kifu's next move is also a candidate (both arrows are kept,
+ * same size, and take turns on the board).
+ */
+function overlaySpecs() {
+  const specs = [];
+  if (!state.game) return specs;
   const cur = state.game.current_node_id;
-  // collect every arrow first, so each label can keep off all of them
-  const specs = []; // [usi, kind, weight, name, score]
   let nextSpec = null; // the 指し手 arrow: its label merges into a candidate's on the same move
 
   // next moves stored in the kifu: the next move of the displayed line (指し手) + other branches
@@ -1370,7 +1559,7 @@ function renderOverlay() {
       if (!n.move_usi) return;
       const isNext = n.node_id === nextId;
       const name = state.opts.arrowLabels ? (isNext ? "指し手" : "分岐") : "";
-      const spec = [n.move_usi, isNext ? "next" : "branch", isNext ? 1 : 0.7, name, null];
+      const spec = [n.move_usi, isNext ? "next" : "branch", isNext ? 1 : 0.7, name, null, false];
       if (isNext) nextSpec = spec;
       specs.push(spec);
     });
@@ -1392,26 +1581,140 @@ function renderOverlay() {
       score.promo = promotionMark(first);
       // with labels OFF the pill keeps only the evaluation
       let name = state.opts.arrowLabels ? (i === 0 ? "候補手" : `候補${seen.size}`) : "";
+      let weight = i === 0 ? 1 : 0.6;
+      const dup = Boolean(nextSpec && nextSpec[0] === first);
       // the kifu's next move is this candidate: one pill 「指・候N +123」 instead of two
-      if (nextSpec && nextSpec[0] === first) {
+      if (dup) {
         if (name) name = `指・候${seen.size}`;
         nextSpec[3] = "";
+        weight = Math.max(weight, nextSpec[2]);
+        nextSpec[2] = weight;
+        nextSpec[5] = true;
       }
-      specs.push([first, i === 0 ? "best" : "best sub", i === 0 ? 1 : 0.6, name, score]);
+      specs.push([first, i === 0 ? "best" : "best sub", weight, name, score, dup]);
     });
   }
+  return specs;
+}
 
+// 指し手 and a candidate on the same move: both arrows are drawn (same shape) and a streak of light
+// runs along them; behind the streak the upper arrow is cut away (or comes back), so the color
+// changes as the light passes. Driven by a shared clock: the overlay is rebuilt often.
+// Every run of the light changes the color, on the beat of the other arrows' streaks (ARROW_FLOW_MS).
+const DUP_CYCLE_MS = ARROW_FLOW_MS * 2; // candidate color -> 指し手 color -> candidate color
+const DUP_SWEEP_MS = 750; // the light's run from tail to tip
+let dupSweeps = [];
+let dupSweepRaf = 0;
+let dupClipSeq = 0;
+
+/** top: the candidate's arrow, bottom: the 指し手's; each shows only its own part, so no color mixes. */
+function setupDupSweep(svg, top, bottom) {
+  const s = top.sweep;
+  if (!s) return;
+  const cell = state.geom.rw / 9;
+  const id = `dupclip${++dupClipSeq}`;
+  const clip = svgEl("clipPath", { id });
+  const poly = svgEl("polygon", { points: "" });
+  clip.appendChild(poly);
+  svg.appendChild(clip);
+  top.setAttribute("clip-path", `url(#${id})`);
+  const rest = svgEl("clipPath", { id: `${id}b` });
+  const restPoly = svgEl("polygon", { points: "" });
+  rest.appendChild(restPoly);
+  svg.appendChild(rest);
+  bottom?.setAttribute("clip-path", `url(#${id}b)`);
+  // the sweep is this pair's only light: no streak / ripple of their own
+  for (const g of [top, bottom]) g?.querySelectorAll(":scope > .flow, :scope > circle.ripple").forEach((e) => e.remove());
+  // the light, cut to the shape's outline
+  const oid = `dupout${dupClipSeq}`;
+  const outline = svgEl("clipPath", { id: oid });
+  outline.appendChild(svgEl(s.outline[0], s.outline[1]));
+  svg.appendChild(outline);
+  const light = svgEl("line", { class: "dup-light", "clip-path": `url(#${oid})`, "stroke-width": (cell * 0.11).toFixed(1), opacity: 0 });
+  dupSweeps.push({ s, poly, restPoly, light });
+  return light;
+}
+
+function drawDupSweeps() {
+  dupSweepRaf = 0;
+  if (!dupSweeps.length) return;
+  const t = performance.now() % DUP_CYCLE_MS;
+  const half = DUP_CYCLE_MS / 2;
+  const ease = (x) => (x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2);
+  // which part of the upper arrow shows: "all", "none", or the part ahead of / behind the light
+  let mode;
+  let p = 0;
+  if (t < DUP_SWEEP_MS) {
+    mode = "ahead"; // upper arrow leaves: the lower color appears behind the light
+    p = ease(t / DUP_SWEEP_MS);
+  } else if (t < half) {
+    mode = "none";
+  } else if (t < half + DUP_SWEEP_MS) {
+    mode = "behind"; // upper arrow comes back behind the light
+    p = ease((t - half) / DUP_SWEEP_MS);
+  } else {
+    mode = "all";
+  }
+  const sweeping = mode === "ahead" || mode === "behind";
+  const fade = sweeping ? Math.min(1, p / 0.12, (1 - p) / 0.12) : 0;
+  for (const { s, poly, restPoly, light } of dupSweeps) {
+    const W = s.w * 1.4;
+    const at = (q, k, along = 0) => `${(q.x + s.n.x * k + s.u.x * along).toFixed(1)},${(q.y + s.n.y * k + s.u.y * along).toFixed(1)}`;
+    const pos = { x: s.a.x + (s.b.x - s.a.x) * p, y: s.a.y + (s.b.y - s.a.y) * p };
+    const none = "0,0 0,0 0,0";
+    const all = [at(s.a, W, -W), at(s.b, W, W), at(s.b, -W, W), at(s.a, -W, -W)].join(" ");
+    const aheadPart = [at(pos, W), at(s.b, W, W), at(s.b, -W, W), at(pos, -W)].join(" ");
+    const behindPart = [at(s.a, W, -W), at(pos, W), at(pos, -W), at(s.a, -W, -W)].join(" ");
+    const [mine, theirs] = { all: [all, none], none: [none, all], ahead: [aheadPart, behindPart], behind: [behindPart, aheadPart] }[mode];
+    poly.setAttribute("points", mine);
+    restPoly.setAttribute("points", theirs);
+    light.setAttribute("opacity", fade.toFixed(2));
+    if (sweeping) {
+      const [x1, y1] = at(pos, W).split(",");
+      const [x2, y2] = at(pos, -W).split(",");
+      light.setAttribute("x1", x1);
+      light.setAttribute("y1", y1);
+      light.setAttribute("x2", x2);
+      light.setAttribute("y2", y2);
+    }
+  }
+  dupSweepRaf = requestAnimationFrame(drawDupSweeps);
+}
+
+function renderOverlay() {
+  const svg = els.boardOverlay;
+  svg.innerHTML = "";
+  overlayLabels = [];
+  overlayObstacles = [];
+  shownArrowKeys = drawnArrowKeys;
+  drawnArrowKeys = new Set();
+  dupSweeps = [];
+  if (dupSweepRaf) cancelAnimationFrame(dupSweepRaf);
+  dupSweepRaf = 0;
+  if (!state.game || !state.geom) return;
+  // collect every arrow first, so each label can keep off all of them
+  const specs = overlaySpecs();
   specs.forEach(([usi, kind, weight], i) => addArrowObstacles(usi, weight, i));
-  const shapes = specs.map(([usi, kind, weight, name, score], i) => overlayShape(usi, kind, weight, name, score, i));
+  const shapes = specs.map(([usi, kind, weight, name, score, dup], i) => ({ g: overlayShape(usi, kind, weight, name, score, i), kind, dup }));
 
-  // draw weaker shapes first so the best move / main line stay on top
+  // draw weaker shapes first so the best move / main line stay on top; a candidate on the 指し手
+  // comes right above it
   const order = { "best sub": 0, branch: 1, next: 2, best: 3 };
+  const rank = ({ kind, dup }) => (dup && kind !== "next" ? 2.5 : order[kind]);
+  const lights = [];
+  const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const nextShape = shapes.find((x) => x.g && x.dup && x.kind === "next")?.g;
   shapes
-    .filter(Boolean)
-    .sort((x, y) => (order[x.getAttribute("class").replace(/^mk /, "")] ?? 0) - (order[y.getAttribute("class").replace(/^mk /, "")] ?? 0))
-    .forEach((s) => svg.appendChild(s));
-  // labels on top of every arrow
+    .filter((s) => s.g)
+    .sort((x, y) => rank(x) - rank(y))
+    .forEach(({ g, kind, dup }) => {
+      svg.appendChild(g);
+      if (dup && kind !== "next" && !still) lights.push(setupDupSweep(svg, g, nextShape));
+    });
+  // the light above every arrow, the labels above everything
+  lights.filter(Boolean).forEach((l) => svg.appendChild(l));
   svg.querySelectorAll(".mv-label").forEach((l) => svg.appendChild(l));
+  if (dupSweeps.length) drawDupSweeps();
 }
 
 /** "成" / "不成" for a board move that could promote in the shown position ("" otherwise). */
@@ -3496,11 +3799,17 @@ function wire() {
   els.pasteTarget.addEventListener("beforeinput", (e) => {
     if (e.inputType !== "insertFromPaste") e.preventDefault(); // nothing can be typed here
   });
+  els.shareBtn.addEventListener("click", openShare);
+  els.shareSave.addEventListener("click", saveShareImage);
+  els.shareNative.addEventListener("click", shareNatively);
+  els.shareX.addEventListener("click", () => postShare("x"));
+  els.shareBsky.addEventListener("click", () => postShare("bsky"));
   els.exportBtn.addEventListener("click", () => {
     showDialog(els.dlgExport);
     refreshExport();
   });
   els.settingsBtn.addEventListener("click", () => showDialog(els.dlgSettings));
+  $("licenseBtn").addEventListener("click", () => showDialog($("dlgLicense")));
   els.engineSave.addEventListener("click", saveEngineSettings);
 
   // phone: actions live in a bottom sheet; each entry forwards to the toolbar button

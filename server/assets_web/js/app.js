@@ -1,4 +1,5 @@
 import { parseSfen } from "/js/vendor/sfen.js";
+import { groupDropSpecs, placeOverlayLabel } from "/js/overlayLayout.js";
 import { buildUsiDrop, buildUsiMove } from "/js/vendor/usi.js";
 import { loadBoardTheme, loadBoardThemeConfig, THEME_LS_KEYS } from "/js/vendor/themeLoader.js";
 import {
@@ -1358,7 +1359,6 @@ function textWidth(text, fs) {
 let overlayLabels = [];
 // boxes along every arrow / marker drawn in this render ({x, y, w, h, owner}): labels keep off them
 let overlayObstacles = [];
-const boxesOverlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 /** Arrow sizes for a move (shared by the drawing and the label avoidance). */
 function arrowSize(weight) {
@@ -1398,38 +1398,26 @@ function addArrowObstacles(usi, weight, owner) {
  * score: optional {text, cls} shown after the name in the same pill (one pill per move,
  * so the name and the evaluation can never collide).
  */
-function moveLabel(anchor, normal, dist, text, cls, primary, score = null, owner = null, along = null) {
-  const { rw, rh } = state.geom;
-  const cell = rw / 9;
+function moveLabelSize(text, primary, score) {
+  const cell = state.geom.rw / 9;
   const fs = Math.max(cell * (primary ? 0.17 : 0.15), (primary ? 9.5 : 8.5) / overlayPxPerUnit());
   const sfs = fs * 1.12;
   const gap = fs * 0.35;
   const pfs = fs * 0.78;
   const promoW = score?.promo ? gap * 0.6 + textWidth(score.promo, pfs) : 0;
   const w = textWidth(text, fs) + (score ? (text ? gap : 0) + textWidth(score.text, sfs) * 0.92 + promoW : 0) + fs * 0.9;
-  const h = fs * 1.5;
-  // distance from the arrow to the pill's centre: half the pill's extent along the normal
-  // (its width for vertical arrows, its height for horizontal ones), so it never covers the arrow
-  const base = dist + Math.abs(normal.x) * (w / 2) + Math.abs(normal.y) * (h / 2);
-  // beside the arrow first, then further out, then slid along it; never on another label or arrow
-  const slide = along ? [0, 0.9, -0.9, 1.6, -1.6].map((v) => v * cell) : [0];
-  let box = null;
-  let first = null;
-  search: for (const sl of slide) {
-    for (const k of [1, -1, 1.9, -1.9, 2.8, -2.8]) {
-      const cx = clamp(anchor.x + normal.x * base * k + (along?.x || 0) * sl, w / 2, rw - w / 2);
-      const cy = clamp(anchor.y + normal.y * base * k + (along?.y || 0) * sl, h / 2, rh - h / 2);
-      box = { x: cx - w / 2, y: cy - h / 2, w, h };
-      first ??= box;
-      // keep a small gap between pills, not just "not overlapping"
-      const m = h * 0.2;
-      const padded = { x: box.x - m, y: box.y - m, w: w + 2 * m, h: h + 2 * m };
-      if (!overlayLabels.some((b) => boxesOverlap(b, padded)) && !overlayObstacles.some((o) => o.owner !== owner && boxesOverlap(o, padded))) break search;
-      box = null;
-    }
-  }
-  box ??= first;
-  overlayLabels.push(box);
+  return { w, h: fs * 1.5, fs, sfs, gap, pfs };
+}
+
+function moveLabel(anchor, normal, dist, text, cls, primary, score = null, owner = null, along = null, fixedBox = null) {
+  const { rw, rh } = state.geom;
+  const cell = rw / 9;
+  const size = moveLabelSize(text, primary, score);
+  const box = fixedBox || placeOverlayLabel({ anchor, normal, dist, along, ...size, rw, rh, cell,
+    labels: overlayLabels, obstacles: overlayObstacles, owner });
+  const { w, h } = box;
+  const { fs, sfs, gap, pfs } = size;
+  if (!fixedBox) overlayLabels.push(box);
   const g = svgEl("g", { class: `mv-label ${cls}` });
   g.appendChild(svgEl("rect", { x: box.x, y: box.y, width: w, height: h, rx: h * 0.35, "stroke-width": cell * 0.016 }));
   const t = svgEl("text", { x: box.x + w / 2, y: box.y + h / 2, "font-size": fs });
@@ -1447,6 +1435,38 @@ function moveLabel(anchor, normal, dist, text, cls, primary, score = null, owner
     }
   }
   g.appendChild(t);
+  return g;
+}
+
+function dropGroupShape({ spec, rows, owner }) {
+  const [usi, kind, weight] = spec;
+  const g = overlayShape(usi, kind, weight, "", null, owner);
+  g.querySelector("text").textContent = "打";
+  const target = moveTarget(usi);
+  const view = toView(target.row, target.col);
+  const anchor = cellCenter(view.vr, view.vc);
+  const { rw, rh } = state.geom;
+  const cell = rw / 9;
+  const gap = cell * .045;
+  const sizes = rows.map((row) => moveLabelSize(row.text, row.primary, row.score));
+  const w = Math.max(...sizes.map((size) => size.w));
+  const h = sizes.reduce((total, size) => total + size.h, 0) + gap * (rows.length - 1);
+  const radius = cell * .34 * Math.max(weight, .8);
+  const box = placeOverlayLabel({ anchor, normal: { x: 0, y: -1 }, dist: radius + cell * .1,
+    along: { x: 1, y: 0 }, w, h, rw, rh, cell, labels: overlayLabels, obstacles: overlayObstacles, owner: null });
+  overlayLabels.push(box);
+  const end = { x: clamp(anchor.x, box.x, box.x + w), y: clamp(anchor.y, box.y, box.y + h) };
+  const length = Math.hypot(end.x - anchor.x, end.y - anchor.y);
+  if (length > radius) g.appendChild(svgEl("path", { class: "drop-link",
+    d: `M ${anchor.x + (end.x - anchor.x) * radius / length} ${anchor.y + (end.y - anchor.y) * radius / length} L ${end.x} ${end.y}`,
+    "stroke-width": cell * .025 }));
+  let y = box.y;
+  rows.forEach((row, i) => {
+    const cls = `lab-${row.kind.split(" ")[0]}${row.kind.includes("sub") ? " lab-sub" : ""}`;
+    g.appendChild(moveLabel(anchor, { x: 0, y: -1 }, 0, row.text, cls, row.primary, row.score, owner, null,
+      { x: box.x, y, w, h: sizes[i].h }));
+    y += sizes[i].h + gap;
+  });
   return g;
 }
 
@@ -1723,8 +1743,13 @@ function renderOverlay() {
   if (!state.game || !state.geom) return;
   // collect every arrow first, so each label can keep off all of them
   const specs = overlaySpecs();
-  specs.forEach(([usi, kind, weight], i) => addArrowObstacles(usi, weight, i));
-  const shapes = specs.map(([usi, kind, weight, name, score, dup], i) => ({ g: overlayShape(usi, kind, weight, name, score, i), kind, dup }));
+  const units = groupDropSpecs(specs);
+  units.forEach(({ spec: [usi, kind, weight], owner }) => addArrowObstacles(usi, weight, owner));
+  // Reserve a whole list before placing individual arrow labels.
+  const shapes = units.sort((a, b) => Number(Boolean(b.rows)) - Number(Boolean(a.rows))).map((unit) => {
+    const { spec: [usi, kind, weight, name, score, dup], rows, owner } = unit;
+    return { g: rows ? dropGroupShape(unit) : overlayShape(usi, kind, weight, name, score, owner), kind, dup: rows ? false : dup };
+  });
 
   // draw weaker shapes first so the best move / main line stay on top; a candidate on the 指し手
   // comes right above it

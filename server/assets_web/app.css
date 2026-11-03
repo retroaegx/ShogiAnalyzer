@@ -567,6 +567,8 @@ button:disabled { cursor: not-allowed; opacity: 0.4; }
 .board-overlay .mk.next circle, .board-overlay .mk.branch circle { fill: rgba(245, 158, 11, .72); }
 .board-overlay .mk text { fill: #fff; stroke: rgba(0, 0, 0, .78); paint-order: stroke; stroke-linejoin: round; font-weight: 900; font-family: var(--font-jp); text-anchor: middle; dominant-baseline: central; }
 .board-overlay .mk { filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .38)); }
+.board-overlay .drop-link { fill: none; stroke: #70e3d6; stroke-opacity: .9; }
+.board-overlay :is(.next, .branch) .drop-link { stroke: #f5c579; }
 .piece-token { font-family: var(--font-jp); font-weight: 700; font-size: calc(var(--cell) * .5); color: #111; position: relative; z-index: 1; }
 .piece-token.gote { transform: rotate(180deg); }
 .board-grid.can-move .sq.mine { cursor: grab; }

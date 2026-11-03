@@ -27,6 +27,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from ..core.sfen_ops import parse_sfen
 from ..paths import data_dir
+from .overlay_layout import group_drop_arrows, place_label_box
 
 ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets_web"
 FONT_DIR = Path(__file__).resolve().parent / "share_fonts"
@@ -650,15 +651,19 @@ class _Renderer:
             self.obstacles.append((x - half, y - half, 2 * half, 2 * half, owner))
 
     def _overlay(self) -> None:
-        for a in self.arrows:
+        arrows = group_drop_arrows(self.arrows)
+        for a in arrows:
             self._add_obstacles(a)
         # weaker shapes first so the best move / main line stay on top
         order = {"best sub": 0, "branch": 1, "next": 2, "best": 3}
-        for a in sorted(self.arrows, key=lambda a: order[a["kind"]]):
+        for a in sorted(arrows, key=lambda a: order[a["kind"]]):
             self._shape(a)
+        for a in arrows:
+            if a.get("rows"):
+                self._drop_group_labels(a)
         # labels are placed in the arrows' original order (like the page), drawn on top of every arrow
-        for a in self.arrows:
-            if a["name"] or a["score"]:
+        for a in arrows:
+            if not a.get("rows") and (a["name"] or a["score"]):
                 self._label(a)
 
     def _shape(self, a: dict[str, Any]) -> bool:
@@ -675,7 +680,7 @@ class _Renderer:
             mark = _layer(self.img.size)
             md = ImageDraw.Draw(mark)
             md.ellipse((cx - rr, cy - rr, cx + rr, cy + rr), fill=_c(MARK_FILL[kind]), outline=(255, 255, 255, 230), width=max(1, round(cell * 0.05 * self.k)))
-            ch = DROP_CHAR.get(str(t["drop"]), "打")
+            ch = "打" if a.get("rows") else DROP_CHAR.get(str(t["drop"]), "打")
             f = _font(str(FONT), round(r * 1.2 * self.k))
             text = _layer((round(rr * 2.4), round(rr * 2.4)))
             ImageDraw.Draw(text).text((text.width / 2, text.height / 2), ch, font=f, fill=(255, 255, 255, 255), anchor="mm",
@@ -731,8 +736,35 @@ class _Renderer:
             part = Image.alpha_composite(shade, part)
         self.img.alpha_composite(_alpha(part, opacity), (box[0], box[1]))
 
-    def _label(self, a: dict[str, Any]) -> None:
-        if "anchor" not in a:
+    def _drop_group_labels(self, a: dict[str, Any]) -> None:
+        rows = a["rows"]
+        sizes = [self._label(row, measure=True) for row in rows]
+        cell = self.rw / 9
+        gap = cell * .045
+        w = max(size[0] for size in sizes)
+        h = sum(size[1] for size in sizes) + gap * (len(rows) - 1)
+        anchor = a["anchor"]
+        radius = cell * .34 * max(a["weight"], .8)
+        box = place_label_box(anchor, (0, -1), radius + cell * .1, (1, 0), w, h,
+                              self.rw, self.rh, cell, self.labels, self.obstacles, -1)
+        self.labels.append(box)
+        end = (max(box[0], min(anchor[0], box[0] + w)), max(box[1], min(anchor[1], box[1] + h)))
+        length = math.dist(anchor, end)
+        if length > radius:
+            start = (anchor[0] + (end[0] - anchor[0]) * radius / length,
+                     anchor[1] + (end[1] - anchor[1]) * radius / length)
+            layer = _layer(self.img.size)
+            color = (112, 227, 214, 230) if a["kind"].startswith("best") else (245, 197, 121, 230)
+            ImageDraw.Draw(layer).line((self._o(*start), self._o(*end)), fill=color, width=max(1, round(cell * .025 * self.k)))
+            self._put(layer)
+        y = box[1]
+        for row, size in zip(rows, sizes):
+            row["anchor"], row["normal"], row["dist"], row["along"] = anchor, (0, -1), 0, None
+            self._label(row, fixed_box=(box[0], y, w, size[1]))
+            y += size[1] + gap
+
+    def _label(self, a: dict[str, Any], fixed_box=None, measure=False):
+        if not measure and "anchor" not in a:
             return
         kind = a["kind"]
         cls = "sub" if kind == "best sub" else kind.split(" ")[0]
@@ -748,27 +780,14 @@ class _Renderer:
         promo_w = gap * 0.6 + wl(score["promo"], f_promo) if score and score["promo"] else 0
         w = wl(name, f_name) + ((gap if name else 0) + wl(score["text"], f_score) * 0.92 + promo_w if score else 0) + fs * 0.9
         h = fs * 1.5
+        if measure:
+            return w, h
         anchor, normal, dist, along = a["anchor"], a["normal"], a["dist"], a["along"]
-        base = dist + abs(normal[0]) * (w / 2) + abs(normal[1]) * (h / 2)
-        slides = [v * cell for v in (0, 0.9, -0.9, 1.6, -1.6)] if along else [0]
-        clamp = lambda v, lo, hi: max(lo, min(v, hi))  # noqa: E731
-        overlap = lambda p, q: p[0] < q[0] + q[2] and q[0] < p[0] + p[2] and p[1] < q[1] + q[3] and q[1] < p[1] + p[3]  # noqa: E731
-        box = first = None
-        for sl in slides:
-            for k in (1, -1, 1.9, -1.9, 2.8, -2.8):
-                cx = clamp(anchor[0] + normal[0] * base * k + (along[0] if along else 0) * sl, w / 2, self.rw - w / 2)
-                cy = clamp(anchor[1] + normal[1] * base * k + (along[1] if along else 0) * sl, h / 2, self.rh - h / 2)
-                cand = (cx - w / 2, cy - h / 2, w, h)
-                first = first or cand
-                m = h * 0.2
-                padded = (cand[0] - m, cand[1] - m, w + 2 * m, h + 2 * m)
-                if not any(overlap(b, padded) for b in self.labels) and not any(o[4] != a["owner"] and overlap(o, padded) for o in self.obstacles):
-                    box = cand
-                    break
-            if box:
-                break
-        box = box or first
-        self.labels.append(box)
+        box = fixed_box or place_label_box(anchor, normal, dist, along, w, h, self.rw, self.rh, cell,
+                                          self.labels, self.obstacles, a["owner"])
+        if not fixed_box:
+            self.labels.append(box)
+        w, h = box[2:]
 
         border, name_color, opacity = LABEL_STYLE[cls]
         layer = _layer(self.img.size)

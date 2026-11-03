@@ -282,8 +282,15 @@ def parse_kif_move_text(move_text: str, *, prev_to_rc: tuple[int, int] | None = 
     else:
         rest_wo_paren = rest
 
-    is_drop = "打" in rest_wo_paren
-    promote = ("成" in rest_wo_paren) and ("不成" not in rest_wo_paren)
+    # Consume the piece name first: the 成 in 成銀/成桂/成香 is not a promotion suffix.
+    piece_name = next((name for name in sorted(JA_TO_BASE, key=len, reverse=True)
+                       if rest_wo_paren.startswith(name)), None)
+    if not piece_name:
+        raise ValueError(f"cannot detect piece name: {move_text}")
+    suffix = rest_wo_paren[len(piece_name):]
+    is_drop = "打" in suffix
+    # Also accept old exports such as 成銀成, without promoting an already promoted piece.
+    promote = piece_name not in {"成銀", "成桂", "成香", "と", "馬", "龍", "竜"} and "成" in suffix and "不成" not in suffix
 
     drop_piece = None
     if is_drop:

@@ -146,7 +146,23 @@ class StateStore:
         game_row = dict(row)
         game_row["meta"] = _loads_dict(game_row.pop("meta_json", None))
         game_row["ui_state"] = _loads_dict(game_row.pop("ui_state_json", None))
-        return GameTree.from_rows(game_row, [dict(n) for n in node_rows])
+        game = GameTree.from_rows(game_row, [dict(n) for n in node_rows])
+        self._repair_promotions(game)
+        return game
+
+    def _repair_promotions(self, game: GameTree) -> bool:
+        repaired, affected = game.repair_promotions()
+        if not repaired:
+            return False
+        with self._conn:
+            self._conn.executemany(
+                "UPDATE nodes SET move_usi = ?, move_label = ? WHERE node_id = ? AND game_id = ?",
+                [(game.nodes[nid].move_usi, game.nodes[nid].move_label, nid, game.game_id) for nid in repaired],
+            )
+            # These scores may describe the engine's last accepted position instead.
+            # Preserve earlier positions and branches that do not pass through a repaired move.
+            self._conn.executemany("DELETE FROM analysis_snapshots WHERE node_id = ?", [(nid,) for nid in affected])
+        return True
 
     def update_game_fields(
         self,
@@ -335,6 +351,11 @@ class StateStore:
         except Exception:
             return None
         sig = value.get("saved_sig")
+        was_clean = sig == content_signature(game)
+        if self._repair_promotions(game):
+            if was_clean:
+                sig = content_signature(game)
+            self.save_working(game, sig if isinstance(sig, str) else None)
         return game, sig if isinstance(sig, str) else None
 
 

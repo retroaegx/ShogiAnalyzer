@@ -956,7 +956,7 @@ async function openShare() {
     for (const b of [els.shareNative, els.shareX, els.shareBsky]) b.disabled = !made.protected;
     els.shareNote.classList.toggle("off", !made.protected);
     els.shareNote.textContent = made.protected
-      ? "投稿の URL から誰でも画像を見られます。公開したくないときは URL を消し、画像をコピーして貼り付けてください。"
+      ? "URL を公開したくない場合は、X・Bluesky に投稿するときに URL リンクを消してください。画像は「画像をコピー」後に貼り付けられます。"
       : `パスワード保護が無効のため共有できません（画像の${canCopyImage() ? "保存・コピー" : "保存"}のみ）。`;
     els.shareNote.hidden = false;
   } catch (e) {
@@ -2879,7 +2879,7 @@ function renderControls() {
   els.saveBtn.disabled = !owner;
   els.saveBtn.classList.toggle("dirty", Boolean(state.game?.dirty));
   els.saveBtn.title = state.game?.dirty ? "保存されていない変更があります — サーバーに保存 (Ctrl+S)" : "サーバーに保存 (Ctrl+S)";
-  for (const b of [els.newGameBtn, els.loadBtn, els.openBtn, els.importBtn, els.pasteBtn]) b.disabled = !canNav;
+  for (const b of [els.newGameBtn, els.loadBtn, els.openBtn, $("loadOpenItem"), els.importBtn, els.pasteBtn]) b.disabled = !canNav;
   els.plySlider.disabled = !canNav;
   document.body.classList.toggle("batch-lock", Boolean(state.batch));
 
@@ -4122,10 +4122,14 @@ async function showAppNotices() {
   });
 }
 
-/** PC: 読み込み ▾ opens ファイルアップロード / クリップボードから読み込み (棋譜一覧 is its own button). */
+/**
+ * 読み込み ▾ opens ファイルアップロード / クリップボードから読み込み (棋譜一覧 is its own button on PC;
+ * on phones it is the first entry here).
+ */
 function setupLoadMenu() {
   const pop = $("loadPop");
   const btn = els.loadBtn;
+  $("loadOpenItem").addEventListener("click", () => els.openBtn.click());
   // the top bar is its own stacking context (blur): keep the list outside so it sits above the board
   document.body.appendChild(pop);
   const setOpen = (open) => {

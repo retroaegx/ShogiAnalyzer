@@ -12,7 +12,8 @@ from collections import deque
 from typing import Any, Awaitable, Callable
 
 from ..core.gametree import GameTree
-from ..core.sfen_ops import sfen_to_position_command
+from ..core.legality import check_move
+from ..core.sfen_ops import normalize_usi_promotion, sfen_to_position_command
 from .state_store import StateStore
 
 
@@ -217,6 +218,7 @@ class AnalysisService:
         # (option specs live in self._option_specs, filled from "option name ..." lines)
         self._status = "idle" if self._configured else "not_configured"
         self._last_error: str | None = None
+        self._position_error: str | None = None
 
         # Keep last few lines for diagnostics (both outgoing commands and engine output).
         self._io_log: "deque[str]" = deque(maxlen=120)
@@ -445,12 +447,18 @@ class AnalysisService:
         target_node_id = node_id or game.current_node_id
         try:
             path = game.path_to_node(target_node_id)
+            moves = []
+            for node in path:
+                if node.move_usi and node.parent_id:
+                    parent_sfen = game.get_node(node.parent_id).position_sfen
+                    move = normalize_usi_promotion(parent_sfen, node.move_usi)
+                    check_move(parent_sfen, move)
+                    moves.append(move)
         except Exception as exc:
-            reason = f"invalid node for analysis: {exc}"
-            await self._emit("analysis:stopped", {"reason": reason})
+            reason = f"analysis start failed: invalid position: {exc}"
+            await self.stop(reason)
             return False, reason
 
-        moves = [n.move_usi for n in path if n.move_usi]
         position_cmd = sfen_to_position_command(game.initial_sfen, moves)
         if multipv is None:
             multipv = _sanitize_multipv((game.ui_state or {}).get("analysis_multipv"), 1)
@@ -475,6 +483,9 @@ class AnalysisService:
                     self._last_sent_info_version = -1
                     self._last_sent_at_monotonic = 0.0
                     self._last_snapshot_signature = None
+                    # Some engines reset the board on isready, so it must precede position.
+                    # Validate the moves above, and reject explicit engine errors below.
+                    self._position_error = None
                     self._analysis_node_id = target_node_id
                     self._analysis_started_monotonic = asyncio.get_running_loop().time()
                     self._active_multipv = multipv
@@ -589,7 +600,7 @@ class AnalysisService:
 
     async def _flush_latest(self) -> None:
         """Send + store the newest lines for the node being analysed (the ticker may lag ~1s)."""
-        if not self._analysis_running or not self._analysis_node_id:
+        if not self._analysis_running or not self._analysis_node_id or self._position_error:
             return
         lines = [self._latest_pv_by_index[i] for i in sorted(self._latest_pv_by_index) if i <= self._active_multipv]
         if not lines:
@@ -827,7 +838,7 @@ class AnalysisService:
                 snapshot_lines: list[dict[str, Any]] = []
 
                 async with self._lock:
-                    if not self._analysis_running or not self._analysis_node_id:
+                    if not self._analysis_running or not self._analysis_node_id or self._position_error:
                         return
 
                     now = asyncio.get_running_loop().time()
@@ -958,7 +969,22 @@ class AnalysisService:
             if emit_reason:
                 await self._emit("analysis:stopped", {"reason": emit_reason})
 
+    async def _reject_position(self, node_id: str | None, started: float, error: str) -> None:
+        # Run outside the reader: stop waits for bestmove, which the reader must consume.
+        async with self._lock:
+            if self._analysis_node_id != node_id or self._analysis_started_monotonic != started:
+                return
+            await self._stop_locked("invalid position", emit=False)
+            self._last_error = error
+            self._status = "error"
+            await self._emit("analysis:stopped", {"reason": f"analysis failed: {error}"})
+
     async def _handle_engine_line(self, line: str) -> None:
+        if line.startswith("info string ") and "illegal input move" in line.lower():
+            self._position_error = line
+            if self._analysis_running:
+                asyncio.create_task(self._reject_position(self._analysis_node_id, self._analysis_started_monotonic, line))
+            return
         if line == "usiok":
             self._usiok_event.set()
             return
@@ -984,7 +1010,7 @@ class AnalysisService:
         # No lock here: this update has no await, so it is atomic on the event loop.
         # Taking self._lock would deadlock the reader while stop/start hold the lock
         # and wait for "bestmove"/"readyok" lines queued behind this info line.
-        if not self._analysis_running or not self._analysis_node_id:
+        if not self._analysis_running or not self._analysis_node_id or self._position_error:
             return
         pv_index = int(parsed.get("pv_index", 1))
         self._latest_pv_by_index[pv_index] = parsed

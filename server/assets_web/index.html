@@ -47,7 +47,9 @@
     <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></symbol>
     <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/></symbol>
     <symbol id="i-paste" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 4.5V3.5h6v1M9 4.5h6v2.5H9z"/><path d="M9 12h6M9 16h4"/></symbol>
+    <symbol id="i-load" viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M5 12V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2h-6"/><path d="M2 18h8M7 15l3 3-3 3"/></symbol>
     <symbol id="i-caret" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
     <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
     <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-4 3 3 6-6"/></symbol>
     <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></symbol>
@@ -86,8 +88,9 @@
         <button id="newGameBtn" class="tb-btn" type="button" title="新規 (初期局面)"><svg class="ico"><use href="#i-new"/></svg><span>新規</span></button>
         <button id="openBtn" class="tb-btn" type="button" title="サーバーに保存した棋譜から開く"><svg class="ico"><use href="#i-open"/></svg><span>棋譜一覧</span></button>
         <div class="load-menu" id="loadMenu">
-          <button id="loadBtn" class="tb-btn" type="button" title="棋譜ファイル・クリップボードから読み込む" aria-haspopup="menu" aria-expanded="false"><svg class="ico"><use href="#i-import"/></svg><span>読み込み</span><svg class="ico caret"><use href="#i-caret"/></svg></button>
+          <button id="loadBtn" class="tb-btn" type="button" title="棋譜ファイル・クリップボードから読み込む" aria-haspopup="menu" aria-expanded="false"><svg class="ico"><use href="#i-load"/></svg><span>読み込み</span><svg class="ico caret"><use href="#i-caret"/></svg></button>
           <div class="load-pop" id="loadPop" role="menu" hidden>
+            <button id="loadOpenItem" class="load-item phone-only" type="button" role="menuitem" title="サーバーに保存した棋譜から開く"><svg class="ico"><use href="#i-open"/></svg><span>棋譜一覧</span></button>
             <button id="importBtn" class="load-item" type="button" role="menuitem" title="棋譜ファイル（KIF / KI2 / USI）を読み込み"><svg class="ico"><use href="#i-import"/></svg><span>ファイルアップロード</span></button>
             <button id="pasteBtn" class="load-item" type="button" role="menuitem" title="クリップボードの棋譜を新しい棋譜として読み込み"><svg class="ico"><use href="#i-paste"/></svg><span>クリップボードから読み込み</span></button>
           </div>
@@ -97,7 +100,7 @@
         <button id="saveBtn" class="tb-btn primary" type="button" title="サーバーに保存 (Ctrl+S)"><svg class="ico"><use href="#i-save"/></svg><span>保存</span></button>
         <button id="settingsBtn" class="tb-btn icon-only" type="button" title="表示設定" aria-label="表示設定"><svg class="ico"><use href="#i-settings"/></svg></button>
         <button id="licenseBtn" class="tb-btn icon-only" type="button" title="ライセンス表記" aria-label="ライセンス表記"><svg class="ico"><use href="#i-info"/></svg></button>
-        <button id="menuBtn" class="tb-btn icon-only menu-btn" type="button" title="メニュー" aria-label="メニュー"><svg class="ico"><use href="#i-more"/></svg></button>
+        <button id="menuBtn" class="tb-btn icon-only menu-btn" type="button" title="メニュー" aria-label="メニュー"><svg class="ico"><use href="#i-menu"/></svg></button>
       </nav>
     </header>
 
@@ -446,7 +449,8 @@ SOFTWARE.</pre>
       <div class="menu-grid">
         <button type="button" data-act="newGameBtn"><svg class="ico"><use href="#i-new"/></svg><span>新規</span></button>
         <button type="button" data-act="openBtn"><svg class="ico"><use href="#i-open"/></svg><span>棋譜一覧</span></button>
-        <button type="button" id="menuLoad"><svg class="ico"><use href="#i-import"/></svg><span>読み込み</span></button>
+        <button type="button" id="menuLoad"><svg class="ico"><use href="#i-load"/></svg><span>読み込み</span></button>
+        <button type="button" data-act="saveBtn"><svg class="ico"><use href="#i-save"/></svg><span>保存</span></button>
         <button type="button" data-act="exportBtn"><svg class="ico"><use href="#i-export"/></svg><span>エクスポート</span></button>
         <button type="button" data-act="shareBtn"><svg class="ico"><use href="#i-share"/></svg><span>共有</span></button>
         <button type="button" data-act="settingsBtn"><svg class="ico"><use href="#i-settings"/></svg><span>表示設定</span></button>

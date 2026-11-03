@@ -11,16 +11,20 @@ PC で起動しておけば、同じ PC のブラウザやスマートフォン�
 ### ライセンス
 
 ShogiAnalyzer 本体は **MIT ライセンス**です（[LICENSE](LICENSE)）。  
-解析エンジンと評価関数は同梱していません。初回起動時に、利用者の同意を得てそれぞれの配布元からダウンロード（Linux ではビルド）します。
+解析エンジン・評価関数・cloudflared は同梱していません。解析エンジンと評価関数は、初回起動時に利用者の同意を得てそれぞれの配布元からダウンロード（Linux ではビルド）します。cloudflared は、外部公開に Quick Tunnel を使うとき（固定アドレス未設定で `SHOGI_ANALYZER_TUNNEL` が TRUE のとき）に配布元から `tools/cloudflared/` へダウンロードします。
 
 | ソフト | 種類 | ライセンス | 配布元 |
 |---|---|---|---|
+| やねうら王（つようら王11mini 対応版） | 解析エンジン | GPLv3 | https://yaneurao.fanbox.cc/posts/12761272 （Linux は https://github.com/yaneurao/YaneuraOu からビルド） |
+| つようら王11mini (nn.bin, progress.bin) | 評価関数 | MIT | https://yaneurao.fanbox.cc/posts/12761272 |
 | AobaNNUE | 解析エンジン | GPLv3 | https://github.com/yssaya/AobaNNUE |
 | AobaNNUE 評価関数 (nn.bin) | 評価関数 | 配布元に明記なし | https://github.com/yssaya/AobaNNUE/releases/tag/v1.1 |
 | やねうら王 | 解析エンジン | GPLv3 | https://github.com/yaneurao/YaneuraOu |
 | 水匠5 (nn.bin) | 評価関数 | 配布元に明記なし | https://github.com/yaneurao/YaneuraOu/releases/tag/suisho5 |
+| cloudflared | 外部公開用トンネル（Quick Tunnel） | Apache License 2.0 | https://github.com/cloudflare/cloudflared |
 
 - ShogiAnalyzer はエンジンを同梱せず、別のプログラムとして USI（標準入出力）で通信するだけなので、GPLv3 は適用されません。
+- cloudflared も同梱せず、別のプログラムとして起動するだけなので、ShogiAnalyzer 本体が Apache License 2.0 による制限を受けることはありません。cloudflared の利用・再配布は、配布元のライセンスと Cloudflare の利用規約に従ってください。
 - エンジンを同梱して再配布する場合は、そのエンジンについて GPLv3 の表記（ライセンス全文の添付とソースコードの入手方法の明示）が必要です。評価関数は各配布元の利用条件に従ってください。
 
 ---

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import uuid
 
-from .sfen_ops import DEFAULT_START_SFEN, apply_usi_move, normalize_sfen
+from .sfen_ops import DEFAULT_START_SFEN, apply_usi_move, normalize_sfen, normalize_usi_promotion
 from .notation import usi_to_kif2_label
 
 
@@ -120,6 +120,31 @@ class GameTree:
     def touch(self) -> None:
         self.updated_at = utc_now_iso()
 
+    def repair_promotions(self) -> tuple[set[str], set[str]]:
+        """Repair legacy moves; analyses of these nodes and their descendants are invalid."""
+        repaired: set[str] = set()
+        for node in self.nodes.values():
+            if not node.parent_id or not node.move_usi:
+                continue
+            parent = self.get_node(node.parent_id)
+            move = normalize_usi_promotion(parent.position_sfen, node.move_usi)
+            if move != node.move_usi:
+                node.move_usi = move
+                node.move_label = usi_to_kif2_label(parent.position_sfen, move)
+                repaired.add(node.node_id)
+        affected = set(repaired)
+        children: dict[str, list[str]] = {}
+        for node in self.nodes.values():
+            if node.parent_id:
+                children.setdefault(node.parent_id, []).append(node.node_id)
+        pending = list(repaired)
+        while pending:
+            for child_id in children.get(pending.pop(), []):
+                if child_id not in affected:
+                    affected.add(child_id)
+                    pending.append(child_id)
+        return repaired, affected
+
     def get_node(self, node_id: str) -> Node:
         try:
             return self.nodes[node_id]
@@ -145,6 +170,7 @@ class GameTree:
 
     def play_move(self, from_node_id: str, move_usi: str) -> Node:
         parent = self.get_node(from_node_id)
+        move_usi = normalize_usi_promotion(parent.position_sfen, move_usi)
         for child in self.children_of(parent.node_id):
             if child.move_usi == move_usi:
                 self.current_node_id = child.node_id

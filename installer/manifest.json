@@ -5,6 +5,41 @@
   },
   "engines": [
     {
+      "id": "tuyouraou11mini_v990",
+      "name": "YaneuraOu + TsuyouraOu 11 mini (つようら王11mini) — auto-select by CPU",
+      "license": "GPLv3",
+      "license_url": "https://github.com/yaneurao/YaneuraOu/blob/master/LICENSE",
+      "terms_url": "https://yaneurao.fanbox.cc/posts/12761272",
+      "license_note": "The engine build for this evaluation file is distributed from the author's announcement (Windows 64bit only); on Linux it is built from the official source.",
+      "eval": {
+        "id": "tuyouraou11mini",
+        "name": "TsuyouraOu 11 mini (nn.bin + progress.bin)"
+      },
+      "platforms": [
+        {
+          "os": "windows",
+          "arch": "amd64",
+          "url": "https://storage.yaneu.com/yaneuraou/YaneuraOuV990-win64-forTuyo11.7z",
+          "sha256": "bc501e45b146a5efc7864a8d0d13af807a44c99f919acbe1535c26d1d92da356",
+          "extract_dir_hint": "yaneuraou-v990-tuyo11",
+          "engine_type_hint": "SFNN_ka2_4096_8_64_progress8"
+        },
+        {
+          "os": "linux",
+          "arch": "amd64",
+          "url": "https://github.com/yaneurao/YaneuraOu/archive/c1b80eaa09fe13d5f12b1599d1ae4d53c224de30.zip",
+          "filename": "YaneuraOu-c1b80eaa.zip",
+          "sha256": "5acbb5e1160bbad09497058d51f44a683d95cae7d32e0498cf8766536119c7b7",
+          "extract_dir_hint": "yaneuraou-v990-tuyo11",
+          "engine_type_hint": "",
+          "build": {
+            "source_dir": "YaneuraOu-c1b80eaa09fe13d5f12b1599d1ae4d53c224de30/source",
+            "edition": "YANEURAOU_ENGINE_SFNN_ka2_4096_8_64_progress8"
+          }
+        }
+      ]
+    },
+    {
       "id": "aobannue_v11",
       "name": "AobaNNUE v1.1 (engine + eval) — auto-select by CPU",
       "license": "GPLv3",
@@ -96,6 +131,17 @@
     }
   ],
   "evals": [
+    {
+      "id": "tuyouraou11mini",
+      "name": "TsuyouraOu 11 mini (つようら王11mini)",
+      "author": "YaneuraOu project (やねうら王プロジェクト)",
+      "url": "https://storage.yaneu.com/yaneuraou/TuyouraOu11mini-SFNN_ka2_4096_8_64_progress8-epoch0010-20261003.7z",
+      "sha256": "bd5cd719e000ee3e8c4f158ecd7b56913655569fa73911bd95209f55bbb772ea",
+      "extract_dir_hint": "tuyouraou11mini",
+      "license": "MIT License",
+      "license_url": "https://yaneurao.fanbox.cc/posts/12761272",
+      "license_note": "nn.bin and progress.bin are MIT licensed (author's announcement). The archive also holds eval_options.txt (FV_SCALE 24), tag.json and banner.png, all placed in eval/."
+    },
     {
       "id": "suisho5_nnue",
       "name": "Suisho5 NNUE (nn.bin)",

@@ -223,6 +223,15 @@ def _unpromoted_base_letter(token: str) -> str:
     return token[-1].upper()
 
 
+def normalize_usi_promotion(sfen: str, usi_move: str) -> str:
+    """Repair redundant '+' suffixes produced by older KIF imports of 成銀/成桂/成香."""
+    if not usi_move.endswith("+"):
+        return usi_move
+    mv = parse_usi_move(usi_move)
+    piece = parse_sfen(sfen)["board"][mv.from_row][mv.from_col]
+    return usi_move[:-1] if piece and piece.startswith("+") else usi_move
+
+
 def apply_usi_move(sfen: str | None, usi_move: str) -> str:
     state = parse_sfen(sfen)
     mv = parse_usi_move(usi_move)

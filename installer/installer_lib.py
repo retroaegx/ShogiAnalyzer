@@ -500,9 +500,17 @@ def _save_engine_config(root: Path, cfg: dict) -> None:
     p.write_text(json.dumps(out, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _os_key() -> str:
+    return "windows" if os.name == "nt" else ("darwin" if sys.platform == "darwin" else "linux")
+
+
+def _has_os_variant(engine: dict) -> bool:
+    return any((v.get("os") or "").lower() == _os_key() for v in engine.get("platforms") or [])
+
+
 def _pick_engine_variant(engine: dict) -> dict | None:
     platforms = engine.get("platforms") or []
-    os_key = "windows" if os.name == "nt" else ("darwin" if sys.platform == "darwin" else "linux")
+    os_key = _os_key()
     arch = py_platform.machine().lower()
     arch_key = "arm64" if arch in {"arm64", "aarch64"} else "amd64"
     for v in platforms:
@@ -704,7 +712,10 @@ def _download_eval_if_needed(root: Path, engine: dict, engines_dir: Path) -> Pat
                     nn = p
                     break
             if nn:
-                shutil.copy2(nn, eval_dir / "nn.bin")
+                # the files next to nn.bin belong to it too (progress.bin, eval_options.txt with FV_SCALE, ...)
+                for p in nn.parent.iterdir():
+                    if p.is_file():
+                        shutil.copy2(p, eval_dir / p.name)
             shutil.rmtree(tmp, ignore_errors=True)
         except Exception as exc:
             print(tr(f"[installer] 評価関数の展開に失敗しました: {exc}", f"[installer] eval extract failed: {exc}"))
@@ -819,6 +830,7 @@ def _download_engine_variant(root: Path, engine: dict) -> Path | None:
         make_cmd = ["make", "-C", str(source), "clean", "tournament", f"TARGET_CPU={target}", f"YANEURAOU_EDITION={edition}"]
         if not shutil.which("clang++") and shutil.which("g++"):
             make_cmd.append("COMPILER=g++")  # the Makefile's default is clang++
+        make_cmd.append(f"PYTHON={sys.executable}")  # newer sources generate arch headers with "python", absent on Ubuntu
         print(tr("[installer] エンジンをビルドしています（時間がかかります）...", "[installer] Building engine (this may take a while)..."))
         rc = run_streamed(make_cmd)
         if rc != 0:
@@ -901,7 +913,8 @@ def ensure_engine_config(root: Path) -> dict[str, str]:
 
     # No engine configured.
     manifest = load_manifest(root)
-    engines = manifest.get("engines") or []
+    # only engines with a download/build for this OS (e.g. the TsuyouraOu build is Windows/Linux only)
+    engines = [e for e in manifest.get("engines") or [] if _has_os_variant(e)]
     if not sys.stdin.isatty():
         # 要件上、初回でエンジン/評価関数の同意とDLが必要。
         # 対話入力ができない場合は黙って解析無効にせず止める。

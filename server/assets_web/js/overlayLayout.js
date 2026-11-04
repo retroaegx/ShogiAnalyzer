@@ -43,15 +43,21 @@ export function placeOverlayLabel({ anchor, normal, dist, along, w, h, rw, rh, c
   const padded = (box) => ({ x: box.x - margin, y: box.y - margin, w: w + 2 * margin, h: h + 2 * margin });
   const free = (box) => !labels.some((other) => boxesOverlap(other, padded(box)));
   const clear = (box) => !obstacles.some((other) => other.owner !== owner && boxesOverlap(other, padded(box)));
-  let first;
+  let first, nearby;
+  let nearbyCost = Infinity;
   for (const slide of along ? [0, .9, -.9, 1.6, -1.6] : [0]) {
     for (const k of [1, -1, 1.9, -1.9, 2.8, -2.8]) {
       const box = { x: clamp(anchor.x + normal.x * base * k + (along?.x || 0) * slide * cell - w / 2, 0, rw - w),
         y: clamp(anchor.y + normal.y * base * k + (along?.y || 0) * slide * cell - h / 2, 0, rh - h), w, h };
       first ??= box;
-      if (free(box) && clear(box)) return box;
+      if (free(box) && clear(box)) {
+        const dx = box.x + w / 2 - anchor.x, dy = box.y + h / 2 - anchor.y;
+        const cost = dx * dx + dy * dy + (k < 0 ? cell * cell * .04 : 0);
+        if (cost < nearbyCost) { nearby = box; nearbyCost = cost; }
+      }
     }
   }
+  if (nearby) return nearby;
   let best = null;
   let bestCost = Infinity;
   const xs = new Set([0, rw - w, clamp(anchor.x - w / 2, 0, rw - w)]);

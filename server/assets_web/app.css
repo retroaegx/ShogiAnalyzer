@@ -543,6 +543,8 @@ button:disabled { cursor: not-allowed; opacity: 0.4; }
 
 /* small "候補手 / 指し手 / 分岐" labels beside the arrows */
 .board-overlay .mv-label rect { fill: rgba(12, 14, 18, .86); }
+.board-overlay .label-link { fill: none; stroke: #70e3d6; stroke-linecap: round; }
+.board-overlay :is(.lab-next, .lab-branch) .label-link { stroke: #f5c579; }
 /* g.mv-label > text outranks the drop marker's ".mk text" style */
 .board-overlay g.mv-label > text {
   stroke: none;
@@ -1013,6 +1015,18 @@ textarea.field.mono { font-size: 12px; }
 
 /* phone-only controls (hidden on desktop) */
 .menu-btn, .mini-eval, .kifu-btn, .drawer-close, .drawer-backdrop { display: none; }
+
+/* Desktop: keep seeking on the left and collect the larger move controls on the right. */
+@media (min-width: 901px) {
+  .desktop-nav-compact .board-area { gap: 10px; justify-content: flex-end; }
+  .desktop-nav-compact .navbar { padding: 4px 8px; gap: 8px; }
+  .desktop-nav-compact .navbar .ply-display { order: -1; margin-right: 4px; }
+  .desktop-nav-compact .navbar .ply-text { white-space: nowrap; }
+  .desktop-nav-compact .navbar .nav-group { flex: none; gap: 6px; }
+  .desktop-nav-compact .navbar .nav-btn { flex: none; width: clamp(48px, 4vw, 56px); height: clamp(52px, 4vw, 56px); }
+  .desktop-nav-compact .navbar .nav-btn .ico { width: 26px; height: 26px; }
+  .desktop-nav-compact .navbar .flip-btn { width: auto; padding: 0 16px; font-size: 14px; }
+}
 
 /* bottom sheet menu (phone) */
 .sheet-grip { width: 42px; height: 5px; border-radius: 3px; background: var(--line-strong); margin: 10px auto 6px; cursor: pointer; }

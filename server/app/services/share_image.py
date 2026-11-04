@@ -710,12 +710,8 @@ class _Renderer:
         st = ARROW_STYLE[kind]
         d.polygon(poly, fill=_c(st["fill"]), outline=_c(st["stroke"]), width=max(1, round(cell * 0.03 * self.k)))
         self._put(layer, st["glow"], 5, dy=0 if kind != "branch" else 2)
-        # beside the middle of the shaft, on the upper side (right side for vertical moves)
-        ln = n
-        if ln[1] > 0.2 or (abs(ln[1]) <= 0.2 and ln[0] < 0):
-            ln = (-n[0], -n[1])
-        mid = ((start[0] + base[0]) / 2, (start[1] + base[1]) / 2)
-        a["anchor"], a["normal"], a["dist"], a["along"] = mid, ln, shaft_w / 2 + cell * 0.08, u
+        a["anchor"], a["normal"], a["dist"], a["along"] = tip, (0, -1), head_w / 2 + cell * .08, (1, 0)
+        a["linked"] = True
         return True
 
     def _put(self, layer: Image.Image, glow: tuple[int, int, int, float] | None = None, blur_px: float = 0, dy: float = 0, opacity: float = 1.0) -> None:
@@ -784,7 +780,7 @@ class _Renderer:
             return w, h
         anchor, normal, dist, along = a["anchor"], a["normal"], a["dist"], a["along"]
         box = fixed_box or place_label_box(anchor, normal, dist, along, w, h, self.rw, self.rh, cell,
-                                          self.labels, self.obstacles, a["owner"])
+                                          self.labels, self.obstacles, -1 if a.get("linked") else a["owner"])
         if not fixed_box:
             self.labels.append(box)
         w, h = box[2:]
@@ -792,6 +788,10 @@ class _Renderer:
         border, name_color, opacity = LABEL_STYLE[cls]
         layer = _layer(self.img.size)
         d = ImageDraw.Draw(layer)
+        if a.get("linked") and not fixed_box:
+            end = (max(box[0], min(anchor[0], box[0] + w)), max(box[1], min(anchor[1], box[1] + h)))
+            color = (112, 227, 214, 230) if kind.startswith("best") else (245, 197, 121, 230)
+            d.line((self._o(*anchor), self._o(*end)), fill=color, width=max(1, round(cell * .022 * self.k)))
         x0, y0 = self._o(box[0], box[1])
         x1, y1 = self._o(box[0] + w, box[1] + h)
         d.rounded_rectangle((x0, y0, x1, y1), radius=h * 0.35 * self.k, fill=_c(PILL_FILL), outline=_c(border), width=max(1, round(cell * 0.016 * self.k)))

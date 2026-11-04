@@ -1,4 +1,5 @@
 import unittest
+import math
 from unittest.mock import patch
 
 from server.app.services.overlay_layout import group_drop_arrows, place_label_box
@@ -17,6 +18,24 @@ def overlap(a, b):
 
 
 class SharedDropOverlayTests(unittest.TestCase):
+    def test_knight_candidates_anchor_shared_image_labels_to_their_destinations(self):
+        raw = [{"usi": usi, "kind": "best" if i == 0 else "best sub", "weight": 1 if i == 0 else .6,
+                "name": f"候補{i + 1}", "score": {"text": "+35281", "cls": "plus"}}
+               for i, usi in enumerate(["8d9f", "8d7f", "5h7h+"])]
+        for flip in (False, True):
+            renderer = _Renderer({"flip": flip, "arrows": raw})
+            renderer.render()
+            for arrow, box in zip(renderer.arrows, renderer.labels):
+                target = arrow["t"]
+                center = renderer._cell_center(*renderer._view(target["row"], target["col"]))
+                self.assertTrue(arrow["linked"])
+                self.assertAlmostEqual(math.dist(arrow["anchor"], center), renderer.rw / 9 * .04)
+                end = (max(box[0], min(arrow["anchor"][0], box[0] + box[2])),
+                       max(box[1], min(arrow["anchor"][1], box[1] + box[3])))
+                self.assertLess(math.dist(arrow["anchor"], end), renderer.rw / 9 * .75)
+            for i, box in enumerate(renderer.labels):
+                self.assertFalse(any(overlap(box, other) for other in renderer.labels[i + 1:]))
+
     def test_shared_picture_groups_piece_names_and_preserves_evaluations(self):
         renderer = _Renderer({"arrows": arrows()})
         grouped = group_drop_arrows(renderer.arrows)

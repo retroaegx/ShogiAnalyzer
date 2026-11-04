@@ -1108,6 +1108,8 @@ function layoutBoard() {
   const g = state.geom;
   if (!g) return;
   const root = document.documentElement;
+  // Measure with the original controls first, so their visual compacting never resizes the board.
+  root.classList.remove("desktop-nav-compact");
   const frac = g.rw / g.natW; // region width relative to image
   const cellPerBs = frac / 9;
   const mobile = isMobile();
@@ -1193,7 +1195,7 @@ function layoutBoard() {
     root.classList.remove("phone-no-graph", "phone-compact");
     placeMiniEval(false);
     const area = els.boardArea.getBoundingClientRect();
-    const nav = els.boardArea.querySelector(".navbar").getBoundingClientRect().height || 54;
+    const nav = els.navbar.getBoundingClientRect().height || 54;
     els.boardStage.classList.remove("stands-side");
     const standK = cellPerBs * 1.9; // matches --stand-w (fixed 2-column stands)
     const fixedW = (state.opts.evalBar ? 12 : 0) + 3 * 12;
@@ -1201,6 +1203,7 @@ function layoutBoard() {
     const bsH = (area.height - nav - 14) / (1 + coordK);
     bs = Math.min(bsW, bsH);
   }
+  root.classList.toggle("desktop-nav-compact", !mobile);
   bs = Math.floor(clamp(bs, mobile ? 160 : 220, 1400)); // phones: never larger than the space left
   const scale = bs / g.natW;
   const cell = (g.rw * scale) / 9;
@@ -1409,16 +1412,21 @@ function moveLabelSize(text, primary, score) {
   return { w, h: fs * 1.5, fs, sfs, gap, pfs };
 }
 
-function moveLabel(anchor, normal, dist, text, cls, primary, score = null, owner = null, along = null, fixedBox = null) {
+function moveLabel(anchor, normal, dist, text, cls, primary, score = null, owner = null, along = null, fixedBox = null, linked = false) {
   const { rw, rh } = state.geom;
   const cell = rw / 9;
   const size = moveLabelSize(text, primary, score);
   const box = fixedBox || placeOverlayLabel({ anchor, normal, dist, along, ...size, rw, rh, cell,
-    labels: overlayLabels, obstacles: overlayObstacles, owner });
+    labels: overlayLabels, obstacles: overlayObstacles, owner: linked ? null : owner });
   const { w, h } = box;
   const { fs, sfs, gap, pfs } = size;
   if (!fixedBox) overlayLabels.push(box);
   const g = svgEl("g", { class: `mv-label ${cls}` });
+  if (linked) {
+    const end = { x: clamp(anchor.x, box.x, box.x + w), y: clamp(anchor.y, box.y, box.y + h) };
+    g.appendChild(svgEl("path", { class: "label-link", d: `M ${anchor.x} ${anchor.y} L ${end.x} ${end.y}`,
+      "stroke-width": cell * .022 }));
+  }
   g.appendChild(svgEl("rect", { x: box.x, y: box.y, width: w, height: h, rx: h * 0.35, "stroke-width": cell * 0.016 }));
   const t = svgEl("text", { x: box.x + w / 2, y: box.y + h / 2, "font-size": fs });
   const name = svgEl("tspan", {});
@@ -1580,11 +1588,9 @@ function overlayShape(usi, kind, weight = 1, labelText = "", score = null, owner
   }
 
   if (labelText || score) {
-    // beside the middle of the shaft, on the upper side (right side for vertical moves)
-    let ln = n;
-    if (ln.y > 0.2 || (Math.abs(ln.y) <= 0.2 && ln.x < 0)) ln = { x: -n.x, y: -n.y };
-    const mid = { x: (start.x + base.x) / 2, y: (start.y + base.y) / 2 };
-    g.appendChild(moveLabel(mid, ln, shaftW / 2 + cell * 0.08, labelText, labelCls, primary, score, owner, u));
+    // Anchor to the destination, with a short leader so avoidance never loses the move's identity.
+    g.appendChild(moveLabel(tip, { x: 0, y: -1 }, headW / 2 + cell * .08,
+      labelText, labelCls, primary, score, owner, { x: 1, y: 0 }, null, true));
   }
   return g;
 }

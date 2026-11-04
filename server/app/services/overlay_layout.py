@@ -51,14 +51,19 @@ def place_label_box(anchor, normal, dist, along, w, h, rw, rh, cell, labels, obs
         return not any(other[4] != owner and overlap(other, padded(box)) for other in obstacles)
 
     base = dist + abs(normal[0]) * w / 2 + abs(normal[1]) * h / 2
-    first = None
+    first, nearby, nearby_cost = None, None, math.inf
     for slide in (0, .9, -.9, 1.6, -1.6) if along else (0,):
         for k in (1, -1, 1.9, -1.9, 2.8, -2.8):
             box = (clamp(anchor[0] + normal[0] * base * k + (along[0] if along else 0) * slide * cell - w / 2, 0, rw - w),
                    clamp(anchor[1] + normal[1] * base * k + (along[1] if along else 0) * slide * cell - h / 2, 0, rh - h), w, h)
             first = first or box
             if free(box) and clear(box):
-                return box
+                dx, dy = box[0] + w / 2 - anchor[0], box[1] + h / 2 - anchor[1]
+                cost = dx * dx + dy * dy + (cell * cell * .04 if k < 0 else 0)
+                if cost < nearby_cost:
+                    nearby, nearby_cost = box, cost
+    if nearby:
+        return nearby
     xs = {0, rw - w, clamp(anchor[0] - w / 2, 0, rw - w)}
     ys = {0, rh - h, clamp(anchor[1] - h / 2, 0, rh - h)}
     xs.update(i * cell * .35 for i in range(math.floor((rw - w) / (cell * .35)) + 1))

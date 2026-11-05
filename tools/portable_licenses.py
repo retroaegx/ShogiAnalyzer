@@ -210,12 +210,15 @@ def bundle_windows_runtime(folder: Path) -> None:
     candidates=[]
     for instance in instances:
         root=Path(instance['installationPath'])/'VC/Redist/MSVC'
-        for directory in root.glob('*/x64/Microsoft.VC143.CRT'):
+        for directory in root.glob('*/x64/Microsoft.VC*.CRT'):
             if all((directory/name).is_file() for name in WINDOWS_RUNTIME_DLLS):
-                version=tuple(int(part) for part in directory.parents[1].name.split('.'))
+                with pefile.PE(str(directory/WINDOWS_RUNTIME_DLLS[0])) as image:
+                    info=image.VS_FIXEDFILEINFO[0]
+                    version=(info.FileVersionMS,info.FileVersionLS)
                 candidates.append((version, str(directory), instance))
     if not candidates:
-        raise RuntimeError('Windows package builds require licensed Visual Studio 2022 C++ REDIST files')
+        roots=[str(Path(instance['installationPath'])/'VC/Redist/MSVC') for instance in instances]
+        raise RuntimeError(f'Windows package builds require licensed Visual Studio 2022 C++ REDIST files; searched {roots}')
     _, directory, instance=max(candidates, key=lambda item:(item[0],item[1]))
     source_dir=Path(directory)
     signature_script="""

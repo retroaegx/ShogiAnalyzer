@@ -1,5 +1,7 @@
 # Python未導入環境での検証（2026-11-05）
 
+本書は段階ごとの検証履歴です。実エンジン・実画面・README・同梱物まで拡大した今回の点検結果は[総点検報告](COMPREHENSIVE_AUDIT.md)を参照してください。
+
 ## 初回ダウンロードのHTTPS修正と再検証
 
 ネット接続ありの初回設定用Sandboxで、cloudflared取得時に`CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate`が発生した。旧Python処理では、初期状態のWindows証明書ストアをOpenSSLへ読み込んだだけでは配布先の証明書チェーンを検証できなかった。ネットワークを無効にした回帰テストでは、この初回ダウンロードを検証できていなかった。

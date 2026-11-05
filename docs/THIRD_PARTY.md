@@ -10,6 +10,14 @@ Python実行環境は同梱しています。アプリ側でCPythonのソース�
 
 HTTPSの証明書検証には、Windows/macOSではtruststore（MIT）を通じてOSの証明書ストアを使用します。LinuxでOS側にCA証明書がない場合はcertifiのMozilla CA証明書集（MPL-2.0）を使用します。証明書の改変や検証無効化は行いません。truststoreとcertifiのライセンス・著作権表示を同梱し、Linux版にはcertifiの同じ版のソース配布物もthird_party_sourcesへ保存します。MPLの対象はcertifiのファイルで、ShogiAnalyzer本体のMITライセンスを変更しません。
 
+## 起動部分・フォント・画像
+
+実行ファイルの起動部分には無改変のPyInstaller bootloaderを使用します。上流のライセンス例外では、依存物の条件を守れば生成物を任意のライセンスで配布でき、PyInstaller自体のライセンス添付やクレジットは必須ではないと説明されています。確認用にPyInstaller-COPYING.txtを添付します。PyInstaller自体の改変版を配布する場合の条件とは区別してください。
+
+Web画面はGoogle FontsからBarlow Semi CondensedとShippori Mincho B1を読み込みます。フォントの実ファイルは本配布物には同梱していません。BarlowはCopyright 2017 The Barlow Project Authors、Shippori MinchoはCopyright 2021 The Shippori Mincho Project Authors、それぞれSIL Open Font License 1.1です。原文はBarlow-Semi-Condensed-OFL.txtとShippori-Mincho-B1-OFL.txtを添付しています。ネット接続がない場合はOSのフォントへフォールバックします。
+
+画像共有用のShogiAnalyzerMaru.ttfは、tools/share_fontの筆画データから本プロジェクトで生成したフォントです。Google Fontsのフォントを改変したものではありません。盤・駒・背景等の同梱画像は、作者が自作またはAI生成した素材であることを2026-11-05に確認しました。これらの本プロジェクト作成物には本体のMITライセンスを適用し、外部のフォントやライブラリーとは区別します。
+
 ## LGPLの展開ライブラリ
 
 py7zr、pybcj（import名bcj）、inflate64、multivolumefile、pyppmdは、それぞれのライセンスに基づいて配布しています。これらのライブラリのソースコード自体は改変していません。PyInstallerの配置方法を変更し、PythonモジュールをPYZに埋め込まず、外部ファイルにしています。

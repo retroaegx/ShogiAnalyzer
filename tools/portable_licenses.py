@@ -149,6 +149,21 @@ def collect(output: Path) -> tuple[Path, Path]:
         raise RuntimeError('Build interpreter must provide its complete Python LICENSE.txt')
     shutil.copyfile(python_license, licenses/'CPython-LICENSE.txt')
     references = []
+    bootloader=metadata.distribution('pyinstaller')
+    copying=next((Path(bootloader.locate_file(item)) for item in bootloader.files or []
+                  if item.name=='COPYING.txt'),None)
+    if copying is None or not copying.is_file():
+        raise RuntimeError('PyInstaller licensing exception reference is missing')
+    shutil.copyfile(copying,licenses/'PyInstaller-COPYING.txt')
+    references.append({'component':'Unmodified PyInstaller bootloader licensing exception reference',
+        'url':f'https://github.com/pyinstaller/pyinstaller/blob/v{bootloader.version}/COPYING.txt',
+        'file':'PyInstaller-COPYING.txt','sha256':hashlib.sha256(copying.read_bytes()).hexdigest()})
+    for name,directory in [('Barlow-Semi-Condensed','barlowsemicondensed'),('Shippori-Mincho-B1','shipporiminchob1')]:
+        source=ROOT/'docs/third_party_fonts'/(name+'-OFL.txt')
+        shutil.copyfile(source,licenses/source.name)
+        references.append({'component':name+' external web font (font binary not bundled)',
+            'url':f'https://github.com/google/fonts/blob/main/ofl/{directory}/OFL.txt',
+            'file':source.name,'sha256':hashlib.sha256(source.read_bytes()).hexdigest()})
     version = platform.python_version()
     url = f'https://docs.python.org/release/{version}/license.html'
     references.append({'component':'CPython incorporated software', 'url':url,

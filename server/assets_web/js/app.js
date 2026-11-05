@@ -454,6 +454,7 @@ function showPendingStep() {
     usi ? kifMove(base.current_position_sfen,usi) : '');
   if (game) { game.ui_state = {...game.ui_state, analysis_enabled:false}; setGame(game); }
   document.body.classList.add("step-pending");
+  if (!els.connOverlay.hidden) showConnLost();
 }
 function clearPendingStep() {
   clearTimeout(stepAckTimer);

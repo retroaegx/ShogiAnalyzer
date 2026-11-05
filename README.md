@@ -35,11 +35,70 @@ WebフォントのBarlow Semi Condensed（The Barlow Project Authors）とShippo
 
 ## ネイティブ配布版を使う場合
 
-通常利用では、OS・CPUに合うネイティブ配布物を選びます。Windows x64はZIPを展開して`Start.bat`、Linux x64はtar.gzを展開してターミナルで`./ShogiAnalyzer`、macOSはIntel/Apple Siliconを選んで展開後の`Start.command`から起動します。アプリ全体を展開し、`_internal`を含むフォルダー構成を維持してください。
+ネイティブ配布版にはPythonと実行ライブラリーを含めています。**Python・PHPの別途導入、手動でのvenv構築・pipインストールは不要**です。[リリースページ](https://github.com/retroaegx/ShogiAnalyzer/releases)の添付ファイルから、OS・CPUに合うパッケージを選んでください。GitHubの「Source code (zip)」「Source code (tar.gz)」は、下記のPythonが必要なソース版です。該当OSのネイティブパッケージが添付されていないリリースでは、ソース版の手順を使ってください。
 
-Python・PHPの別途導入、venv構築、pipインストールは不要です。Windows版には必要なVC++ DLL2個も同梱します。対応はWindows 10以降、Linux x64はUbuntu 22.04相当のglibc 2.35以降です。配布物のOS・CPUは共用できません。macOSは署名・公証していません。
+| OS・CPU | ダウンロードするファイルの末尾 | 起動するファイル |
+|---|---|---|
+| Windows x64（Windows 10以降） | `windows-amd64.zip` | `Start.bat` |
+| Linux x64（glibc 2.35以降。Ubuntu 22.04以降など） | `linux-amd64.tar.gz` | `ShogiAnalyzer` |
+| Mac Intel | `macos-amd64.tar.gz` | `Start.command` |
+| Mac Apple Silicon（M1以降） | `macos-arm64.tar.gz` | `Start.command` |
 
-初回起動ではパスワード保護を選択し、エンジン・評価関数の配布元と規約を確認して導入します。エンジン・評価関数・cloudflaredは配布物には含みません。初回の取得にはインターネット接続が必要です。Linuxの一部エンジンはソースからビルドするため、make・C++コンパイラー等の開発ツールが別途必要です。アプリにPythonを同梱することと、エンジン用のビルドツールが不要になることは別です。
+パッケージはOS・CPU間で共用できません。展開したフォルダー内の`_internal`も必要なので、実行ファイルだけを取り出さず、書き込み可能な場所にフォルダーごと置きます。初回のエンジン・評価関数等の取得にはインターネット接続が必要です。
+
+### Windows
+
+1. `windows-amd64.zip`を右クリックし、「すべて展開」で展開します。
+2. 展開先の`ShogiAnalyzer`フォルダーを開き、`Start.bat`をダブルクリックします。
+3. 下記の「[初回設定](#first-run-setup)」へ進みます。
+
+必要なVC++ランタイムDLL2個も同梱しています。通常利用者によるPython・Visual Studio・VC++ランタイムの別途インストールは不要です。
+
+### Linux
+
+Linuxでは、アプリ本体にPythonを入れる必要はありませんが、**エンジンの自動導入にはmake・C++コンパイラーが必要**です。やねうら王v8.30のソース取得ではGitも使用します。このエンジンのビルド要件は、従来のPython版でも必要だったものです。
+
+Ubuntu 22.04以降／Debian 12以降での準備例です。ターミナルを開き、次を順に実行します。
+
+```bash
+sudo apt update
+sudo apt install build-essential git ca-certificates
+```
+
+`build-essential`には[makeとg++等が含まれます](https://packages.ubuntu.com/jammy/build-essential)。`sudo`で求められるのはLinuxのログインパスワードです。入力中は文字が表示されません。すでに導入済みなら追加の作業は不要です。他のディストリビューションでは、そのOSのパッケージ管理で同等のツールを用意してください。Linuxの確認環境はUbuntu 22.04／24.04です。
+
+続いて、ダウンロードした`linux-amd64.tar.gz`を展開して起動します。以下はファイルを`~/Downloads`へ保存したv1.1.10の例です。保存先とファイル名は、実際に取得したものに合わせてください。
+
+```bash
+cd ~/Downloads
+tar -xzf ShogiAnalyzer-v1.1.10-linux-amd64.tar.gz
+cd ShogiAnalyzer
+./ShogiAnalyzer
+```
+
+起動後は「[初回設定](#first-run-setup)」へ進みます。エンジンを選択して同意すると、ソース取得とビルドも自動で進みます。ビルド中は時間がかかるので、ターミナルを閉じずに待ってください。ビルドに使うPython処理には同梱Pythonを使用します。現在のLinux自動ビルドはAVX2またはSSE4.2に対応するx64 CPUが対象です。
+
+`make: not found`や`g++: not found`等が出た場合は、上記ツールの導入を確認して起動し直してください。手持ちのLinux用USIエンジンを使う場合は、初回メニューで`m`を選びます。ビルドツールなしで使う場合は、別途ビルド済みの対応エンジンが必要です。
+
+### macOS
+
+1. Appleメニューの「このMacについて」で、「チップ」がApple Mシリーズなら`macos-arm64.tar.gz`、「プロセッサ」がIntelなら`macos-amd64.tar.gz`を選びます。
+2. ダウンロードしたファイルを展開し、`ShogiAnalyzer`フォルダーの`Start.command`をダブルクリックします。
+3. 開いたターミナルで「[初回設定](#first-run-setup)」を行います。
+
+ネイティブ版ではPython・Homebrew・Xcodeの導入は不要です。アプリは署名・公証していません。起動がOSに止められた場合は、取得元を確認のうえ[Appleの案内](https://support.apple.com/ja-jp/guide/mac-help/mh40616/mac)に従ってください。
+
+### 自動導入できるエンジン
+
+インストーラーには、使用中のOS・CPUに対応する設定があるエンジンだけが表示されます。**番号はOSによって変わるため、表示されたエンジン名を確認して選んでください。**
+
+| エンジン・評価関数 | Windows x64 | Linux x64 | Mac Intel／Apple Silicon |
+|---|---|---|---|
+| やねうら王＋つようら王11mini | 実行ファイルを取得 | ソースからビルド | 自動導入対象外 |
+| AobaNNUE v1.1 | 実行ファイルを取得 | ソースからビルド | 自動導入対象外 |
+| やねうら王v8.30＋水匠5 | 実行ファイルを取得 | ソースからビルド | Mac用の配布物を取得 |
+
+Macにもやねうら王v8.30の自動取得設定があります。取得した配布物にOS・CPU対応の実行ファイルが見つからない場合は、手持ちの対応USIエンジンを手動設定してください。Macの初期OS環境での導入操作は未検証です。
 
 設定`.env`と棋譜等の`server/data/`、取得した`engines/`・`tools/cloudflared/`は、標準では実行ファイルの横に作成されます。アプリを終了してからこれらをバックアップしてください。別の保存先を使う場合は`SHOGI_ANALYZER_HOME`に絶対パスを指定します。更新時はユーザーデータを削除せず、アプリのファイルを置き換えます。詳しくは[ネイティブ配布版の説明](docs/PORTABLE.md)を参照してください。
 
@@ -52,16 +111,38 @@ Python・PHPの別途導入、venv構築、pipインストールは不要です�
 - Windows: コマンドプロンプトで `python --version` を実行して確認します。  
   入っていなければ https://www.python.org/downloads/windows/ から Windows installer (64-bit) を入れてください。  
   インストール時に **「Add Python to PATH」を ON** にしてください。
-- macOS: `brew install python@3.12`
-- Ubuntu / Debian: `sudo apt install python3 python3-venv`
+- macOS: Homebrewを利用する場合は、[Python 3.12の導入方法](https://formulae.brew.sh/formula/python@3.12)に従い、ターミナルで次を実行します。このターミナル内で`python3`が3.12を指すようPATHも設定します。
 
-## 2. 起動
+  ```bash
+  brew install python@3.12
+  export PATH="$(brew --prefix python@3.12)/libexec/bin:$PATH"
+  python3 --version
+  ```
+
+- Ubuntu / Debian: `sudo apt update`の後、`sudo apt install python3 python3-venv`を実行します。エンジンを自動ビルドする場合は、上記Linux手順の`build-essential`・`git`・`ca-certificates`も用意してください。
+
+## 2. 起動と初回設定
+
+### ソース版の起動
+
+ソースコードを展開したフォルダーで起動します。ネイティブ版の起動方法は上記OS別手順を使ってください。
 
 - Windows: `run.bat` をダブルクリック
 - macOS / Linux: `sh run.sh`
 
-初回はライブラリや解析エンジンのダウンロードがあるため、少し時間がかかります。  
-途中で「この評価関数をダウンロードしますか？」などと聞かれたら、配布元の利用条件を確認して `y` を入力してください。
+ソース版では、起動時に`.venv`の作成と必要ライブラリーの導入を自動で行います。手動でvenvを作ったり、システム全体へpipでインストールしたりする必要はありません。macOSでHomebrewのPATHを上記のように設定した場合は、同じターミナルで`sh run.sh`を実行してください。
+
+<a id="first-run-setup"></a>
+
+### 初回設定（ネイティブ版・ソース版共通）
+
+1. 「パスワード保護を有効にしますか？」に回答します。外部公開する場合は`y`、このPCだけで利用する場合は`n`で無効にしても使えます。選んだ後にEnterを押します。有効にした場合、パスワード自体は後でブラウザーの初回画面で設定します。
+2. エンジン一覧の名前を確認し、使いたいものの番号を入力してEnterを押します。手持ちのUSIエンジンは`m`でパスを指定できます。`s`は解析なしで起動する選択です。
+3. 表示されるエンジン・評価関数の配布元と規約・ライセンスを確認し、同意する場合だけ`y`を入力してEnterを押します。別々に取得する評価関数にも確認が出ます。同意しない場合はメニューに戻ります。
+4. 取得・展開（Linuxではビルドも）が完了し、`local : http://localhost:31145`等のアドレスが出るまで待ちます。
+5. 同じPCのブラウザーを開き、アドレス欄に表示された`local`のURLを入力します。パスワード保護を有効にした場合は、初回の設定画面に従って設定します。スマートフォンから初回設定する場合は、コンソールのセットアップコードも必要です。
+
+エンジン・評価関数はアプリ配布物には含めていません。インストーラーが同意後に取得して、エンジンと評価関数のパスを保存します。すでに設定済みなら、次回からその設定を使って起動します。
 
 起動するとコンソールに URL が表示されます。
 
@@ -264,7 +345,8 @@ Cloudflare ダッシュボード →「Zero Trust」→「Access」→「アプ�
 1. アプリを止めます（コンソールで `Ctrl + C`、またはウィンドウを閉じる。Ubuntu などでサービスにしている場合は `sudo systemctl stop shogianalyzer`）。
 2. フォルダを新しいバージョンにします。
    - `git clone` で取得した場合: フォルダで `git pull`
-   - zip で取得した場合: [リリースページ](https://github.com/retroaegx/ShogiAnalyzer/releases) から新しい zip をダウンロードし、今のフォルダに上書き
-3. もう一度起動します（`run.bat` / `run.sh`、サービスなら `sudo systemctl start shogianalyzer`）。必要な Python パッケージは起動時に自動で更新されます。
+   - ネイティブ版の場合: [リリースページ](https://github.com/retroaegx/ShogiAnalyzer/releases)から同じOS・CPU用の新しいZIP／tar.gzを取得し、すべて展開してアプリのファイルを更新します。設定`.env`・棋譜`server/data/`・エンジン`engines/`・`tools/cloudflared/`は残してください。
+   - ソース版をZIPで取得した場合: ソース版の新しいZIPを展開してアプリのファイルを更新します。上記の設定・データは残してください。
+3. ネイティブ版はWindowsの`Start.bat`、Linuxの`./ShogiAnalyzer`、Macの`Start.command`から再起動します。ソース版は`run.bat`／`sh run.sh`、サービスなら`sudo systemctl start shogianalyzer`です。ソース版のPythonパッケージは起動時に自動で更新されます。
 
 設定（`.env`）・棋譜（`server/data`）・エンジン（`engines`）は git の管理外なので、更新しても消えません。

@@ -19,6 +19,7 @@ import hmac
 import json
 import os
 import secrets
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -94,6 +95,9 @@ def apply_setting() -> str:
                 "[auth] Password protection is OFF: the saved password was deleted",
             )
         return ""
+    path = auth_file()
+    if os.name != 'nt' and path.is_file():
+        path.chmod(0o600)
     if configured():
         return _tr(f"[auth] パスワード保護: ON（ログインは {LOGIN_DAYS} 日間有効）", f"[auth] Password protection: ON (logins last {LOGIN_DAYS} days)")
     setup_code = f"{secrets.randbelow(10**6):06d}"
@@ -132,9 +136,16 @@ def save_password(password: str) -> None:
     }
     path = auth_file()
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    os.replace(tmp, path)
+    # NamedTemporaryFile starts private (0600 on POSIX), even under umask 022.
+    # A unique temporary file also avoids following a predictable auth.tmp link.
+    with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent,
+                                     prefix='.auth-', delete=False) as stream:
+        tmp = Path(stream.name)
+        stream.write(json.dumps(data, indent=2) + "\n")
+    try:
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
     setup_code = None
 
 

@@ -214,6 +214,8 @@ def main():
         assert auth_request('/api/auth/setup',{'password':'cleanroom-test-only'},'https://unrelated.invalid')[0]==403
         assert not json.loads(auth_request('/api/auth/status')[1])['configured']
         assert auth_request('/api/auth/setup',{'password':'cleanroom-test-only'})[0]==200
+        if os.name!='nt':
+            assert (home/'server/data/auth.json').stat().st_mode & 0o777 == 0o600
         assert auth_request('/api/settings')[0]==200
         assert auth_request('/api/logout',{})[0]==200
         assert auth_request('/api/settings')[0]==401

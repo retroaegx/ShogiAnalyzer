@@ -14,9 +14,22 @@ import urllib.error
 import urllib.request
 from types import SimpleNamespace
 from server.app.api import _client_ip
+from server.app import auth
+from unittest.mock import patch
 
 
 class AuthenticationHTTPTests(unittest.TestCase):
+    @unittest.skipIf(os.name == 'nt', 'POSIX file permissions')
+    def test_existing_auth_file_becomes_private_at_startup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'auth.json'
+            with patch.object(auth, 'auth_file', return_value=path), patch.object(auth, 'required', return_value=True):
+                auth.save_password('test-only-password')
+                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+                path.chmod(0o644)
+                auth.apply_setting()
+                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
     def test_direct_clients_cannot_spoof_rate_limit_address(self):
         remote=SimpleNamespace(client=SimpleNamespace(host='198.51.100.12'),headers={'cf-connecting-ip':'different-address'})
         self.assertEqual(_client_ip(remote),'198.51.100.12')
@@ -55,6 +68,8 @@ class AuthenticationHTTPTests(unittest.TestCase):
                     self.assertFalse(json.loads(request('/api/auth/status')[1])['configured'])
                     self.assertEqual(request('/api/auth/setup',{'password':'x'},base)[0],400)
                     self.assertEqual(request('/api/auth/setup',{'password':'test-password'},base)[0],200)
+                    if os.name != 'nt':
+                        self.assertEqual((Path(directory)/'server/data/auth.json').stat().st_mode & 0o777,0o600)
                     self.assertEqual(request('/api/settings')[0],200)
                     self.assertEqual(request('/api/app/licenses')[0],200)
                     self.assertEqual(request('/api/app/license-document/app')[0],200)

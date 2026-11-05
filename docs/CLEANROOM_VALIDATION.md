@@ -12,6 +12,8 @@ DLLはVisual Studio 2022 Build ToolsのC++ REDISTフォルダーから取得し�
 
 ローカル証跡は`E:\work\ShogiAnalyzer_cleanroom\20261105\windows-bundled-results`に保存。baseline.jsonとafter.jsonがOS側の未導入状態、summary.jsonとprobe.jsonが成功結果。確認用Sandboxは検証後も停止せず残した。中の`C:\ShogiTest\ShogiAnalyzer\Start.bat`から通常起動できるよう、検証用の保存棋譜とUSIテスト相手の設定を用意している。解析相手はRegression engineというテスト用プログラムであり、実際の将棋エンジンではない。
 
+この検証済み設定は通常の初回導入を確認する用途には適さないため、別途ネット接続を有効にした新規Sandboxを用意し、デスクトップのShogiAnalyzerフォルダーへ同じZIPを展開した。展開後の.env・engine_config.jsonが未作成であることと、ネット接続が可能なことを確認した。証跡はwindows-first-run-results/first-run-ready.json。パスワードの選択やエンジン・評価関数の取得は利用者自身が通常の初回手順で行う。今後のハーネスは、回帰テスト用の設定を展開した配布物へコピーせず、プローブ専用のapplication-dataだけに保持する。
+
 ## 旧構成（VC++ランタイム非同梱）の検証記録
 
 以下は修正前の記録。現行のDLL同梱版は追加インストール不要であり、下記の旧構成の前提とは異なる。

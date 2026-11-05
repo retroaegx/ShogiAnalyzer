@@ -1,6 +1,20 @@
 # Python未導入環境での検証（2026-11-05）
 
-以下はVC++ランタイムを同梱しなかった旧構成の検証記録。後続のDLL同梱対応では追加インストール不要とする構成へ変更した。旧構成と同梱対応後の結果を混同しないこと。
+## VC++ DLL同梱後の再検証
+
+Windows Sandboxを新規に作成し、Python/PHP/Nodeのコマンド・Pythonのインストール登録・System32のvcruntime140.dllとvcruntime140_1.dllがないことを確認した。同梱版の展開後、OSへ何もインストールせずにEXE直接実行とStart.batの自己検査が成功した。通常ランチャーでの起動、HTTP配信、USIテスト相手との解析通信、103手棋譜の読み込み、再接続時の操作同期、保存、終了、再起動も成功した。終了後にも同じ初期状態のチェックを行い、PythonやVC++ランタイムがOSへ追加されていないことを確認した。
+
+環境はWindows 11 Enterprise build 26100、ネットワーク・クリップボード無効。入力フォルダーは読み取り専用で、VC++ランタイムのインストーラーは渡していない。再現スクリプトはtools/windows_cleanroom.ps1、通常操作の共通プローブはtools/cleanroom_probe.py。
+
+検証ZIPは`ShogiAnalyzer-v1.1.10-windows-amd64.zip`、31,173,268 bytes、SHA256は`05ca0ed79dc4ab0bcad148374b3c48508a9c616130b583e70a2814fbaa393878`。ビルド元は`0217a3801fa504d88c78b394232213114d5d6450`。従来のZIPとの差は204,037 bytes（約0.20 MB）で、ランタイムDLL2個とライセンス文書を含む。
+
+DLLはVisual Studio 2022 Build ToolsのC++ REDISTフォルダーから取得したMicrosoft純正のvcruntime140.dllとvcruntime140_1.dll、バージョン14.44.35211.0。どちらもMicrosoftの電子署名がValidであることを確認して改変せず同梱した。原文と全文テキストのMicrosoft条件、再配布条件の参照文書、Windows版Pythonの追加条件、ファイルごとの出所・ハッシュを配布物に含めている。詳細はdocs/THIRD_PARTY.mdと配布物のWINDOWS_RUNTIME.jsonを参照。
+
+ローカル証跡は`E:\work\ShogiAnalyzer_cleanroom\20261105\windows-bundled-results`に保存。baseline.jsonとafter.jsonがOS側の未導入状態、summary.jsonとprobe.jsonが成功結果。確認用Sandboxは検証後も停止せず残した。中の`C:\ShogiTest\ShogiAnalyzer\Start.bat`から通常起動できるよう、検証用の保存棋譜とUSIテスト相手の設定を用意している。解析相手はRegression engineというテスト用プログラムであり、実際の将棋エンジンではない。
+
+## 旧構成（VC++ランタイム非同梱）の検証記録
+
+以下は修正前の記録。現行のDLL同梱版は追加インストール不要であり、下記の旧構成の前提とは異なる。
 
 対象はPR #37のネイティブ配布版（VERSIONは1.1.10のまま）。Windows Sandboxと新規Ubuntuコンテナーで、OS側にPython・PHPを入れずに検証した。
 

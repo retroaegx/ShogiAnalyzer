@@ -1,5 +1,5 @@
 // Shogi rules / notation helpers used by the UI (lightweight, enough for move input + display).
-import { parseSfen } from "/js/vendor/sfen.js";
+import { parseSfen, toSfen } from "/js/vendor/sfen.js";
 import { normalizeDropPieceType, parseUsi } from "/js/vendor/usi.js";
 
 export const HAND_ORDER = ["rook", "bishop", "gold", "silver", "knight", "lance", "pawn"];
@@ -365,4 +365,27 @@ export function formatScore(line, sideToMove) {
     return `${x > 0 ? "+" : ""}${x}`;
   }
   return "—";
+}
+
+/** A provisional legal move; the server will validate it again when synchronized. */
+export function sfenAfterMove(sfen, usi) {
+  const position = parseSfen(sfen), move = parseUsi(usi);
+  if (!position || !move?.ok) return null;
+  const me = position.currentPlayer;
+  let legal;
+  if (move.isDrop) {
+    const type = normalizeDropPieceType(move.pieceType) || move.pieceType;
+    if (!(position.capturedPieces[me][type] > 0)) return null;
+    legal = legalDrops(position.board, type, me);
+  } else {
+    const piece = position.board[move.fromRow]?.[move.fromCol];
+    if (!piece || piece.owner !== me) return null;
+    if (move.promote && !canPromote(piece,move.fromRow,move.toRow)) return null;
+    if (!move.promote && mustPromote(piece,move.toRow)) return null;
+    legal = legalMovesFrom(position.board,move.fromRow,move.fromCol,piece);
+  }
+  if (!legal.some(p => p.row === move.toRow && p.col === move.toCol)) return null;
+  applyMove(position,usi);
+  position.ply += 1;
+  return toSfen(position);
 }

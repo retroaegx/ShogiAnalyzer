@@ -1,0 +1,11 @@
+# Build in a clean native venv; no dev reloaders or GUI frameworks.
+PyInstaller>=6.11,<7
+fastapi>=0.115,<1.0
+uvicorn>=0.30,<1.0
+websockets>=12.0,<16
+wsproto>=1.2.0,<2
+py7zr>=0.21.0,<2
+py-cpuinfo>=9.0.0,<10
+Pillow>=10.0,<13
+truststore>=0.10.5,<0.11
+certifi>=2024.8.30; sys_platform == 'linux'

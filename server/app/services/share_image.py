@@ -21,6 +21,7 @@ import secrets
 import time
 from functools import lru_cache
 from pathlib import Path
+from app_paths import resource_root
 from typing import Any
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -29,8 +30,8 @@ from ..core.sfen_ops import parse_sfen
 from ..paths import data_dir
 from .overlay_layout import group_drop_arrows, place_label_box
 
-ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets_web"
-FONT_DIR = Path(__file__).resolve().parent / "share_fonts"
+ASSETS_DIR = resource_root() / "server" / "assets_web"
+FONT_DIR = resource_root() / "server" / "app" / "services" / "share_fonts"
 # our own font (tools/share_font builds it from stroke skeletons)
 FONT = FONT_DIR / "ShogiAnalyzerMaru.ttf"
 

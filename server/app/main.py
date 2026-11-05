@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import mimetypes
 from pathlib import Path
+from app_paths import resource_root
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
@@ -22,7 +23,7 @@ mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 
 def _server_dir() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return resource_root() / "server"
 
 
 def create_app() -> FastAPI:

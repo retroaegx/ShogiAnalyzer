@@ -1,0 +1,58 @@
+name: Native portable packages
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'app_paths.py'
+      - 'external_process.py'
+      - 'installer/**'
+      - 'server/**'
+      - 'tools/*portable*'
+      - 'tests/**'
+      - '.github/workflows/portable.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            platform: windows-amd64
+            executable: ShogiAnalyzer.exe
+          - runner: ubuntu-22.04
+            platform: linux-amd64
+            executable: ShogiAnalyzer
+          - runner: macos-15-intel
+            platform: macos-amd64
+            executable: ShogiAnalyzer
+          - runner: macos-15
+            platform: macos-arm64
+            executable: ShogiAnalyzer
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -r tools/requirements-portable.txt
+      - run: python -m unittest discover -s tests -p "test_*.py"
+      - run: node --test tests/test_*.mjs
+      - run: python tools/build_portable.py
+      - run: python tools/smoke_portable.py dist/portable/app/ShogiAnalyzer/${{ matrix.executable }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ShogiAnalyzer-${{ matrix.platform }}
+          path: |
+            dist/portable/ShogiAnalyzer-v*.zip
+            dist/portable/ShogiAnalyzer-v*.tar.gz
+            dist/portable/build-report.json
+            dist/portable/build-requirements.lock
+          if-no-files-found: error

@@ -14,6 +14,8 @@ def resource_root() -> Path:
 
 def runtime_home() -> Path:
     configured = os.environ.get("SHOGI_ANALYZER_HOME", "").strip()
+    base = Path(sys.executable).resolve().parent if is_frozen() else resource_root()
     if configured:
-        return Path(configured).expanduser().resolve()
-    return Path(sys.executable).resolve().parent if is_frozen() else resource_root()
+        path = Path(configured).expanduser()
+        return (path if path.is_absolute() else base / path).resolve()
+    return base

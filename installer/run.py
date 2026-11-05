@@ -245,7 +245,7 @@ def _run_server(env: dict[str, str]) -> subprocess.Popen:
     print(tr(f"[installer] サーバーを起動しています: http://localhost:{PORT}", f"[installer] Starting server: http://localhost:{PORT}"))
     proc = subprocess.Popen(
         cmd,
-        cwd=str(runtime_home()),
+        cwd=str(runtime_home() if is_frozen() else repo_root()),
         env=merged,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

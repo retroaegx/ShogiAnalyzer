@@ -440,7 +440,7 @@ def find_existing_cloudflared_config() -> list[Path]:
             candidates.append(p)
     # project-local override
     for name in ("cloudflared.yml", "cloudflared.yaml", "config.yml", "config.yaml"):
-        p = repo_root() / name
+        p = runtime_home() / name
         if p.exists() and p.is_file() and p not in candidates:
             candidates.append(p)
     return candidates
@@ -500,7 +500,7 @@ def _load_engine_config(root: Path) -> dict:
         return {}
     for key in _CONFIG_PATH_KEYS:
         if cfg.get(key):
-            cfg[key] = resolve_portable(str(cfg[key]), root)
+            cfg[key] = resolve_portable(str(cfg[key]), runtime_home())
     return cfg
 
 
@@ -510,7 +510,7 @@ def _save_engine_config(root: Path, cfg: dict) -> None:
     out = dict(cfg)
     for key in _CONFIG_PATH_KEYS:
         if out.get(key):
-            out[key] = portable_path(str(out[key]), root)
+            out[key] = portable_path(str(out[key]), runtime_home())
     p.write_text(json.dumps(out, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 

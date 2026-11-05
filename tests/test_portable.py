@@ -13,6 +13,23 @@ from installer.installer_lib import _pick_engine_variant, _platform_key
 
 
 class PortableTests(unittest.TestCase):
+    def test_saved_engine_paths_are_relative_to_runtime_not_bundle(self):
+        import json
+        from installer.installer_lib import _load_engine_config, _save_engine_config
+        with tempfile.TemporaryDirectory() as temp:
+            home=Path(temp).resolve()
+            resources=home / '_internal'
+            engine=home / 'engines' / 'engine.exe'
+            with patch('installer.installer_lib.runtime_home',return_value=home):
+                _save_engine_config(resources,{'engine_path':str(engine)})
+                saved=json.loads((home/'server/data/engine_config.json').read_text())
+                self.assertEqual(saved['engine_path'],'engines/engine.exe')
+                self.assertEqual(_load_engine_config(resources)['engine_path'],str(engine))
+
+    def test_relative_runtime_home_does_not_depend_on_current_directory(self):
+        with patch.dict(os.environ,{'SHOGI_ANALYZER_HOME':'user-files'}), patch('app_paths.resource_root',return_value=Path(tempfile.gettempdir())):
+            self.assertEqual(runtime_home(),(Path(tempfile.gettempdir())/'user-files').resolve())
+
     def test_quoted_command_paths_and_arguments(self):
         import subprocess
         import shlex

@@ -73,6 +73,12 @@ def self_check() -> int:
 
 
 def main() -> int:
+    # PyInstaller's isolated interpreter ignores PYTHONIOENCODING. The launcher
+    # decodes server pipes as UTF-8, so configure the actual pipe writers here.
+    # Leave native console streams alone; Python uses the Windows Unicode API.
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and not stream.isatty() and hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='backslashreplace', write_through=True)
     args = sys.argv[1:]
     if args == ["--self-check"]:
         return self_check()

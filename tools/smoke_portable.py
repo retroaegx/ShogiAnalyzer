@@ -25,6 +25,15 @@ def main():
         empty_bin.mkdir()
         env['PATH'] = os.path.join(env.get('SystemRoot', 'C:/Windows'), 'System32') if os.name == 'nt' else str(empty_bin)
         env.update(SHOGI_ANALYZER_HOME=temp, SHOGI_ANALYZER_PASSWORD='FALSE', SHOGI_ANALYZER_TUNNEL='FALSE', SHOGI_ANALYZER_UPDATE_CHECK='FALSE')
+        # A frozen Windows child ignores PYTHONIOENCODING and used to emit cp932
+        # into the launcher's UTF-8 reader. Check real executable pipe bytes.
+        sample='パスワード保護: ON / 最初の画面で設定してください。\n'
+        pipe_probe=Path(temp)/'pipe_encoding.py'
+        pipe_probe.write_text('import sys\nsys.stdout.write('+repr(sample)+')\nsys.stderr.write('+repr(sample)+')\n',encoding='utf-8')
+        encoded=subprocess.run([str(exe),'--engine-python',str(pipe_probe)],
+            env={**env,'PYTHONIOENCODING':'utf-8'},capture_output=True,check=True,timeout=20)
+        assert encoded.stdout==sample.encode('utf-8'), 'Non-UTF-8 stdout from native executable'
+        assert encoded.stderr==sample.encode('utf-8'), 'Non-UTF-8 stderr from native executable'
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0))
             env['SHOGI_ANALYZER_PORT'] = str(sock.getsockname()[1])

@@ -113,12 +113,6 @@
             <div class="stand-pieces" id="handTop"></div>
           </div>
 
-          <div class="evalbar" id="evalBar" aria-label="評価値バー">
-            <div class="evalbar-fill" id="evalBarFill"></div>
-            <div class="evalbar-mid"></div>
-            <span class="evalbar-text" id="evalBarText">0</span>
-          </div>
-
           <div class="board-frame" id="boardFrame">
             <div class="coords coords-files" id="coordFiles"></div>
             <div class="coords coords-ranks" id="coordRanks"></div>
@@ -138,16 +132,16 @@
 
         <div class="navbar" aria-label="局面移動">
           <div class="nav-group">
-            <button id="btnStart" class="nav-btn" type="button" title="最初へ (Home)" aria-label="最初へ"><svg class="ico"><use href="#i-first"/></svg></button>
-            <button id="btnPrev" class="nav-btn" type="button" title="1手戻る (←)" aria-label="1手戻る"><svg class="ico"><use href="#i-prev"/></svg></button>
+            <button id="btnStart" class="nav-btn" type="button" title="最初へ (Home)" aria-label="最初へ"><svg class="ico"><use href="#i-first"/></svg><span class="nav-label" aria-hidden="true">最初</span></button>
+            <button id="btnPrev" class="nav-btn" type="button" title="1手戻る (←)" aria-label="1手戻る"><svg class="ico"><use href="#i-prev"/></svg><span class="nav-label" aria-hidden="true">戻る</span></button>
           </div>
           <div class="ply-display">
             <input id="plySlider" class="ply-slider" type="range" min="0" max="0" value="0" aria-label="手数">
             <div class="ply-text"><b id="plyNow">0</b><span>/</span><span id="plyMax">0</span><span class="ply-unit">手</span><span class="turn-chip" id="turnChip">▲先手番</span></div>
           </div>
           <div class="nav-group">
-            <button id="btnNext" class="nav-btn" type="button" title="1手進む (→)" aria-label="1手進む"><svg class="ico"><use href="#i-next"/></svg></button>
-            <button id="btnEnd" class="nav-btn" type="button" title="最後へ (End)" aria-label="最後へ"><svg class="ico"><use href="#i-last"/></svg></button>
+            <button id="btnNext" class="nav-btn" type="button" title="1手進む (→)" aria-label="1手進む"><svg class="ico"><use href="#i-next"/></svg><span class="nav-label" aria-hidden="true">進む</span></button>
+            <button id="btnEnd" class="nav-btn" type="button" title="最後へ (End)" aria-label="最後へ"><svg class="ico"><use href="#i-last"/></svg><span class="nav-label" aria-hidden="true">最後</span></button>
           </div>
           <button id="kifuDrawerBtn" class="nav-btn kifu-btn" type="button" title="棋譜" aria-label="棋譜を開く"><svg class="ico"><use href="#i-list"/></svg><span>棋譜</span></button>
           <button id="flipBtn" class="nav-btn flip-btn" type="button" title="盤を反転（先手・後手の向きを入れ替え） (F)" aria-label="盤を反転"><svg class="ico"><use href="#i-flipboard"/></svg><span>反転</span></button>
@@ -223,6 +217,7 @@
             <span class="card-sub" id="kifuSub"></span>
             <button id="kifuDrawerClose" class="icon-btn drawer-close" type="button" aria-label="棋譜を閉じる"><svg class="ico"><use href="#i-close"/></svg></button>
           </header>
+          <div class="kifu-columns" aria-hidden="true"><span>手数</span><span>指し手</span><span>評価値</span><span></span></div>
           <ol class="move-list" id="moveList"></ol>
           <div class="variations" id="variations" hidden>
             <div class="var-head"><svg class="ico"><use href="#i-branch"/></svg><span id="varTitle">変化</span></div>
@@ -320,7 +315,6 @@
             <button type="button" data-v="overlay">盤の縁に重ねる</button><button type="button" data-v="outside">盤の外</button><button type="button" data-v="off">非表示</button>
           </div>
         </div>
-        <label class="check"><input type="checkbox" id="optEvalBar" checked> 評価値バーを表示</label>
         <label class="check"><input type="checkbox" id="optLegal" checked> 移動可能マスを表示</label>
         <label class="check"><input type="checkbox" id="optLastMove" checked> 最後に指した手を強調 <span class="legend red"></span></label>
         <label class="check"><input type="checkbox" id="optBestMove" checked> コンピュータの手（最善手 / 候補手）を表示 <span class="legend green"></span></label>

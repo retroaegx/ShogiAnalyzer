@@ -851,12 +851,8 @@ def _download_engine_variant(root: Path, engine: dict) -> Path | None:
     type_hint = (variant.get("engine_type_hint") or "").strip()
     best = _choose_best_engine_exe(extracted_root if extracted_root.exists() else engines_dir, type_hint=type_hint)
     if best is None:
-        # fallback: largest file
-        files = [p for p in (extracted_root if extracted_root.exists() else engines_dir).rglob("*") if p.is_file()]
-        if not files:
-            return None
-        files.sort(key=lambda p: p.stat().st_size, reverse=True)
-        best = files[0]
+        print(tr("[installer] このOS・CPUに対応するエンジンがありません。手動で対応エンジンを設定してください。",
+                 "[installer] No compatible engine for this OS/CPU; configure a compatible engine manually."))
     return best
 
 

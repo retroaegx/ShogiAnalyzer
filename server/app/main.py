@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import mimetypes
+from urllib.parse import urlsplit
 from pathlib import Path
 from app_paths import resource_root
 
@@ -52,6 +53,17 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def _require_login(request, call_next):
         path = request.url.path
+        # CORS does not prevent cross-site simple POSTs from changing state.
+        # In particular, initial password setup has no login cookie yet.
+        origin=request.headers.get('origin')
+        if request.method in {'POST','PUT','PATCH','DELETE'} and origin:
+            try:
+                parsed=urlsplit(origin)
+                valid=parsed.scheme in {'http','https'} and parsed.netloc.lower()==request.headers.get('host','').lower()
+            except ValueError:
+                valid=False
+            if not valid:
+                return JSONResponse({'detail':'same-origin request required'},status_code=403)
         if not auth.required() or path in open_paths or path.startswith(("/icons/", "/img/", "/s/")) or auth.token_valid(request.cookies.get(auth.COOKIE_NAME)):
             return await call_next(request)
         if path.startswith("/api/"):

@@ -9,10 +9,26 @@ from unittest.mock import patch
 from app_paths import runtime_home, resource_root
 from external_process import external_env, split_command
 from installer.cpu_variants import choose_engine, binary_target
-from installer.installer_lib import _pick_engine_variant, _platform_key
+from installer.installer_lib import _pick_engine_variant, _platform_key, _download_engine_variant
 
 
 class PortableTests(unittest.TestCase):
+    def test_download_never_replaces_cpu_rejection_with_largest_file(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            def extract(_archive, destination):
+                destination.mkdir(parents=True)
+                (destination / 'unsupported-engine.exe').write_bytes(b'unsupported binary')
+                (destination / 'nn.bin').write_bytes(b'x' * 1024)
+            with patch('installer.installer_lib.runtime_home', return_value=home), \
+                 patch('installer.installer_lib._pick_engine_variant', return_value={'url': 'https://example.invalid/engine.zip'}), \
+                 patch('installer.installer_lib._prompt_consent', return_value=True), \
+                 patch('installer.installer_lib._download'), \
+                 patch('installer.installer_lib._log_installer_event'), \
+                 patch('installer.installer_lib._extract_archive', side_effect=extract), \
+                 patch('installer.installer_lib._choose_best_engine_exe', return_value=None):
+                self.assertIsNone(_download_engine_variant(home, {'id': 'test'}))
+
     def test_saved_engine_paths_are_relative_to_runtime_not_bundle(self):
         import json
         from installer.installer_lib import _load_engine_config, _save_engine_config

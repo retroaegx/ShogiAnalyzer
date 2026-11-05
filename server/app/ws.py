@@ -546,11 +546,18 @@ def _analysis_off(g) -> None:
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
+    # Block cross-site browser sockets even when password protection is OFF.
+    origin = ws.headers.get("origin") or ""
+    try:
+        parsed = urlsplit(origin)
+        same_origin = not origin or (parsed.scheme in {'http','https'} and parsed.netloc.lower() == (ws.headers.get('host') or '').lower())
+    except ValueError:
+        same_origin = False
+    if not same_origin:
+        await ws.close(code=4403)
+        return
     if auth.required():
-        # login cookie required (also while the password is not set yet), and only from this app's own pages (blocks cross-site sockets)
-        origin = ws.headers.get("origin") or ""
-        same_origin = not origin or urlsplit(origin).netloc == (ws.headers.get("host") or "")
-        if not same_origin or not auth.token_valid(ws.cookies.get(auth.COOKIE_NAME)):
+        if not auth.token_valid(ws.cookies.get(auth.COOKIE_NAME)):
             await ws.close(code=4401)
             return
     hub = _hub_from_ws(ws)

@@ -54,6 +54,13 @@ class WebSocketReconnectTests(unittest.IsolatedAsyncioTestCase):
     def connect(self,tab):
         return websockets.connect(f'ws://127.0.0.1:{self.port}/ws?tab={tab}')
 
+    async def test_cross_site_socket_rejected_with_password_off(self):
+        async with websockets.connect(f'ws://127.0.0.1:{self.port}/ws?tab=cross-site',
+                                      origin='https://unrelated.invalid') as ws:
+            with self.assertRaises(websockets.exceptions.ConnectionClosedError) as rejected:
+                await asyncio.wait_for(ws.recv(), 5)
+            self.assertEqual(rejected.exception.rcvd.code, 4403)
+
     async def send(self,ws,session,kind,payload):
         await ws.send(json.dumps({'type':kind,'payload':payload,'session_id':session['session_id'],'owner_token':session['owner_token']}))
 

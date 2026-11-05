@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
+import http.cookiejar
 import json
 import os
 from pathlib import Path
@@ -14,6 +15,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+import urllib.error
 
 
 class WebSocket:
@@ -194,6 +196,34 @@ def main():
         assert (home/'server/data/app.db').is_file()
         assert not (home/'.venv').exists() and not (home/'engines').exists()
         checks['no_venv_or_engine_download']=True
+        with urllib.request.urlopen(f'http://127.0.0.1:{port}/api/app/licenses') as response:
+            assert '同梱ソフトウェア' in response.read().decode('utf-8')
+        checks['bundled_license_page']=True
+        stop()
+        env['SHOGI_ANALYZER_PASSWORD']='TRUE'
+        start()
+        client=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        base=f'http://127.0.0.1:{port}'
+        def auth_request(path, data=None, origin=base):
+            req=urllib.request.Request(base+path, data=None if data is None else json.dumps(data).encode(),
+                headers={'Content-Type':'application/json','Origin':origin})
+            try:
+                with client.open(req,timeout=5) as response: return response.status,response.read()
+            except urllib.error.HTTPError as error: return error.code,error.read()
+        assert auth_request('/api/settings')[0]==401
+        assert auth_request('/api/auth/setup',{'password':'cleanroom-test-only'},'https://unrelated.invalid')[0]==403
+        assert not json.loads(auth_request('/api/auth/status')[1])['configured']
+        assert auth_request('/api/auth/setup',{'password':'cleanroom-test-only'})[0]==200
+        assert auth_request('/api/settings')[0]==200
+        assert auth_request('/api/logout',{})[0]==200
+        assert auth_request('/api/settings')[0]==401
+        assert auth_request('/api/login',{'password':'wrong-test-only'})[0]==401
+        assert auth_request('/api/login',{'password':'cleanroom-test-only'})[0]==200
+        stop(); start()
+        assert auth_request('/api/settings')[0]==200
+        assert json.loads(auth_request('/api/auth/status')[1])['configured']
+        checks['native_password_setup_login_logout_restart']=True
+        checks['cross_site_setup_rejected']=True
         report['ok']=True
     except Exception as error:
         report['ok']=False

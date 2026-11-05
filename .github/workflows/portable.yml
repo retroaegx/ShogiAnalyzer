@@ -77,7 +77,7 @@ jobs:
           docker pull ubuntu:22.04
           docker image inspect ubuntu:22.04 --format '{{json .RepoDigests}}' > dist/cleanroom-results/image-digest.json
           docker run --rm --network none --read-only --memory 768m --cpus 2 --pids-limit 128 \
-            --tmpfs /tmp:rw,size=512m --tmpfs /test:rw,size=256m \
+            --tmpfs /tmp:rw,size=512m --tmpfs /test:rw,exec,size=256m \
             -v "$PWD/dist/cleanroom-input:/input:ro" \
             -v "$PWD/dist/cleanroom-results:/results:rw" \
             -v "$PWD/tools/cleanroom_probe.py:/probe.py:ro" \

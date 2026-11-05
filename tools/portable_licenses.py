@@ -228,9 +228,13 @@ $ErrorActionPreference='Stop'
     @{file=$_;status=$signature.Status.ToString();publisher=$signature.SignerCertificate.Subject}
 } | ConvertTo-Json
 """
+    # A parent pwsh session may export a module path containing PS7-only modules;
+    # let Windows PowerShell initialize its own module search path.
+    signature_env={key:value for key,value in os.environ.items() if key.lower() != 'psmodulepath'}
+    signature_env['SHOGI_BUILD_VC_RUNTIME_SOURCE']=str(source_dir)
     signatures=json.loads(subprocess.check_output([
         'powershell.exe', '-NoProfile', '-NonInteractive', '-Command', signature_script],
-        env={**os.environ, 'SHOGI_BUILD_VC_RUNTIME_SOURCE':str(source_dir)},encoding='utf-8'))
+        env=signature_env,encoding='utf-8'))
     signatures={row['file']:row for row in signatures}
     internal=(folder/'_internal').resolve()
     notices=internal/'third_party_notices'

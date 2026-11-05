@@ -46,14 +46,8 @@ try {
     $after=Environment-Snapshot
     $after | ConvertTo-Json -Depth 5 | Set-Content "$result\after.json" -Encoding UTF8
     if($after.python_commands.Count -or $after.python_registry.Count -or $after.system_vcruntime140 -or $after.system_vcruntime140_1){throw 'Application installed an unexpected system runtime'}
-    # Keep the fixture available for manual inspection with the ordinary Start.bat.
-    Copy-Item -LiteralPath "$result\application-data\server" -Destination 'C:\ShogiTest\ShogiAnalyzer\server' -Recurse
-    $settings=Get-Content "$result\application-data\.env" -Raw
-    $settings=$settings -replace '(?m)^SHOGI_ANALYZER_TUNNEL=.*','SHOGI_ANALYZER_TUNNEL=FALSE'
-    $settings=$settings -replace '(?m)^SHOGI_ANALYZER_PASSWORD=.*','SHOGI_ANALYZER_PASSWORD=FALSE'
-    $settings=$settings -replace '(?m)^SHOGI_ANALYZER_UPDATE_CHECK=.*','SHOGI_ANALYZER_UPDATE_CHECK=FALSE'
-    $settings+="`r`nSHOGI_ANALYZER_ENGINE_CMD=C:\ShogiTest\ShogiAnalyzer\ShogiAnalyzer.exe --engine-python C:\ShogiInput\fake_usi.py`r`n"
-    [IO.File]::WriteAllText('C:\ShogiTest\ShogiAnalyzer\.env',$settings,[Text.UTF8Encoding]::new($false))
+    # Leave the extracted distribution untouched. Regression fixtures and the
+    # mock engine configuration belong only to the probe's application-data.
     [ordered]@{ok=$true;direct_executable=$true;start_bat=$true;system_runtimes_installed=$false;kept_open_for_inspection=$true} | ConvertTo-Json | Set-Content "$result\summary.json" -Encoding UTF8
     @'
 ShogiAnalyzer inspection environment
@@ -61,8 +55,12 @@ ShogiAnalyzer inspection environment
 Open C:\ShogiTest\ShogiAnalyzer and double-click Start.bat.
 Then open http://localhost:31145 in the Sandbox browser.
 
-The saved Clean-room fixture is available in the game library.
-Analysis uses a controlled USI test peer (Regression engine), NOT a real shogi engine.
+The extracted application has no initial settings or mock engine configured.
+This Sandbox has networking DISABLED: real engine downloads cannot complete here.
+Use a separate network-enabled fresh Sandbox to inspect the normal first-run setup.
+
+Automated regression results are in C:\ShogiResults.
+Only those automated tests use a controlled USI peer, NOT a real shogi engine.
 Python / PHP / VC++ runtime have NOT been installed in this Windows OS.
 The required VC++ DLLs are inside the application's _internal folder.
 

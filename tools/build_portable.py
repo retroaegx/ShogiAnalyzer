@@ -14,7 +14,7 @@ import tarfile
 import tempfile
 import zipfile
 
-from portable_licenses import collect, audit_bundle, windows_system_runtime
+from portable_licenses import collect, audit_bundle, bundle_windows_runtime
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -54,7 +54,7 @@ def main() -> None:
     exe = folder / ('ShogiAnalyzer.exe' if sys.platform == 'win32' else 'ShogiAnalyzer')
     shutil.copytree(source_dir, folder / 'third_party_sources', dirs_exist_ok=True)
     shutil.copyfile(ROOT / 'docs/THIRD_PARTY.md', folder / 'THIRD_PARTY.txt')
-    windows_system_runtime(folder)
+    bundle_windows_runtime(folder)
     audit_bundle(folder)
     subprocess.run([str(exe), '--self-check'], check=True)
     shutil.copyfile(ROOT / 'docs' / 'PORTABLE.md', folder / 'README.txt')
@@ -88,7 +88,8 @@ def main() -> None:
         'sha256': hashlib.sha256(archive.read_bytes()).hexdigest(), 'python': sys.version,
         'platform': platform.platform(), 'engines_included': False, 'evaluations_included': False,
         'commit': subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
-        'license_sources_included': True, 'lgpl_modules_external': True, 'microsoft_runtime_bundled': False}
+        'license_sources_included': True, 'lgpl_modules_external': True,
+        'microsoft_runtime_bundled': sys.platform == 'win32'}
     (output / 'build-report.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     (output / 'build-requirements.lock').write_text(''.join(sorted(f"{d.metadata['Name']}=={d.version}\n" for d in metadata.distributions())), encoding='utf-8')
     license_stage.cleanup()

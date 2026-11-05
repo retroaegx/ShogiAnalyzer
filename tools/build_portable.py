@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import zipfile
 
 from portable_licenses import collect, audit_bundle, windows_system_runtime
@@ -24,7 +25,10 @@ def main() -> None:
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
-    license_dir, source_dir = collect(output)
+    license_stage = tempfile.TemporaryDirectory(prefix='license-stage-', dir=output)
+    if not Path(license_stage.name).resolve().is_relative_to(output):
+        raise RuntimeError('License staging escaped build output')
+    license_dir, source_dir = collect(Path(license_stage.name))
     # Explicit allowlist: never add the whole repository, engines, evaluation files,
     # .env, databases or user-generated shares to the frozen bundle.
     resources = [('.env.template', '.'), ('VERSION', '.'), ('LICENSE', '.'),
@@ -87,6 +91,7 @@ def main() -> None:
         'license_sources_included': True, 'lgpl_modules_external': True, 'microsoft_runtime_bundled': False}
     (output / 'build-report.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     (output / 'build-requirements.lock').write_text(''.join(sorted(f"{d.metadata['Name']}=={d.version}\n" for d in metadata.distributions())), encoding='utf-8')
+    license_stage.cleanup()
     print(json.dumps(report, indent=2))
 
 

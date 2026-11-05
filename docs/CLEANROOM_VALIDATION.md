@@ -1,5 +1,19 @@
 # Python未導入環境での検証（2026-11-05）
 
+## 初回ダウンロードのHTTPS修正と再検証
+
+ネット接続ありの初回設定用Sandboxで、cloudflared取得時に`CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate`が発生した。旧Python処理では、初期状態のWindows証明書ストアをOpenSSLへ読み込んだだけでは配布先の証明書チェーンを検証できなかった。ネットワークを無効にした回帰テストでは、この初回ダウンロードを検証できていなかった。
+
+Windows/macOSではtruststoreを使用してOSの証明書検証・チェーン構築を利用し、LinuxではOSのCAを優先し、CAがない最小環境だけcertifiを使用するように修正した。インストーラーの取得と更新確認で共通のHTTPS処理を使用する。証明書検証とホスト名検証は有効のままで、OSへ手作業で証明書を追加する修正や検証の無効化は行わない。
+
+同じWindows Sandboxで、旧処理はGitHubのリリース取得先・storage.yaneu.com・Google Driveの3か所ですべて証明書エラーを再現。修正版のネイティブ実行ファイルでは、リダイレクト先も含めて3か所すべてのHTTPS接続が成功した。実際のダウンロード関数で公開Pythonライセンス文書13,936 bytesを取得し、更新確認のAPI呼び出しも成功。自己署名証明書とホスト名不一致の証明書は拒否した。エンジン・評価関数の本体を取得したという意味ではなく、これらの配布先にはHEADで接続している。
+
+修正版ZIPは31,204,034 bytes、SHA256は`2e29988b751b2c43a8bf12ab26be02baef4d05b6e6679418c3c1c32905e3f1c8`、ビルド元は`3a6b0b64d5125307257f276336ea849c7d192b16`。Sandboxを閉じずに、デスクトップのShogiAnalyzerをこの版へ更新した。.envのハッシュが更新前後で同一であることを確認し、選択済みのパスワード保護を含む設定を保持した。
+
+証跡はwindows-first-run-resultsのtls-probe.json（旧処理とOS検証の比較）、tls-fixed-https.json、tls-update-applied.json、tls-applied-https.json。最初の診断には一時的な公開アセットURLが含まれるため、共有時はクエリー文字列を除くこと。恒久的なtools/probe_https.pyは最終ホスト名だけを記録する。
+
+Pythonのテスト31件には、ローカルHTTPSサーバーを使った正常接続・未知のCAの拒否・信頼したCAでもホスト名が異なる場合の拒否を含む。テスト証明書は実運用には使わず、OSの信頼ストアにも追加しない。[各OSビルドと新規UbuntuでのHTTPS検証の成功](https://github.com/retroaegx/ShogiAnalyzer/actions/runs/41990811136)。Ubuntuのオフライン回帰テストとは別に、OSへPythonやCAパッケージを追加せず、ネット接続ありの新規コンテナーでもHTTPSの実取得を検証した。
+
 ## VC++ DLL同梱後の再検証
 
 Windows Sandboxを新規に作成し、Python/PHP/Nodeのコマンド・Pythonのインストール登録・System32のvcruntime140.dllとvcruntime140_1.dllがないことを確認した。同梱版の展開後、OSへ何もインストールせずにEXE直接実行とStart.batの自己検査が成功した。通常ランチャーでの起動、HTTP配信、USIテスト相手との解析通信、103手棋譜の読み込み、再接続時の操作同期、保存、終了、再起動も成功した。終了後にも同じ初期状態のチェックを行い、PythonやVC++ランタイムがOSへ追加されていないことを確認した。

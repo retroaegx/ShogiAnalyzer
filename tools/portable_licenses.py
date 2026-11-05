@@ -4,12 +4,14 @@ from __future__ import annotations
 import hashlib
 from importlib import metadata
 import json
+import os
 from pathlib import Path
 import platform
 import re
 import shutil
 import ssl
 import sqlite3
+import subprocess
 import sys
 import sysconfig
 import urllib.request
@@ -23,6 +25,40 @@ from packaging.utils import canonicalize_name
 ROOT = Path(__file__).resolve().parents[1]
 LGPL_MODULES = {'py7zr': 'py7zr', 'pybcj': 'bcj', 'inflate64': 'inflate64',
     'multivolumefile': 'multivolumefile', 'pyppmd': 'pyppmd'}
+WINDOWS_RUNTIME_DLLS = ('vcruntime140.dll', 'vcruntime140_1.dll')
+
+
+def collect_windows_licenses(licenses: Path, references: list) -> None:
+    if sys.platform != 'win32':
+        return
+    documents = [
+        ('Microsoft Visual C++ Runtime end-user terms', 'Microsoft-runtime-terms',
+         'https://visualstudio.microsoft.com/wp-content/uploads/2021/09/Visual-C-Runtime-2015-2022-License-1.docx',
+         'f1e3d56ceb2ad68aae0711b910375009e651ac5530fa0760f0dea6e81e54fae1'),
+        ('Visual Studio 2022 redistribution license reference', 'Microsoft-VS2022-terms',
+         'https://visualstudio.microsoft.com/wp-content/uploads/2021/11/Visual-Studio-2022-Community-License-EN.docx',
+         '41a207b10c8ab91d0d2f10a854715f73dca54509581692d2fe179aa3ffcb8540'),
+    ]
+    namespace = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+    for component, name, url, expected in documents:
+        target = licenses / (name + '.docx')
+        digest = fetch(url, target, expected)
+        with zipfile.ZipFile(target) as document:
+            tree = ET.fromstring(document.read('word/document.xml'))
+        # Preserve the complete text and the unmodified official document.
+        text = '\n'.join(''.join(node.text or '' for node in paragraph.findall('.//w:t', namespace))
+                         for paragraph in tree.findall('.//w:p', namespace)) + '\n'
+        (licenses / (name + '.txt')).write_text(text, encoding='utf-8')
+        references.append({'component': component, 'url': url, 'file': target.name,
+                           'sha256': digest, 'text_file': name + '.txt'})
+    for component, name, url in [
+        ('Visual Studio 2022 redistributable file list', 'Microsoft-REDIST.html',
+         'https://learn.microsoft.com/en-us/visualstudio/releases/2022/redistribution'),
+        ('CPython Windows additional conditions', 'CPython-Windows-conditions.txt',
+         f'https://raw.githubusercontent.com/python/cpython/v{platform.python_version()}/PC/crtlicense.txt'),
+    ]:
+        references.append({'component': component, 'url': url, 'file': name,
+                           'sha256': fetch(url, licenses / name)})
 
 
 def runtime_distributions() -> list:
@@ -129,16 +165,12 @@ def collect(output: Path) -> tuple[Path, Path]:
     url = 'https://raw.githubusercontent.com/gcc-mirror/gcc/master/COPYING3'
     references.append({'component':'GCC GPL text (subject to runtime exception)', 'url':url,
         'file':'GCC-COPYING3.txt', 'sha256':fetch(url,licenses/'GCC-COPYING3.txt')})
+    collect_windows_licenses(licenses, references)
     (licenses/'INVENTORY.json').write_text(json.dumps({'packages':inventory,'native_references':references,
         'interpreter':sys.version,'openssl':ssl.OPENSSL_VERSION,'sqlite':sqlite3.sqlite_version,
         'zlib':zlib.ZLIB_RUNTIME_VERSION},ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     (licenses/'DEPENDENCIES.txt').write_text(''.join(f"{r['name']}=={r['version']} — {r['license']}\n" for r in inventory),encoding='utf-8')
     (sources/'SOURCES.json').write_text(json.dumps([r for r in inventory if 'source' in r],indent=2)+'\n',encoding='utf-8')
-    # Reusing an output folder must not retain earlier development-only notices.
-    # Only generated files under this notices folder are removed.
-    for old in ('Microsoft-runtime-terms.html','Microsoft-runtime-terms.docx','Microsoft-runtime-terms.txt'):
-        path=licenses/old
-        if path.is_file(): path.unlink()
     return licenses, sources
 
 
@@ -163,24 +195,89 @@ def audit_bundle(folder: Path) -> None:
         if path.is_file() and (path.suffix.lower() in {'.dll','.pyd','.dylib'} or '.so' in path.name)))+'\n',encoding='utf-8')
 
 
-def windows_system_runtime(folder: Path) -> None:
+def bundle_windows_runtime(folder: Path) -> None:
     if sys.platform != 'win32':
         return
-    # Do not redistribute Microsoft's runtime DLLs under the PSF/MIT license.
-    # Windows 10+ supplies UCRT; VC runtime comes from the user's official install.
+    import pefile
+
+    # Obtain original release DLLs from Visual Studio's REDIST directory, rather
+    # than harvesting a user's System32 files. Build machines must be licensed
+    # for redistribution under the relevant Visual Studio terms.
+    vswhere=Path(os.environ['ProgramFiles(x86)'])/'Microsoft Visual Studio/Installer/vswhere.exe'
+    instances=json.loads(subprocess.check_output([
+        str(vswhere), '-products', '*', '-version', '[17.0,18.0)', '-format', 'json', '-utf8'],
+        encoding='utf-8'))
+    candidates=[]
+    for instance in instances:
+        root=Path(instance['installationPath'])/'VC/Redist/MSVC'
+        for directory in root.glob('*/x64/Microsoft.VC143.CRT'):
+            if all((directory/name).is_file() for name in WINDOWS_RUNTIME_DLLS):
+                version=tuple(int(part) for part in directory.parents[1].name.split('.'))
+                candidates.append((version, str(directory), instance))
+    if not candidates:
+        raise RuntimeError('Windows package builds require licensed Visual Studio 2022 C++ REDIST files')
+    _, directory, instance=max(candidates, key=lambda item:(item[0],item[1]))
+    source_dir=Path(directory)
+    signature_script="""
+$ErrorActionPreference='Stop'
+@('vcruntime140.dll','vcruntime140_1.dll') | ForEach-Object {
+    $signature=Get-AuthenticodeSignature -LiteralPath (Join-Path $env:SHOGI_BUILD_VC_RUNTIME_SOURCE $_)
+    if($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
+        throw "Invalid Microsoft runtime signature: $_"
+    }
+    @{file=$_;status=$signature.Status.ToString();publisher=$signature.SignerCertificate.Subject}
+} | ConvertTo-Json
+"""
+    signatures=json.loads(subprocess.check_output([
+        'powershell.exe', '-NoProfile', '-NonInteractive', '-Command', signature_script],
+        env={**os.environ, 'SHOGI_BUILD_VC_RUNTIME_SOURCE':str(source_dir)},encoding='utf-8'))
+    signatures={row['file']:row for row in signatures}
     internal=(folder/'_internal').resolve()
+    notices=internal/'third_party_notices'
+    required_notices = ('CPython-LICENSE.txt', 'CPython-Windows-conditions.txt',
+                        'Microsoft-runtime-terms.docx', 'Microsoft-runtime-terms.txt',
+                        'Microsoft-VS2022-terms.docx', 'Microsoft-VS2022-terms.txt',
+                        'Microsoft-REDIST.html')
+    for name in required_notices:
+        if not (notices/name).is_file():
+            raise RuntimeError(f'Missing Microsoft redistribution document: {name}')
+    runtime_files=[]
+    for name in WINDOWS_RUNTIME_DLLS:
+        source=source_dir/name
+        with pefile.PE(str(source), fast_load=False) as image:
+            if image.FILE_HEADER.Machine != 0x8664:
+                raise RuntimeError(f'Expected x64 runtime: {source}')
+            values={key.decode(): value.decode() for group in image.FileInfo
+                    for entry in group if entry.Key == b'StringFileInfo'
+                    for table in entry.StringTable for key,value in table.entries.items()}
+            if values.get('CompanyName') != 'Microsoft Corporation':
+                raise RuntimeError(f'Unexpected runtime publisher: {source}')
+        target=internal/name
+        shutil.copyfile(source,target)
+        runtime_files.append({'file':name, 'sha256':hashlib.sha256(target.read_bytes()).hexdigest(),
+                              'bytes':target.stat().st_size, 'source':str(source),
+                              'version':values['FileVersion'], 'copyright':values['LegalCopyright'],
+                              'publisher':values['CompanyName'], 'signature':signatures[name]})
     removed=[]
     for path in internal.rglob('*.dll'):
         name=path.name.lower()
-        if name.startswith(('api-ms-win-','vcruntime','msvcp','concrt','msvcr')) or name=='ucrtbase.dll':
+        # UCRT is an OS component on supported Windows 10+. Do not ship copies of
+        # Windows system DLLs or silently add unreviewed VC runtime components.
+        if name.startswith(('api-ms-win-',)) or name=='ucrtbase.dll':
             if not path.resolve().is_relative_to(internal):
                 raise RuntimeError('Unexpected library path outside application bundle')
             removed.append(path.relative_to(internal).as_posix())
             path.unlink()
-    (internal/'third_party_notices'/'WINDOWS_SYSTEM_RUNTIME.txt').write_text(
-        'Microsoft Windows / VC Runtime DLLs are not redistributed in this package.\n'
-        'Requires Windows 10 or later and the official Microsoft Visual C++ x64 Runtime.\n'
-        'Start.bat checks the runtime and links to Microsoft if it is absent.\n'
-        'https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist\n'
-        'Removed from generated bundle:\n'+'\n'.join(removed)+'\n',encoding='utf-8')
-    (folder/'Start.bat').write_text('@echo off\nsetlocal\nset "SA_SYSTEM=%SystemRoot%\\System32"\nif defined PROCESSOR_ARCHITEW6432 set "SA_SYSTEM=%SystemRoot%\\Sysnative"\nif not exist "%SA_SYSTEM%\\vcruntime140.dll" goto missing_runtime\nif not exist "%SA_SYSTEM%\\vcruntime140_1.dll" goto missing_runtime\n"%~dp0ShogiAnalyzer.exe" %*\nset "SA_RESULT=%ERRORLEVEL%"\nif not "%SA_RESULT%"=="0" pause\nexit /b %SA_RESULT%\n:missing_runtime\necho Microsoft Visual C++ Runtime x64 is required. Python is included.\necho Install it from Microsoft\'s official page, then run Start.bat again.\necho https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist\nstart "" "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist"\npause\nexit /b 2\n',encoding='utf-8',newline='\r\n')
+        elif name.startswith(('vcruntime','msvcp','concrt','msvcr')) and name not in WINDOWS_RUNTIME_DLLS:
+            raise RuntimeError(f'Unreviewed Microsoft runtime DLL: {path}')
+    (notices/'WINDOWS_RUNTIME.json').write_text(json.dumps({
+        'files':runtime_files, 'source_distribution':'Visual Studio 2022 C++ REDIST',
+        'visual_studio':{'product':instance['productId'], 'version':instance['installationVersion']},
+        'cpython_conditions':'CPython-Windows-conditions.txt',
+        'runtime_terms':'Microsoft-runtime-terms.txt',
+        'redistribution_reference':'Microsoft-VS2022-terms.txt',
+        'removed_os_dlls':removed}, ensure_ascii=False, indent=2)+'\n',encoding='utf-8')
+    # Retire the previous, incorrect OS-installed VC runtime prerequisite notice.
+    old=notices/'WINDOWS_SYSTEM_RUNTIME.txt'
+    if old.is_file(): old.unlink()
+    (folder/'Start.bat').write_text('@echo off\nsetlocal\n"%~dp0ShogiAnalyzer.exe" %*\nset "SA_RESULT=%ERRORLEVEL%"\nif not "%SA_RESULT%"=="0" pause\nexit /b %SA_RESULT%\n',encoding='utf-8',newline='\r\n')

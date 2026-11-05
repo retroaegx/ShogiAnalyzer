@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-from portable_licenses import LGPL_MODULES, audit_bundle
+from portable_licenses import LGPL_MODULES, WINDOWS_RUNTIME_DLLS, audit_bundle
 
 
 def main():
@@ -18,6 +18,17 @@ def main():
     folder = exe.parent
     audit_bundle(folder)
     inventory=json.loads((folder/'_internal/third_party_notices/INVENTORY.json').read_text(encoding='utf-8'))
+    if os.name == 'nt':
+        notices=folder/'_internal/third_party_notices'
+        runtime=json.loads((notices/'WINDOWS_RUNTIME.json').read_text(encoding='utf-8'))
+        assert {row['file'] for row in runtime['files']} == set(WINDOWS_RUNTIME_DLLS)
+        for row in runtime['files']:
+            assert hashlib.sha256((folder/'_internal'/row['file']).read_bytes()).hexdigest()==row['sha256']
+        for row in inventory['native_references']:
+            assert hashlib.sha256((notices/row['file']).read_bytes()).hexdigest()==row['sha256']
+        assert 'MICROSOFT SOFTWARE LICENSE TERMS' in (notices/runtime['runtime_terms']).read_text(encoding='utf-8')
+        assert 'DISTRIBUTABLE CODE' in (notices/runtime['redistribution_reference']).read_text(encoding='utf-8')
+        assert 'System32' not in (folder/'Start.bat').read_text(encoding='utf-8')
     assert all(item['name']!='python-shogi' for item in inventory['packages'])
     source_rows=json.loads((folder/'third_party_sources/SOURCES.json').read_text(encoding='utf-8'))
     assert {row['name'] for row in source_rows} == set(LGPL_MODULES)

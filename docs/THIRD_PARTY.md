@@ -24,6 +24,12 @@ py7zr、pybcj（import名bcj）、inflate64、multivolumefile、pyppmdは、そ�
 
 エンジン・評価関数・cloudflaredは含めていません。エンジンと評価関数は利用者が配布元の条件を確認・同意してから正規配布元より取得します。python-shogiは開発時のテストでのみ利用し、このアプリの実行ファイルには含めません。
 
-## Windowsのシステム実行環境
+## Windowsの実行環境
 
-MicrosoftのDLLはPSF/MITライセンスの対象ではないため、本ZIPからは除外しています。Windows 10以降と、Microsoft公式のVisual C++ x64 Runtimeを利用します。Start.batはvcruntime140.dllとvcruntime140_1.dllがOS側にあるか確認し、不足時にはMicrosoft公式の導入案内を開きます。必要なPCでは、このランタイムの導入が別途必要です。Pythonの導入は不要です。
+Windows版には、Visual Studio 2022のC++再配布用フォルダーから取得したvcruntime140.dllとvcruntime140_1.dllを改変せず同梱します。著作権はMicrosoft Corporationに帰属します。Microsoftの有効な電子署名を確認し、これらのDLLをPSF/MITライセンスで再許諾しません。利用者によるVC++ランタイムやVisual Studioの別途インストールは不要です。Windows 10以降に含まれるUCRTを使用し、WindowsのシステムDLLは配布しません。
+
+Microsoft製コードの利用には `_internal/third_party_notices/Microsoft-runtime-terms.txt` のMicrosoftの条件が適用されます。Windows版Pythonの追加条件は同フォルダーのCPython-Windows-conditions.txtです。利用・再配布する方はこれらの条件に同意したうえで利用・再配布してください。著作権・商標等の表示を変更せず、Microsoft公認と誤認させず、Microsoft製コードについて同条件が保護する権利を侵害する利用・再配布を行わないでください。法令上の権利および同梱されるオープンソースの条件による例外は、各原文のとおりです。この条件はMicrosoft製コードに限定され、ShogiAnalyzer本体や別のライセンスを持つライブラリの条件を置き換えません。
+
+公式の原文DOCXと、全文をテキストに変換したものを保存しています。再配布権に関するVisual Studioの条項はMicrosoft-VS2022-terms.txt、対象ファイル一覧はMicrosoft-REDIST.htmlです。再配布者は適用されるVisual Studioの有効な利用許諾および再配布条件を満たす必要があります。単に本書に表示を加えることで再配布権が新たに付与されるわけではありません。
+
+取得元と文書ハッシュはINVENTORY.json、DLLの版・著作権表示・ビルド時の取得元・ハッシュはWINDOWS_RUNTIME.jsonに記録します。DLLは必要な2個だけを同梱し、インストーラー全体は同梱しません。ランタイムの更新はアプリ配布物の更新として行います。

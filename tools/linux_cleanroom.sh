@@ -15,10 +15,15 @@ mkdir -p /results
 } > /results/baseline.txt
 mkdir -p /test
 tar -xzf /input/ShogiAnalyzer-v*-linux-amd64.tar.gz -C /test
-env -i HOME=/tmp PATH=/usr/sbin:/usr/bin:/sbin:/bin LANG=C.UTF-8 \
-  /test/ShogiAnalyzer/ShogiAnalyzer --engine-python /probe.py \
-  --exe /test/ShogiAnalyzer/ShogiAnalyzer \
-  --peer /peer.py --fixture /fixture.kif --output /results/probe.json
+if [ "${1:-}" = https ]; then
+  env -i HOME=/tmp PATH=/usr/sbin:/usr/bin:/sbin:/bin LANG=C.UTF-8 \
+    /test/ShogiAnalyzer/ShogiAnalyzer --engine-python /https-probe.py --output /results/https-probe.json
+else
+  env -i HOME=/tmp PATH=/usr/sbin:/usr/bin:/sbin:/bin LANG=C.UTF-8 \
+    /test/ShogiAnalyzer/ShogiAnalyzer --engine-python /probe.py \
+    --exe /test/ShogiAnalyzer/ShogiAnalyzer \
+    --peer /peer.py --fixture /fixture.kif --output /results/probe.json
+fi
 {
   echo 'Interpreter commands after test:'
   for tool in python python3 pip pip3 php node; do

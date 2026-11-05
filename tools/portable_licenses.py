@@ -111,7 +111,8 @@ def collect(output: Path) -> tuple[Path, Path]:
         expression = dist.metadata.get('License-Expression') or dist.metadata.get('License') or ''
         if name == 'python-shogi' or ('GPL' in expression.upper() and 'LGPL' not in expression.upper()):
             raise RuntimeError(f'Unreviewed GPL runtime dependency: {name}')
-        if not any(token in expression.upper() for token in ('MIT', 'BSD', 'APACHE', 'PSF', 'LGPL', 'PUBLIC DOMAIN', 'ZLIB')):
+        reviewed_mpl = name == 'certifi' and 'MPL' in expression.upper()
+        if not reviewed_mpl and not any(token in expression.upper() for token in ('MIT', 'BSD', 'APACHE', 'PSF', 'LGPL', 'PUBLIC DOMAIN', 'ZLIB')):
             raise RuntimeError(f'Unreviewed runtime license: {name}: {expression}')
         copied = []
         for item in dist.files or []:
@@ -125,8 +126,8 @@ def collect(output: Path) -> tuple[Path, Path]:
         if not copied:
             raise RuntimeError(f'No license text supplied by installed distribution: {name}')
         row = {'name':name, 'version':dist.version, 'license':expression, 'notices':copied}
-        if 'LGPL' in expression.upper():
-            if name not in LGPL_MODULES:
+        if 'LGPL' in expression.upper() or reviewed_mpl:
+            if not reviewed_mpl and name not in LGPL_MODULES:
                 raise RuntimeError(f'No replacement test for LGPL dependency: {name}')
             url = f'https://pypi.org/pypi/{name}/{dist.version}/json'
             with urllib.request.urlopen(url, timeout=30) as response:
@@ -138,7 +139,8 @@ def collect(output: Path) -> tuple[Path, Path]:
             filename = Path(item['filename']).name
             digest = fetch(item['url'], sources / filename, item['digests']['sha256'])
             row['source'] = {'file':filename, 'url':item['url'], 'sha256':digest}
-            row['module'] = LGPL_MODULES[name]
+            if name in LGPL_MODULES:
+                row['module'] = LGPL_MODULES[name]
         inventory.append(row)
 
     candidates = [Path(sys.base_prefix)/'LICENSE.txt', Path(sysconfig.get_path('stdlib'))/'LICENSE.txt']

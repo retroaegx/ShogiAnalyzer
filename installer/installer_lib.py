@@ -13,13 +13,13 @@ import sys
 import tempfile
 import tarfile
 import time
-import urllib.request
 import zipfile
 import shlex
 
 from app_paths import resource_root, runtime_home, is_frozen
 from external_process import external_env, external_libraries
 from installer.cpu_variants import choose_engine
+from https_client import verified_urlopen
 
 
 def repo_root() -> Path:
@@ -225,7 +225,7 @@ def _sha256_file(path: Path) -> str:
 def _download(url: str, dst: Path) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
     tmp = dst.with_suffix(dst.suffix + ".tmp")
-    with urllib.request.urlopen(url) as r, tmp.open("wb") as f:
+    with verified_urlopen(url) as r, tmp.open("wb") as f:
         shutil.copyfileobj(r, f)
     tmp.replace(dst)
 

@@ -1,3 +1,5 @@
+import { coalesceFrame } from '/js/render_schedule.js';
+import { StepOutbox, graceIndicator, previewStep } from "/js/reconnect.js";
 import { parseSfen } from "/js/vendor/sfen.js";
 import { groupDropSpecs, placeOverlayLabel } from "/js/overlayLayout.js";
 import { buildUsiDrop, buildUsiMove } from "/js/vendor/usi.js";
@@ -18,6 +20,7 @@ import {
   promotedTypeOf,
   senteScore,
   winRate,
+  sfenAfterMove,
 } from "/js/shogi.js";
 
 /*
@@ -429,6 +432,90 @@ const TAB_ID = (() => {
   }
 })();
 
+let recoveryStorage = null;
+try { recoveryStorage = sessionStorage; } catch {}
+const outbox = new StepOutbox(recoveryStorage);
+let stepAckTimer = null;
+const scheduleAnalysisPaint = coalesceFrame(() => {
+  renderAnalysis(); renderEvalGraph(); updateMoveEvals();
+});
+const connectionNotice = graceIndicator(() => {
+  setConn("connecting", "再接続中");
+  showConnLost();
+}, () => { els.connOverlay.hidden = true; });
+function canStep() { return !state.batch && outbox.canStep(); }
+function canEdit() { return state.isOwner && outbox.ready && !outbox.pending; }
+function showPendingStep() {
+  const pending = outbox.pending;
+  if (!pending) return;
+  const base = pending.base;
+  const usi = pending.payload.move_usi;
+  const game = previewStep(pending, usi ? sfenAfterMove(base.current_position_sfen,usi) : null,
+    usi ? kifMove(base.current_position_sfen,usi) : '');
+  if (game) { game.ui_state = {...game.ui_state, analysis_enabled:false}; setGame(game); }
+  document.body.classList.add("step-pending");
+  if (!els.connOverlay.hidden) showConnLost();
+}
+function clearPendingStep() {
+  clearTimeout(stepAckTimer);
+  stepAckTimer = null;
+  if (outbox.ready) connectionNotice.stop();
+  outbox.clear();
+  document.body.classList.remove("step-pending");
+}
+function reconcileStep(game, acknowledged = false) {
+  const result = outbox.inspect(game);
+  if (acknowledged || result === 'applied' || result === 'conflict') {
+    clearPendingStep();
+    if (!acknowledged && result === 'conflict') toast('warning','局面が変更されたため、未同期の1手は反映していません');
+    return false;
+  }
+  return result === 'replay';
+}
+function connectionReady(game, acknowledged = false) {
+  outbox.grant();
+  connectionNotice.stop();
+  setConn('connected','接続済み');
+  if (reconcileStep(game, acknowledged)) {
+    showPendingStep();
+    transmitStep();
+  } else setGame(game);
+}
+function transmitStep() {
+  const p = outbox.pending;
+  if (!p || !outbox.ready || !state.isOwner) return false;
+  try {
+    if (!sendRaw(p.type,p.payload)) return false;
+    connectionNotice.start();
+    clearTimeout(stepAckTimer);
+    stepAckTimer = setTimeout(() => {
+      stepAckTimer = null;
+      if (outbox.pending === p) {
+        outbox.disconnect();
+        showPendingStep();
+        renderControls();
+        connectWs();
+      }
+    }, 3000);
+    return true;
+  }
+  catch { outbox.disconnect(); connectionNotice.start(); showPendingStep(); scheduleReconnect(0); return false; }
+}
+function sendStep(type,payload) {
+  if (!state.ws || state.ws.readyState !== WebSocket.OPEN) outbox.disconnect();
+  if (!canStep()) return false;
+  if (type === 'node:play_move' && !sfenAfterMove(state.game.current_position_sfen,payload.move_usi)) return false;
+  const pending = outbox.stage(state.game,type,payload);
+  if (!pending) { toast('info','再接続中に移動できるのは1手だけです'); return false; }
+  if (!outbox.ready || !transmitStep()) {
+    outbox.disconnect();
+    connectionNotice.start();
+    showPendingStep();
+  }
+  renderControls();
+  return true;
+}
+
 function wsUrl() {
   return `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws?tab=${encodeURIComponent(TAB_ID)}`;
 }
@@ -456,7 +543,11 @@ function checkConnection() {
     return;
   }
   if (ws.readyState !== WebSocket.OPEN) return; // still connecting
+  if (wsPingTimer) return;
   const sentAt = Date.now();
+  outbox.disconnect();
+  connectionNotice.start();
+  renderControls();
   try {
     ws.send(JSON.stringify({ type: "ping" }));
   } catch {
@@ -465,15 +556,18 @@ function checkConnection() {
   }
   clearTimeout(wsPingTimer);
   wsPingTimer = setTimeout(() => {
+    wsPingTimer = null;
     // no answer: the connection is dead even if the browser has not noticed; start a new one
     if (state.ws === ws && (state.wsLastSeen || 0) < sentAt) {
       wsRetry = 0;
       connectWs();
+    } else if (state.ws === ws && state.isOwner && !outbox.ready) {
+      sendWs('game:refresh',{});
     }
   }, 3000);
 }
 
-function sendWs(type, payload = {}) {
+function sendRaw(type, payload = {}) {
   const ws = state.ws;
   if (!ws || ws.readyState !== WebSocket.OPEN) return false;
   const msg = { type, payload };
@@ -483,13 +577,25 @@ function sendWs(type, payload = {}) {
   return true;
 }
 
+function sendWs(type, payload = {}) {
+  if (type === 'node:jump' || type === 'node:play_move') return sendStep(type,payload);
+  if (!outbox.ready && !['ping','game:refresh','session:takeover'].includes(type)) return false;
+  try { return sendRaw(type,payload); } catch { checkConnection(); return false; }
+}
+
 function setConn(stateName, text) {
+  els.wsStatus.hidden = false;
   els.wsStatus.dataset.state = stateName;
   els.wsStatus.querySelector(".status-text").textContent = text;
   els.wsStatus.title = text;
 }
 
 function resetSession() {
+  clearTimeout(stepAckTimer);
+  stepAckTimer = null;
+  if (outbox.pending) toast('warning','操作権が変更されたため、未同期の1手は反映していません');
+  outbox.revoke();
+  document.body.classList.remove("step-pending");
   state.isOwner = false;
   state.sessionId = null;
   state.ownerToken = null;
@@ -500,8 +606,10 @@ function connectWs() {
   clearTimeout(wsRetryTimer);
   clearTimeout(wsConnectTimer);
   clearTimeout(wsPingTimer);
+  wsPingTimer = null;
   const old = state.ws;
-  setConn("connecting", "接続中");
+  outbox.disconnect();
+  connectionNotice.start();
   const ws = new WebSocket(wsUrl());
   state.ws = ws;
   if (old && old.readyState <= WebSocket.OPEN) {
@@ -528,18 +636,20 @@ function connectWs() {
     clearTimeout(wsConnectTimer);
     wsRetry = 0;
     state.wsLastSeen = Date.now();
-    setConn("connected", "接続済み");
-    showConnRestored();
+    // Wait for session:granted and its authoritative game before enabling edits.
   });
   ws.addEventListener("close", (ev) => {
     if (state.ws !== ws) return; // an old socket we already replaced
     clearTimeout(wsConnectTimer);
     if (ev.code === 4401) {
+      connectionNotice.stop();
+      resetSession();
       // password protection is on and this browser is not logged in (or the login expired)
       location.replace("/login");
       return;
     }
     if (ev.code === 4409) {
+      connectionNotice.stop();
       // another page with the same tab id (a duplicated tab) took the session: stay read-only
       toast("warning", "他の画面にセッションが引き継がれました");
       setConn("busy", "閲覧のみ");
@@ -548,9 +658,11 @@ function connectWs() {
       loadReadOnlyState();
       return;
     }
-    setConn("error", "切断 — 再接続中");
-    showConnLost();
-    resetSession();
+    outbox.disconnect();
+    state.isOwner = false;
+    state.sessionId = state.ownerToken = null;
+    connectionNotice.start();
+    showPendingStep();
     renderControls();
     scheduleReconnect();
   });
@@ -570,6 +682,9 @@ function connectWs() {
     switch (type) {
       case "pong":
         clearTimeout(wsPingTimer);
+        wsPingTimer = null;
+        if (state.isOwner && !outbox.ready) sendWs('game:refresh',{});
+        else if (!state.isOwner) connectionNotice.stop();
         return;
 
       case "toast":
@@ -577,6 +692,7 @@ function connectWs() {
         return;
 
       case "session:busy": {
+        connectionNotice.stop();
         setConn("busy", "他の接続が操作中");
         resetSession();
         loadReadOnlyState();
@@ -593,6 +709,7 @@ function connectWs() {
       }
 
       case "session:kicked":
+        connectionNotice.stop();
         toast("warning", "他の画面にセッションが引き継がれました");
         setConn("busy", "閲覧のみ");
         resetSession();
@@ -600,8 +717,10 @@ function connectWs() {
         return;
 
       case "session:stale":
-        toast("warning", "セッションが古くなったため再接続します");
-        resetSession();
+        outbox.disconnect();
+        state.isOwner = false;
+        state.sessionId = state.ownerToken = null;
+        connectionNotice.start();
         try {
           ws.close();
         } catch {
@@ -622,7 +741,7 @@ function connectWs() {
         state.engine = payload.engine_status || null;
         state.batch = state.engine?.batch || null;
         if (state.engine?.last_error) toast("error", String(state.engine.last_error));
-        setGame(payload.game || null);
+        connectionReady(payload.game || null);
         syncSettingsFromServer();
         return;
       }
@@ -654,9 +773,13 @@ function connectWs() {
         return;
       }
 
-      case "game:state":
-        setGame(payload.game || null);
+      case "game:state": {
+        const game = payload.game || null;
+        const acknowledged = Boolean(outbox.pending && payload.operation_id === outbox.pending.payload.operation_id);
+        if (!outbox.ready && state.isOwner) { connectionReady(game, acknowledged); return; }
+        if (!reconcileStep(game,acknowledged)) setGame(game);
         return;
+      }
 
       case "analysis:update": {
         const a = state.analysis;
@@ -672,9 +795,7 @@ function connectWs() {
             state.evals.set(a.nodeId, { score_type: best.score_type, score_value: best.score_value, depth: best.depth || 0, lines: a.lines });
           }
         }
-        renderAnalysis();
-        renderEvalGraph();
-        updateMoveEvals();
+        scheduleAnalysisPaint();
         return;
       }
 
@@ -1308,7 +1429,7 @@ function renderBoard() {
       sq.appendChild(pe);
     }
   }
-  els.boardGrid.classList.toggle("can-move", state.isOwner);
+  els.boardGrid.classList.toggle("can-move", canStep());
   applyHighlights();
   renderOverlay();
 }
@@ -1834,7 +1955,7 @@ function renderStands() {
       b.dataset.owner = owner;
       b.dataset.type = t;
       b.title = `${PIECE_JA[t]} ×${n}`;
-      b.disabled = !state.isOwner || owner !== turn;
+      b.disabled = !canStep() || owner !== turn;
       if (state.selection?.kind === "hand" && state.selection.owner === owner && state.selection.pieceType === t) b.classList.add("selected");
       const url = pieceUrl(t, owner);
       if (url) {
@@ -1870,7 +1991,7 @@ function clearSelection(render = true) {
 
 function selectBoard(row, col) {
   const p = state.parsed?.board?.[row]?.[col];
-  if (!p || !state.isOwner || p.owner !== state.parsed.currentPlayer) return false;
+  if (!p || !canStep() || p.owner !== state.parsed.currentPlayer) return false;
   state.selection = { kind: "board", owner: p.owner, pieceType: p.piece, fromRow: row, fromCol: col };
   state.legal = legalMovesFrom(state.parsed.board, row, col, p);
   applyHighlights();
@@ -1878,7 +1999,7 @@ function selectBoard(row, col) {
 }
 
 function selectHand(owner, type) {
-  if (!state.isOwner || owner !== state.parsed?.currentPlayer) return false;
+  if (!canStep() || owner !== state.parsed?.currentPlayer) return false;
   state.selection = { kind: "hand", owner, pieceType: type };
   state.legal = legalDrops(state.parsed.board, type, owner);
   applyHighlights();
@@ -2024,7 +2145,7 @@ function squareFromPoint(x, y) {
 
 function onBoardPointerDown(e) {
   if (e.button !== 0 && e.pointerType === "mouse") return;
-  if (!state.parsed || !state.isOwner || kifuLocked()) return;
+  if (!state.parsed || !canStep() || kifuLocked()) return;
   const sqEl = e.target.closest(".sq");
   if (!sqEl) return;
   const { row, col } = toInternal(Number(sqEl.dataset.vr), Number(sqEl.dataset.vc));
@@ -2051,7 +2172,7 @@ function onBoardPointerDown(e) {
 
 function onHandPointerDown(e, owner, type) {
   if (e.button !== 0 && e.pointerType === "mouse") return;
-  if (!state.parsed || !state.isOwner || owner !== state.parsed.currentPlayer || kifuLocked()) return;
+  if (!state.parsed || !canStep() || owner !== state.parsed.currentPlayer || kifuLocked()) return;
   e.preventDefault();
   const already = state.selection?.kind === "hand" && state.selection.owner === owner && state.selection.pieceType === type;
   if (!already) {
@@ -2181,7 +2302,7 @@ function renderMiniEval(best, cp, side) {
   const a = state.analysis;
   els.miniOnOff.classList.toggle("on", a.enabled);
   els.miniOnOff.querySelector("b").textContent = a.enabled ? "ON" : "OFF";
-  els.miniOnOff.disabled = !a.available || !state.isOwner;
+  els.miniOnOff.disabled = !a.available || !canEdit();
   els.miniScore.textContent = best ? formatScore(best, side) : "±0";
   els.miniScore.className = `mini-score ${cp == null ? "" : cp >= 0 ? "plus" : "minus"}`;
   els.miniScore.style.opacity = best ? "" : "0.4";
@@ -2205,7 +2326,7 @@ function renderMiniEval(best, cp, side) {
 function renderAnalysis() {
   const a = state.analysis;
   const on = a.enabled;
-  const canUse = a.available && state.isOwner;
+  const canUse = a.available && canEdit();
   for (const b of els.analysisOnOff.querySelectorAll("button")) {
     const isOn = b.dataset.v === "on";
     b.classList.toggle("active", isOn === on);
@@ -2301,7 +2422,7 @@ function renderAnalysis() {
       li.appendChild(play);
       const first = line.pv_usi?.[0];
       li.addEventListener("click", () => {
-        if (first && state.isOwner) playUsi(first);
+        if (first && canStep()) playUsi(first);
       });
       els.pvList.appendChild(li);
     }
@@ -2879,13 +3000,14 @@ function renderVariations() {
 function renderComment() {
   const cur = node(state.game?.current_node_id);
   if (document.activeElement !== els.commentInput) els.commentInput.value = cur?.comment || "";
-  els.commentInput.disabled = !state.isOwner;
+  els.commentInput.disabled = !canEdit();
 }
 
 // ---------- controls ----------
 function renderControls() {
-  const owner = state.isOwner;
-  const canNav = owner && !state.batch; // 全解析 drives the position
+  const owner = canEdit();
+  els.commentInput.disabled = !owner;
+  const canNav = canStep(); // 全解析 drives the position
   const cur = state.game?.current_node_id;
   const hasPrev = Boolean(node(cur)?.parent_id);
   const hasNext = Boolean(firstChild(cur));
@@ -2896,8 +3018,9 @@ function renderControls() {
   els.saveBtn.disabled = !owner;
   els.saveBtn.classList.toggle("dirty", Boolean(state.game?.dirty));
   els.saveBtn.title = state.game?.dirty ? "保存されていない変更があります — サーバーに保存 (Ctrl+S)" : "サーバーに保存 (Ctrl+S)";
-  for (const b of [els.newGameBtn, els.loadBtn, els.openBtn, $("loadOpenItem"), els.importBtn, els.pasteBtn]) b.disabled = !canNav;
-  els.plySlider.disabled = !canNav;
+  for (const b of [els.newGameBtn, els.loadBtn, els.openBtn, $("loadOpenItem"), els.importBtn, els.pasteBtn]) b.disabled = !owner || Boolean(state.batch);
+  els.plySlider.disabled = !canNav || !outbox.ready;
+  if (!outbox.ready) { els.btnStart.disabled = true; els.btnEnd.disabled = true; }
   document.body.classList.toggle("batch-lock", Boolean(state.batch));
 
   const max = Math.max(state.mainLine.length - 1, 0);
@@ -3291,7 +3414,7 @@ async function setupThemeChoices() {
 // ---------- analysis ON/OFF, 全解析 ----------
 async function setAnalysisEnabled(on) {
   const a = state.analysis;
-  if (!a.available || !state.isOwner || a.enabled === on) return;
+  if (!a.available || !canEdit() || a.enabled === on) return;
   if (on && state.batch) {
     const ans = await confirmDialog({
       title: "全解析を中止しますか？",
@@ -3576,30 +3699,12 @@ function wireDrawerSwipe() {
   });
 }
 
-// ---------- connection overlay ----------
-let connHideTimer = null;
-let connAttempts = 0;
-
+// ---------- delayed, non-blocking connection notice ----------
 function showConnLost() {
-  clearTimeout(connHideTimer);
-  connAttempts += 1;
   els.connOverlay.hidden = false;
-  els.connOverlay.dataset.state = "lost";
-  els.connTitle.textContent = "接続が切れました";
-  els.connMsg.textContent = connAttempts > 1 ? `再接続しています…（${connAttempts}回目）` : "再接続しています…";
-}
-
-function showConnRestored() {
-  if (els.connOverlay.hidden) return; // first connection: nothing to announce
-  connAttempts = 0;
-  els.connOverlay.dataset.state = "ok";
-  els.connTitle.textContent = "接続されました";
-  els.connMsg.textContent = "操作を再開できます";
-  clearTimeout(connHideTimer);
-  connHideTimer = setTimeout(() => {
-    els.connOverlay.dataset.state = "hide";
-    connHideTimer = setTimeout(() => (els.connOverlay.hidden = true), 260);
-  }, 1100);
+  els.connOverlay.dataset.state = 'lost';
+  els.connTitle.textContent = '接続を確認しています';
+  els.connMsg.textContent = outbox.pending ? '表示中の1手を再接続後に同期します' : outbox.wasOwner ? '再接続中です。1手だけ仮操作できます' : '再接続を待っています';
 }
 
 function saveOpts() {
@@ -4299,6 +4404,7 @@ async function main() {
     pushSettings({ board_set, piece_set });
   }
   setupThemeChoices();
+  if (outbox.pending) showPendingStep();
   connectWs();
   // back to the page / network back: check the connection right away instead of waiting for
   // the browser to notice a dead socket; while visible, check it every 20 seconds

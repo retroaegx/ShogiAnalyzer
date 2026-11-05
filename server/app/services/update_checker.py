@@ -18,12 +18,14 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from https_client import verified_urlopen
 from pathlib import Path
 from typing import Any
 
 from ..paths import data_dir
+from app_paths import resource_root
 
-ROOT_DIR = Path(__file__).resolve().parents[3]
+ROOT_DIR = resource_root()
 VERSION_FILE = ROOT_DIR / "VERSION"
 DEFAULT_REPO = "retroaegx/ShogiAnalyzer"
 DEFAULT_INTERVAL_HOURS = 24.0
@@ -124,7 +126,7 @@ def _latest_release(repo: str) -> dict[str, Any]:
         f"https://api.github.com/repos/{repo}/releases/latest",
         headers={"Accept": "application/vnd.github+json", "User-Agent": "ShogiAnalyzer update checker", "X-GitHub-Api-Version": "2022-11-28"},
     )
-    with urllib.request.urlopen(req, timeout=TIMEOUT_SEC) as resp:
+    with verified_urlopen(req, timeout=TIMEOUT_SEC) as resp:
         data = json.loads(resp.read().decode(resp.headers.get_content_charset() or "utf-8", errors="replace"))
     if not isinstance(data, dict):
         raise RuntimeError("invalid release response")

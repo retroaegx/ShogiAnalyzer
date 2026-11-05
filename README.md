@@ -1,7 +1,7 @@
 # ShogiAnalyzer
 
 自分の PC を将棋の検討サーバーにするアプリです。  
-PC で起動しておけば、同じ PC のブラウザやスマートフォン、出先からでも、棋譜の整理と解析エンジン（AobaNNUE、またはやねうら王 + 水匠5）による検討ができます。
+PC で起動しておけば、同じ PC のブラウザやスマートフォン、出先からでも、棋譜の整理と解析エンジン（AobaNNUE、やねうら王 + つようら王11mini／水匠5）による検討ができます。
 
 - 盤面操作・分岐つき棋譜・KIF / KI2 / USI の読み込みと書き出し
 - 常時解析（候補手の矢印・評価値・読み筋）と全解析（評価値グラフ）
@@ -11,6 +11,10 @@ PC で起動しておけば、同じ PC のブラウザやスマートフォン�
 ### ライセンス
 
 ShogiAnalyzer 本体は **MIT ライセンス**です（[LICENSE](LICENSE)）。  
+ネイティブ配布版に含むPython・実行ライブラリー・Windows用VC++ DLLなどには、個別の条件が適用されます。[同梱物のライセンスと対応ソース](docs/THIRD_PARTY.md)を参照してください。アプリの「ライセンス表記」からも、実際の配布物の一覧・原文を開けます。MPLのcertifiはLinuxでCA証明書がない場合のために同梱し、LGPLの展開ライブラリー5件とともに対応ソースを添付します。Microsoft製DLLをMIT/PSFで再許諾するものではありません。
+
+WebフォントのBarlow Semi Condensed（The Barlow Project Authors）とShippori Mincho B1（The Shippori Mincho Project Authors）はSIL OFL 1.1で、Google Fontsから読み込みます。フォント本体は同梱せず、原文を[Webフォントのライセンス](docs/third_party_fonts/)に記載しています。画像共有用フォントは本プロジェクトで生成した別のフォントです。
+
 解析エンジン・評価関数・cloudflared は同梱していません。解析エンジンと評価関数は、初回起動時に利用者の同意を得てそれぞれの配布元からダウンロード（Linux ではビルド）します。cloudflared は、外部公開に Quick Tunnel を使うとき（固定アドレス未設定で `SHOGI_ANALYZER_TUNNEL` が TRUE のとき）に配布元から `tools/cloudflared/` へダウンロードします。
 
 | ソフト | 種類 | ライセンス | 配布元 |
@@ -23,29 +27,122 @@ ShogiAnalyzer 本体は **MIT ライセンス**です（[LICENSE](LICENSE)）。
 | 水匠5 (nn.bin) | 評価関数 | 配布元に明記なし | https://github.com/yaneurao/YaneuraOu/releases/tag/suisho5 |
 | cloudflared | 外部公開用トンネル（Quick Tunnel） | Apache License 2.0 | https://github.com/cloudflare/cloudflared |
 
-- ShogiAnalyzer はエンジンを同梱せず、別のプログラムとして USI（標準入出力）で通信するだけなので、GPLv3 は適用されません。
-- cloudflared も同梱せず、別のプログラムとして起動するだけなので、ShogiAnalyzer 本体が Apache License 2.0 による制限を受けることはありません。cloudflared の利用・再配布は、配布元のライセンスと Cloudflare の利用規約に従ってください。
+- ShogiAnalyzer本体はMITで提供します。エンジンは別のプログラムとしてUSI（標準入出力）で通信する構成で、エンジン側のGPL等の条件はそのまま適用されます。
+- cloudflaredも別のプログラムとして起動します。cloudflaredの利用・再配布は、配布元のライセンスとCloudflareの利用規約に従ってください。
 - エンジンを同梱して再配布する場合は、そのエンジンについて GPLv3 の表記（ライセンス全文の添付とソースコードの入手方法の明示）が必要です。評価関数は各配布元の利用条件に従ってください。
 
 ---
 
-## 1. Python のインストール
+## ネイティブ配布版を使う場合
+
+ネイティブ配布版にはPythonと実行ライブラリーを含めています。**Python・PHPの別途導入、手動でのvenv構築・pipインストールは不要**です。[リリースページ](https://github.com/retroaegx/ShogiAnalyzer/releases)の添付ファイルから、OS・CPUに合うパッケージを選んでください。GitHubの「Source code (zip)」「Source code (tar.gz)」は、下記のPythonが必要なソース版です。該当OSのネイティブパッケージが添付されていないリリースでは、ソース版の手順を使ってください。
+
+| OS・CPU | ダウンロードするファイルの末尾 | 起動するファイル |
+|---|---|---|
+| Windows x64（Windows 10以降） | `windows-amd64.zip` | `Start.bat` |
+| Linux x64（glibc 2.35以降。Ubuntu 22.04以降など） | `linux-amd64.tar.gz` | `ShogiAnalyzer` |
+| Mac Intel | `macos-amd64.tar.gz` | `Start.command` |
+| Mac Apple Silicon（M1以降） | `macos-arm64.tar.gz` | `Start.command` |
+
+パッケージはOS・CPU間で共用できません。展開したフォルダー内の`_internal`も必要なので、実行ファイルだけを取り出さず、書き込み可能な場所にフォルダーごと置きます。初回のエンジン・評価関数等の取得にはインターネット接続が必要です。
+
+### Windows
+
+1. `windows-amd64.zip`を右クリックし、「すべて展開」で展開します。
+2. 展開先の`ShogiAnalyzer`フォルダーを開き、`Start.bat`をダブルクリックします。
+3. 下記の「[初回設定](#first-run-setup)」へ進みます。
+
+必要なVC++ランタイムDLL2個も同梱しています。通常利用者によるPython・Visual Studio・VC++ランタイムの別途インストールは不要です。
+
+### Linux
+
+Linuxでは、アプリ本体にPythonを入れる必要はありませんが、**エンジンの自動導入にはmake・C++コンパイラーが必要**です。やねうら王v8.30のソース取得ではGitも使用します。このエンジンのビルド要件は、従来のPython版でも必要だったものです。
+
+Ubuntu 22.04以降／Debian 12以降での準備例です。ターミナルを開き、次を順に実行します。
+
+```bash
+sudo apt update
+sudo apt install build-essential git ca-certificates
+```
+
+`build-essential`には[makeとg++等が含まれます](https://packages.ubuntu.com/jammy/build-essential)。`sudo`で求められるのはLinuxのログインパスワードです。入力中は文字が表示されません。すでに導入済みなら追加の作業は不要です。他のディストリビューションでは、そのOSのパッケージ管理で同等のツールを用意してください。Linuxの確認環境はUbuntu 22.04／24.04です。
+
+続いて、ダウンロードした`linux-amd64.tar.gz`を展開して起動します。以下はファイルを`~/Downloads`へ保存したv1.1.10の例です。保存先とファイル名は、実際に取得したものに合わせてください。
+
+```bash
+cd ~/Downloads
+tar -xzf ShogiAnalyzer-v1.1.10-linux-amd64.tar.gz
+cd ShogiAnalyzer
+./ShogiAnalyzer
+```
+
+起動後は「[初回設定](#first-run-setup)」へ進みます。エンジンを選択して同意すると、ソース取得とビルドも自動で進みます。ビルド中は時間がかかるので、ターミナルを閉じずに待ってください。ビルドに使うPython処理には同梱Pythonを使用します。現在のLinux自動ビルドはAVX2またはSSE4.2に対応するx64 CPUが対象です。
+
+`make: not found`や`g++: not found`等が出た場合は、上記ツールの導入を確認して起動し直してください。手持ちのLinux用USIエンジンを使う場合は、初回メニューで`m`を選びます。ビルドツールなしで使う場合は、別途ビルド済みの対応エンジンが必要です。
+
+### macOS
+
+1. Appleメニューの「このMacについて」で、「チップ」がApple Mシリーズなら`macos-arm64.tar.gz`、「プロセッサ」がIntelなら`macos-amd64.tar.gz`を選びます。
+2. ダウンロードしたファイルを展開し、`ShogiAnalyzer`フォルダーの`Start.command`をダブルクリックします。
+3. 開いたターミナルで「[初回設定](#first-run-setup)」を行います。
+
+ネイティブ版ではPython・Homebrew・Xcodeの導入は不要です。アプリは署名・公証していません。起動がOSに止められた場合は、取得元を確認のうえ[Appleの案内](https://support.apple.com/ja-jp/guide/mac-help/mh40616/mac)に従ってください。
+
+### 自動導入できるエンジン
+
+インストーラーには、使用中のOS・CPUに対応する設定があるエンジンだけが表示されます。**番号はOSによって変わるため、表示されたエンジン名を確認して選んでください。**
+
+| エンジン・評価関数 | Windows x64 | Linux x64 | Mac Intel／Apple Silicon |
+|---|---|---|---|
+| やねうら王＋つようら王11mini | 実行ファイルを取得 | ソースからビルド | 自動導入対象外 |
+| AobaNNUE v1.1 | 実行ファイルを取得 | ソースからビルド | 自動導入対象外 |
+| やねうら王v8.30＋水匠5 | 実行ファイルを取得 | ソースからビルド | Mac用の配布物を取得 |
+
+Macにもやねうら王v8.30の自動取得設定があります。取得した配布物にOS・CPU対応の実行ファイルが見つからない場合は、手持ちの対応USIエンジンを手動設定してください。Macの初期OS環境での導入操作は未検証です。
+
+設定`.env`と棋譜等の`server/data/`、取得した`engines/`・`tools/cloudflared/`は、標準では実行ファイルの横に作成されます。アプリを終了してからこれらをバックアップしてください。別の保存先を使う場合は`SHOGI_ANALYZER_HOME`に絶対パスを指定します。更新時はユーザーデータを削除せず、アプリのファイルを置き換えます。詳しくは[ネイティブ配布版の説明](docs/PORTABLE.md)を参照してください。
+
+以下のPython導入・`run.bat`/`run.sh`は、ソースから実行する場合の手順です。ネイティブ配布版では実施しません。
+
+## 1. ソースから実行する場合のPython導入
 
 **Python 3.10 以上**が必要です。
 
 - Windows: コマンドプロンプトで `python --version` を実行して確認します。  
   入っていなければ https://www.python.org/downloads/windows/ から Windows installer (64-bit) を入れてください。  
   インストール時に **「Add Python to PATH」を ON** にしてください。
-- macOS: `brew install python@3.12`
-- Ubuntu / Debian: `sudo apt install python3 python3-venv`
+- macOS: Homebrewを利用する場合は、[Python 3.12の導入方法](https://formulae.brew.sh/formula/python@3.12)に従い、ターミナルで次を実行します。このターミナル内で`python3`が3.12を指すようPATHも設定します。
 
-## 2. 起動
+  ```bash
+  brew install python@3.12
+  export PATH="$(brew --prefix python@3.12)/libexec/bin:$PATH"
+  python3 --version
+  ```
+
+- Ubuntu / Debian: `sudo apt update`の後、`sudo apt install python3 python3-venv`を実行します。エンジンを自動ビルドする場合は、上記Linux手順の`build-essential`・`git`・`ca-certificates`も用意してください。
+
+## 2. 起動と初回設定
+
+### ソース版の起動
+
+ソースコードを展開したフォルダーで起動します。ネイティブ版の起動方法は上記OS別手順を使ってください。
 
 - Windows: `run.bat` をダブルクリック
 - macOS / Linux: `sh run.sh`
 
-初回はライブラリや解析エンジンのダウンロードがあるため、少し時間がかかります。  
-途中で「この評価関数をダウンロードしますか？」などと聞かれたら、配布元の利用条件を確認して `y` を入力してください。
+ソース版では、起動時に`.venv`の作成と必要ライブラリーの導入を自動で行います。手動でvenvを作ったり、システム全体へpipでインストールしたりする必要はありません。macOSでHomebrewのPATHを上記のように設定した場合は、同じターミナルで`sh run.sh`を実行してください。
+
+<a id="first-run-setup"></a>
+
+### 初回設定（ネイティブ版・ソース版共通）
+
+1. 「パスワード保護を有効にしますか？」に回答します。外部公開する場合は`y`、このPCだけで利用する場合は`n`で無効にしても使えます。選んだ後にEnterを押します。有効にした場合、パスワード自体は後でブラウザーの初回画面で設定します。
+2. エンジン一覧の名前を確認し、使いたいものの番号を入力してEnterを押します。手持ちのUSIエンジンは`m`でパスを指定できます。`s`は解析なしで起動する選択です。
+3. 表示されるエンジン・評価関数の配布元と規約・ライセンスを確認し、同意する場合だけ`y`を入力してEnterを押します。別々に取得する評価関数にも確認が出ます。同意しない場合はメニューに戻ります。
+4. 取得・展開（Linuxではビルドも）が完了し、`local : http://localhost:31145`等のアドレスが出るまで待ちます。
+5. 同じPCのブラウザーを開き、アドレス欄に表示された`local`のURLを入力します。パスワード保護を有効にした場合は、初回の設定画面に従って設定します。スマートフォンから初回設定する場合は、コンソールのセットアップコードも必要です。
+
+エンジン・評価関数はアプリ配布物には含めていません。インストーラーが同意後に取得して、エンジンと評価関数のパスを保存します。すでに設定済みなら、次回からその設定を使って起動します。
 
 起動するとコンソールに URL が表示されます。
 
@@ -64,11 +161,11 @@ ShogiAnalyzer 本体は **MIT ライセンス**です（[LICENSE](LICENSE)）。
 
 > **注意**
 > - `public` の `trycloudflare.com`（Cloudflare Quick Tunnel）は**起動するたびにアドレスが変わります**。また、テスト・開発用のサービスなので常用はできません。続けて使う場合は「[5. 公開アドレスを固定する](#5-公開アドレスを固定する)」で固定アドレスにするか、`SHOGI_ANALYZER_TUNNEL=FALSE` で公開を止めてください。
-> - パスワード保護は既定で OFF です。OFF のままだと、公開アドレスを知っている人は誰でも操作できます。アドレスは他人に教えないか、「[パスワード保護](#パスワード保護)」を ON にしてください。
+> - 初回起動でパスワード保護を有効にするか選択します。OFF のままだと、公開アドレスを知っている人は誰でも操作できます。外部公開する場合は「[パスワード保護](#パスワード保護)」を ON にしてください。
 
 ## 3. 設定ファイル（.env）
 
-初回起動時に、ShogiAnalyzer のフォルダ（`run.bat` がある場所）に設定ファイル `.env` が作られます（中身は `.env.template` と同じ。git の管理外）。  
+初回起動時に、ShogiAnalyzer のフォルダ（ネイティブ版では実行ファイル、ソース版では`run.bat`がある場所）に設定ファイル `.env` が作られます（中身は `.env.template` と同じ。git の管理外）。`SHOGI_ANALYZER_HOME`を指定した場合は、その保存先に作成します。
 メモ帳などで編集して保存し、**アプリを再起動すると反映**されます。  
 エンジンの 2 項目は、空欄のまま起動すると実際に使うパスが自動で書き込まれます（自分で書いた値は上書きしません）。
 
@@ -220,13 +317,14 @@ Cloudflare ダッシュボード →「Zero Trust」→「Access」→「アプ�
 - 「常時解析」を ON にすると、表示中の局面を解析し続けます（`Space` でも切り替え）。OFF にしても最後の結果は残ります。
 - 盤の上に、候補手（緑の矢印と評価値）、棋譜の次の手（オレンジ）、分岐（薄いオレンジ）が表示されます。表示する内容は右上の表示設定で切り替えられます。
 - 「候補手」の数字で読み筋の数（MultiPV）を選べます。
+- 棋譜一覧・グラフは、各局面で保存された最も深い解析結果を表示します。候補手数を変えて浅い深さから解析し直している間は、現在の解析欄の評価値と異なることがあります。
 - 「全解析」で棋譜の最初から最後までを順に解析し、評価値グラフを作ります（1 局面あたりの時間は ⚙ で設定）。実行中は棋譜を操作できません。
 
 ### スマートフォン
 - スクロールなしで 1 画面に収まります。盤の下に移動ボタン、その下に「解析 ON/OFF・評価値・深さ・最善手」、候補手の数・全解析、評価値グラフが並びます。候補手は盤上の矢印と評価値で表示します（グラフの高さは画面の高さに合わせて自動で調整します。iPhone SE など縦が短い画面では持ち駒を盤の横に置きます）。
-- 移動ボタンの左の「棋譜」ボタン、または画面の右端から左へスワイプすると棋譜が開きます。
+- 移動ボタン横の「棋譜」ボタン、または画面の右端から左へスワイプすると棋譜が開きます。
 - 移動ボタンの右の「反転」ボタンで盤を上下反転します。
-- 新規・開く・読込・貼付・書出・表示設定・エンジン設定は右上の「⋯」にあります。
+- 新規・棋譜一覧・エクスポート・表示設定・エンジン設定は右上のメニューにあります。読み込みは上部の書類アイコンからも開けます。
 
 ### アプリとしてインストール（ホーム画面に追加）
 - **Android の Chrome**: アドレスを開き、メニュー（⋮）→「アプリをインストール」（または「ホーム画面に追加」）。
@@ -237,7 +335,7 @@ Cloudflare ダッシュボード →「Zero Trust」→「Access」→「アプ�
 
 ## 9. バージョンと更新
 
-- 今のバージョンは、フォルダ直下の `VERSION` に書かれています。起動時のコンソールと、画面右上の「表示設定」の一番下にも表示されます。
+- 今のバージョンは、ソース版ではフォルダ直下の `VERSION`、ネイティブ版では`_internal/VERSION`と`BUILD_INFO.json`に書かれています。起動時のコンソールと、画面右上の「表示設定」の一番下にも表示されます。
 - アプリは起動時と 24 時間ごと、また画面を開いたときに前回の確認から 1 時間以上たっていれば、[GitHub のリリース](https://github.com/retroaegx/ShogiAnalyzer/releases) を確認します。新しいバージョンがあると、画面上部に **「!」** が出て（押すと内容とリリースページへのリンク）、コンソールにも `[update] 新しいバージョン … があります` と表示されます。
 - 「表示設定」→「バージョン」の **「更新を確認」** で、すぐに確認することもできます。
 - 確認しないようにするには `.env` で `SHOGI_ANALYZER_UPDATE_CHECK=FALSE` にします。
@@ -247,7 +345,8 @@ Cloudflare ダッシュボード →「Zero Trust」→「Access」→「アプ�
 1. アプリを止めます（コンソールで `Ctrl + C`、またはウィンドウを閉じる。Ubuntu などでサービスにしている場合は `sudo systemctl stop shogianalyzer`）。
 2. フォルダを新しいバージョンにします。
    - `git clone` で取得した場合: フォルダで `git pull`
-   - zip で取得した場合: [リリースページ](https://github.com/retroaegx/ShogiAnalyzer/releases) から新しい zip をダウンロードし、今のフォルダに上書き
-3. もう一度起動します（`run.bat` / `run.sh`、サービスなら `sudo systemctl start shogianalyzer`）。必要な Python パッケージは起動時に自動で更新されます。
+   - ネイティブ版の場合: [リリースページ](https://github.com/retroaegx/ShogiAnalyzer/releases)から同じOS・CPU用の新しいZIP／tar.gzを取得し、すべて展開してアプリのファイルを更新します。設定`.env`・棋譜`server/data/`・エンジン`engines/`・`tools/cloudflared/`は残してください。
+   - ソース版をZIPで取得した場合: ソース版の新しいZIPを展開してアプリのファイルを更新します。上記の設定・データは残してください。
+3. ネイティブ版はWindowsの`Start.bat`、Linuxの`./ShogiAnalyzer`、Macの`Start.command`から再起動します。ソース版は`run.bat`／`sh run.sh`、サービスなら`sudo systemctl start shogianalyzer`です。ソース版のPythonパッケージは起動時に自動で更新されます。
 
 設定（`.env`）・棋譜（`server/data`）・エンジン（`engines`）は git の管理外なので、更新しても消えません。

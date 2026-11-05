@@ -11,7 +11,11 @@ import threading
 import time
 import venv
 
-from installer_lib import (
+# run.bat calls this file directly; the frozen entry imports it as a package.
+if not getattr(sys, "frozen", False):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from app_paths import is_frozen
+from installer.installer_lib import (
     ensure_cloudflared,
     ensure_engine_config,
     ensure_env_file,
@@ -230,6 +234,8 @@ def _run_server(env: dict[str, str]) -> subprocess.Popen:
     ]
     if os.environ.get("SHOGI_ANALYZER_RELOAD", "").strip().lower() in {"1", "true", "yes", "on"}:
         cmd.append("--reload")
+    if is_frozen():
+        cmd = [sys.executable, "--serve"]
     # values from the environment / .env win over the saved engine config
     merged = dict(env)
     merged.update(os.environ)
@@ -239,7 +245,7 @@ def _run_server(env: dict[str, str]) -> subprocess.Popen:
     print(tr(f"[installer] サーバーを起動しています: http://localhost:{PORT}", f"[installer] Starting server: http://localhost:{PORT}"))
     proc = subprocess.Popen(
         cmd,
-        cwd=str(repo_root()),
+        cwd=str(runtime_home() if is_frozen() else repo_root()),
         env=merged,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -255,6 +261,9 @@ def _run_server(env: dict[str, str]) -> subprocess.Popen:
 
 def main() -> int:
     global PORT, HOST
+    if os.name == 'nt':
+        import signal
+        signal.signal(signal.SIGBREAK, signal.default_int_handler)
     root = repo_root()
     ansi_ok = _enable_windows_ansi()
     log_path = _setup_console_log()
@@ -275,20 +284,20 @@ def main() -> int:
     HOST = (os.environ.get("SHOGI_ANALYZER_HOST") or "127.0.0.1").strip()
     public_url = (os.environ.get("SHOGI_ANALYZER_PUBLIC_URL") or "").strip().rstrip("/")
 
-    if _is_running_in_venv():
+    if is_frozen() or _is_running_in_venv():
         version_file = repo_root() / "VERSION"
         version = version_file.read_text(encoding="utf-8").strip() if version_file.exists() else "?"
         print(f"[installer] ShogiAnalyzer v{version}")
         print(tr(f"[installer] ログ  : {log_path}", f"[installer] Console log: {log_path}"))
         created = tr("  （新規作成）", "  (created)") if env_created else ""
         print(tr(f"[installer] 設定  : {env_path}{created}", f"[installer] Settings   : {env_path}{created}"))
-    py = _ensure_venv()
-    if not py.exists():
-        print(tr(f"[installer] エラー: 仮想環境の Python が見つかりません: {py}", f"[installer] ERROR: venv python not found: {py}"))
-        return 1
-
-    if not _is_running_in_venv():
-        return _rerun_in_venv(py)
+    if not is_frozen():
+        py = _ensure_venv()
+        if not py.exists():
+            print(tr(f"[installer] エラー: 仮想環境の Python が見つかりません: {py}", f"[installer] ERROR: venv python not found: {py}"))
+            return 1
+        if not _is_running_in_venv():
+            return _rerun_in_venv(py)
 
     # stop here with a clear message instead of a bind error after all the setup
     if _port_in_use(HOST, PORT):
@@ -306,7 +315,7 @@ def main() -> int:
     ask_password_protection(env_path)
 
     # 1) Python deps (WS含む) は起動時に必ず整える。
-    if not ensure_requirements(root):
+    if not is_frozen() and not ensure_requirements(root):
         print(tr("[installer] 致命的エラー: Python 環境を準備できませんでした", "[installer] FATAL: could not prepare python environment"))
         return 2
 
@@ -372,57 +381,59 @@ def main() -> int:
 
     # 4) サーバ起動
     server = _run_server(env)
-    time.sleep(1.5)
-    if server.poll() is not None:
-        # the reason (bind error etc.) was printed just above by the server
-        print(tr("\n[installer] エラー: サーバーの起動に失敗しました（上のメッセージを確認してください）",
-                 "\n[installer] ERROR: the server failed to start (see the message above)"))
-        return 5
-
-    # 5) Quick Tunnel（固定アドレスが無く、SHOGI_ANALYZER_TUNNEL=TRUE のとき）
     tunnel_proc = None
-    tunnel_url = None
-    if want_tunnel and cloudflared:
-        tunnel_proc, tunnel_url = run_quick_tunnel(cloudflared, PORT)
-
-    print(tr("\n[installer] アドレス", "\n[installer] URLs"))
-    print(f"  local : {_red(f'http://localhost:{PORT}', ansi_ok)}")
-    if HOST in {"0.0.0.0", "::"}:
-        for ip in _lan_addresses():
-            print(f"  lan   : http://{ip}:{PORT}")
-    if public_url:
-        print(f"  public: {_red(public_url, ansi_ok)}  " + tr("（固定アドレス / .env の SHOGI_ANALYZER_PUBLIC_URL）", "(fixed address / SHOGI_ANALYZER_PUBLIC_URL in .env)"))
-    elif tunnel_url:
-        print(f"  public: {_red(tunnel_url, ansi_ok)}  " + tr("（Quick Tunnel: 起動ごとに変わります）", "(Quick Tunnel: changes on every start)"))
-    elif want_tunnel:
-        tunnel_log = runtime_home() / "server" / "data" / "cloudflared_quick_tunnel.log"
-        print(tr(
-            "  public: (失敗)  ※ cloudflared が失敗しました。\n"
-            f"          ログ: {tunnel_log}\n"
-            "          UDP禁止環境などでは --protocol http2 が必要なことがあります。\n"
-            "          また、既存の ~/.cloudflared/config.yml(config.yaml) がある環境では Quick Tunnel が動かないことがあります。",
-            "  public: (failed)  * cloudflared failed.\n"
-            f"          log: {tunnel_log}\n"
-            "          Networks that block UDP may need --protocol http2.\n"
-            "          Quick Tunnel may not work when ~/.cloudflared/config.yml (config.yaml) exists.",
-        ))
-    else:
-        print(tr("  public: (なし)  ※ .env で SHOGI_ANALYZER_TUNNEL=FALSE", "  public: (none)  * SHOGI_ANALYZER_TUNNEL=FALSE in .env"))
-    print(tr(f"  ログ  : {log_path}", f"  log   : {log_path}"))
-    print(tr(f"  設定  : {env_path}", f"  settings: {env_path}"))
-
-    # 6) keep
     try:
-        rc = server.wait()
-        if tunnel_proc and tunnel_proc.poll() is None:
-            tunnel_proc.terminate()
-        return int(rc or 0)
+        time.sleep(1.5)
+        if server.poll() is not None:
+            # the reason (bind error etc.) was printed just above by the server
+            print(tr("\n[installer] エラー: サーバーの起動に失敗しました（上のメッセージを確認してください）",
+                     "\n[installer] ERROR: the server failed to start (see the message above)"))
+            return 5
+
+        # 5) Quick Tunnel（固定アドレスが無く、SHOGI_ANALYZER_TUNNEL=TRUE のとき）
+        tunnel_url = None
+        if want_tunnel and cloudflared:
+            tunnel_proc, tunnel_url = run_quick_tunnel(cloudflared, PORT)
+
+        print(tr("\n[installer] アドレス", "\n[installer] URLs"))
+        print(f"  local : {_red(f'http://localhost:{PORT}', ansi_ok)}")
+        if HOST in {"0.0.0.0", "::"}:
+            for ip in _lan_addresses():
+                print(f"  lan   : http://{ip}:{PORT}")
+        if public_url:
+            print(f"  public: {_red(public_url, ansi_ok)}  " + tr("（固定アドレス / .env の SHOGI_ANALYZER_PUBLIC_URL）", "(fixed address / SHOGI_ANALYZER_PUBLIC_URL in .env)"))
+        elif tunnel_url:
+            print(f"  public: {_red(tunnel_url, ansi_ok)}  " + tr("（Quick Tunnel: 起動ごとに変わります）", "(Quick Tunnel: changes on every start)"))
+        elif want_tunnel:
+            tunnel_log = runtime_home() / "server" / "data" / "cloudflared_quick_tunnel.log"
+            print(tr(
+                "  public: (失敗)  ※ cloudflared が失敗しました。\n"
+                f"          ログ: {tunnel_log}\n"
+                "          UDP禁止環境などでは --protocol http2 が必要なことがあります。\n"
+                "          また、既存の ~/.cloudflared/config.yml(config.yaml) がある環境では Quick Tunnel が動かないことがあります。",
+                "  public: (failed)  * cloudflared failed.\n"
+                f"          log: {tunnel_log}\n"
+                "          Networks that block UDP may need --protocol http2.\n"
+                "          Quick Tunnel may not work when ~/.cloudflared/config.yml (config.yaml) exists.",
+            ))
+        else:
+            print(tr("  public: (なし)  ※ .env で SHOGI_ANALYZER_TUNNEL=FALSE", "  public: (none)  * SHOGI_ANALYZER_TUNNEL=FALSE in .env"))
+        print(tr(f"  ログ  : {log_path}", f"  log   : {log_path}"))
+        print(tr(f"  設定  : {env_path}", f"  settings: {env_path}"))
+
+        return int(server.wait() or 0)
     except KeyboardInterrupt:
         print(tr("\n[installer] 停止しています ...", "\n[installer] stopping..."))
-        server.terminate()
-        if tunnel_proc and tunnel_proc.poll() is None:
-            tunnel_proc.terminate()
         return 0
+    finally:
+        for proc in (server, tunnel_proc):
+            if proc is not None and proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
 
 
 if __name__ == "__main__":

@@ -19,9 +19,26 @@ from .core.import_usi import detect_format, import_usi_game, normalize_usi_text
 from .services.state_store import RuntimeState, StateStore, default_game_title
 from .services.share_image import SHARE_TYPES, ShareImageError, create_share, share_file, share_page
 from .services.update_checker import check_update_now, get_update_status, read_current_version
+from .services import license_docs
 
 
 router = APIRouter()
+
+
+@router.get('/api/app/licenses', response_class=HTMLResponse)
+async def app_licenses():
+    return HTMLResponse(license_docs.overview(),headers={'Cache-Control':'no-store'})
+
+
+@router.get('/api/app/license-document/{document:path}')
+async def app_license_document(document: str):
+    path=license_docs.documents().get(document)
+    if path is None:
+        raise HTTPException(status_code=404,detail='License document not found')
+    if path.suffix.lower()=='.docx':
+        return FileResponse(path,filename=path.name,headers={'X-Content-Type-Options':'nosniff'})
+    return Response(path.read_bytes(),media_type='text/plain; charset=utf-8',
+                    headers={'X-Content-Type-Options':'nosniff','Cache-Control':'no-store'})
 
 
 def _runtime(request: Request) -> RuntimeState:
@@ -50,7 +67,8 @@ def _logged_in(request: Request) -> bool:
 
 def _client_ip(request: Request) -> str:
     # behind Cloudflare Tunnel every request comes from 127.0.0.1; the real address is in this header
-    return request.headers.get("cf-connecting-ip") or (request.client.host if request.client else "?")
+    host=request.client.host if request.client else '?'
+    return (request.headers.get('cf-connecting-ip') or host) if host in {'127.0.0.1','::1'} else host
 
 
 # failed logins per client: (count, locked_until)

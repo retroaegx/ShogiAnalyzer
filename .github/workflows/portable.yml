@@ -24,7 +24,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: windows-latest
+          # Keep the toolchain aligned with the reviewed VS 2022 REDIST terms.
+          - runner: windows-2022
             platform: windows-amd64
             executable: ShogiAnalyzer.exe
           - runner: ubuntu-22.04

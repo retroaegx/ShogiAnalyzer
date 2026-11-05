@@ -19,13 +19,22 @@ def self_check() -> int:
     import tempfile
     import py7zr
     import cpuinfo
-    import shogi
     import websockets
     from PIL import Image, ImageDraw, ImageFont
     from app_paths import resource_root, runtime_home
     from server.app.core.gametree import GameTree
     from server.app.services.state_store import StateStore
     root = resource_root()
+    import importlib
+    library_paths = {}
+    probes = {}
+    for name in ('py7zr','bcj','inflate64','multivolumefile','pyppmd'):
+        module = importlib.import_module(name)
+        path = Path(module.__file__)
+        if getattr(sys, 'frozen', False) and (not path.is_file() or path.suffix != '.py'):
+            raise RuntimeError(f'Library is not externally replaceable: {name}: {path}')
+        library_paths[name] = str(path)
+        probes[name] = getattr(module, 'SHOGI_REPLACEMENT_PROBE', None)
     required = ["VERSION", ".env.template", "installer/manifest.json", "server/assets_web/index.html",
         "server/assets_web/js/app.js", "server/app/services/share_fonts/ShogiAnalyzerMaru.ttf"]
     for name in required:
@@ -41,9 +50,19 @@ def self_check() -> int:
         font = ImageFont.truetype(str(root / required[-1]), 18)
         ImageDraw.Draw(image).text((0, 0), "先手７六歩", font=font)
         image.save(Path(temp) / "check.png")
+        # Exercise extraction with the same library used by engine setup.
+        sample = Path(temp) / 'sample.txt'
+        sample.write_text('archive roundtrip', encoding='utf-8')
+        archive = Path(temp) / 'check.7z'
+        with py7zr.SevenZipFile(archive, 'w') as package:
+            package.write(sample, 'sample.txt')
+        with py7zr.SevenZipFile(archive, 'r') as package:
+            package.extractall(Path(temp) / 'extracted')
+        if (Path(temp) / 'extracted/sample.txt').read_text() != 'archive roundtrip':
+            raise RuntimeError('7z roundtrip failed')
         flags = cpuinfo.get_cpu_info().get("flags", [])
     print(json.dumps({"ok": True, "version": (root / "VERSION").read_text().strip(),
-        "resources": str(root), "runtime": str(runtime_home()), "cpu_flags": len(flags)}))
+        "resources": str(root), "runtime": str(runtime_home()), "cpu_flags": len(flags), "replaceable_libraries":library_paths, "replacement_probes":probes}))
     return 0
 
 

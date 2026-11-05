@@ -50,3 +50,13 @@ WindowsおよびUbuntuで同梱版の自己検査、通常ランチャー→子�
 ビルドごとの実サイズ・SHA-256・依存バージョンは `build-report.json` と `build-requirements.lock` に保存する。
 
 参考: [PyInstallerの配布形式](https://pyinstaller.org/en/stable/operating-mode.html)、[リソースと実行ファイル](https://pyinstaller.org/en/stable/runtime-information.html)、[外部プログラムの起動](https://pyinstaller.org/en/stable/common-issues-and-pitfalls.html)、[やねうら王のビルド手順](https://github.com/yaneurao/YaneuraOu/wiki/やねうら王のビルド手順)。
+
+## 追加の依存・配布条件対応
+
+実行試験の成功だけで配布条件まで確認済みとは扱わない。初期requirementsに棋譜解析用と記載されていたpython-shogiは、初期コードでも本体の使用箇所を確認できなかった。自己検査への追加は不要だったため取り消し、実行依存から外し、開発テストだけのtests/requirements.txtへ移した。PyInstallerでもshogiを明示除外する。
+
+配布時の依存一覧はビルド環境に入った全パッケージではなく、実行依存のグラフから生成する。GPL依存・未確認のライセンス・ライセンス文書欠落を検出するとビルドを止める。LGPLの展開ライブラリ5件については、正確なバージョンのソース配布物をPyPIのSHA-256と照合して配布物へ添え、外部の.pyとネイティブモジュールとして配置する。改変したライブラリが実際に読み込まれる検査を追加した。ライセンス文書のコピーだけで完了とは扱わない。
+
+CPythonのPSF文書・組み込みソフトウェアの表示、OpenSSL、Pillow内の表示等を保持する。ソースや参考文書の取得元とハッシュ、実際のネイティブファイル一覧も記録する。Microsoft製のWindowsランタイムDLLはこのZIPから除外し、Windows 10以降のOS側のUCRTと、公式に導入されたVisual C++ x64 Runtimeを使う。不足時にはStart.batが公式の導入案内を開く。これはPython不要とは別の前提なのでREADMEにも明記する。
+
+配布物にはTHIRD_PARTY.txt、対応ソース、差し替え・再ビルド手順、BUILD_INFO.jsonを含める。エンジン・評価関数の非同梱、利用者同意後の直接取得、VERSIONを勝手に更新しない条件は継続する。

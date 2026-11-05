@@ -9,6 +9,8 @@ on:
       - 'installer/**'
       - 'server/**'
       - 'tools/*portable*'
+      - 'tools/pyinstaller_hooks/**'
+      - 'docs/THIRD_PARTY.md'
       - 'tests/**'
       - '.github/workflows/portable.yml'
 
@@ -42,10 +44,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: python -m pip install -r tools/requirements-portable.txt
+      - run: python -m pip install -r tools/requirements-portable.txt -r tests/requirements.txt
       - run: python -m unittest discover -s tests -p "test_*.py"
       - run: node --test tests/test_*.mjs
       - run: python tools/build_portable.py
+      - run: python tools/check_portable_licenses.py dist/portable/app/ShogiAnalyzer/${{ matrix.executable }}
       - run: python tools/smoke_portable.py dist/portable/app/ShogiAnalyzer/${{ matrix.executable }}
       - uses: actions/upload-artifact@v4
         with:

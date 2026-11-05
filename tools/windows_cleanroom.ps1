@@ -37,9 +37,9 @@ try {
     [IO.Compression.ZipFile]::ExtractToDirectory('C:\ShogiInput\ShogiAnalyzer.zip','C:\ShogiTest')
     Run-Captured $exe '--self-check' 'direct-executable'
     Run-Captured $env:ComSpec '/d /c "C:\ShogiTest\ShogiAnalyzer\Start.bat --self-check"' 'start-bat'
-    # A console is required for the probe's CTRL_BREAK shutdown test. This opens
-    # only the application's test process; it performs no GUI automation.
-    $probe=Start-Process -FilePath $exe -ArgumentList '--engine-python C:\ShogiInput\cleanroom_probe.py --exe C:\ShogiTest\ShogiAnalyzer\ShogiAnalyzer.exe --fixture C:\ShogiInput\fixture.kif --peer C:\ShogiInput\fake_usi.py --output C:\ShogiResults\probe.json' -PassThru
+    # A hidden console is required for the probe's CTRL_BREAK shutdown test.
+    # This is an automated helper, not a user-facing application window.
+    $probe=Start-Process -WindowStyle Hidden -FilePath $exe -ArgumentList '--engine-python C:\ShogiInput\cleanroom_probe.py --exe C:\ShogiTest\ShogiAnalyzer\ShogiAnalyzer.exe --fixture C:\ShogiInput\fixture.kif --peer C:\ShogiInput\fake_usi.py --output C:\ShogiResults\probe.json' -PassThru
     if(-not $probe.WaitForExit(180000)){throw 'Application probe timeout'}
     $report=Get-Content "$result\probe.json" -Raw | ConvertFrom-Json
     if(-not $report.ok){throw 'Application probe failed (see probe.json)'}

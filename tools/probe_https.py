@@ -45,9 +45,17 @@ def main():
             _download('https://raw.githubusercontent.com/python/cpython/v3.12.10/LICENSE',target)
             assert b'PYTHON SOFTWARE FOUNDATION LICENSE' in target.read_bytes()
             report['checks']['real_download_bytes']=target.stat().st_size
-        release=_latest_release('retroaegx/ShogiAnalyzer')
-        assert release.get('tag_name')
-        report['checks']['release_check']=True
+        try:
+            release=_latest_release('retroaegx/ShogiAnalyzer')
+            assert release.get('tag_name')
+            report['checks']['release_check']=True
+        except urllib.error.HTTPError as error:
+            # Shared CI egress can exhaust GitHub's unauthenticated API quota.
+            # A verified HTTP response proves TLS, but not release metadata.
+            if error.code != 403 or error.headers.get('x-ratelimit-remaining') != '0':
+                raise
+            report['checks']['release_check']={'status':'rate_limited',
+                'http_status':403,'release_metadata_verified':False}
         if args.full:
             for host in ('self-signed.badssl.com','wrong.host.badssl.com'):
                 try:

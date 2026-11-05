@@ -89,9 +89,6 @@ const els = {
   standTopName: $("standTopName"),
   standBottomMark: $("standBottomMark"),
   standBottomName: $("standBottomName"),
-  evalBar: $("evalBar"),
-  evalBarFill: $("evalBarFill"),
-  evalBarText: $("evalBarText"),
 
   btnStart: $("btnStart"),
   btnPrev: $("btnPrev"),
@@ -183,7 +180,6 @@ const els = {
   bgChoices: $("bgChoices"),
   pieceChoices: $("pieceChoices"),
   optCoordsSeg: $("optCoordsSeg"),
-  optEvalBar: $("optEvalBar"),
   optLegal: $("optLegal"),
   dlgEngine: $("dlgEngine"),
   engineName: $("engineName"),
@@ -225,7 +221,7 @@ const state = {
   sessionId: null,
   ownerToken: null,
   flip: false,
-  opts: { theme: UI_THEMES[0].id, coords: "overlay", evalBar: true, legal: true, lastMove: true, bestMove: true, nextMove: true, arrowLabels: true },
+  opts: { theme: UI_THEMES[0].id, coords: "overlay", legal: true, lastMove: true, bestMove: true, nextMove: true, arrowLabels: true },
 
   theme: null,
   geom: null, // {natW, natH, rx, ry, rw, rh} in image px
@@ -310,6 +306,8 @@ function loadOpts() {
 }
 
 function normalizeOpts() {
+  // The board-side evaluation bar has been removed; discard older saved preferences.
+  delete state.opts.evalBar;
   // coordinates used to be on/off: on -> the new default (on the board frame), off -> hidden
   if (state.opts.coords === true) state.opts.coords = "overlay";
   if (state.opts.coords === false) state.opts.coords = "off";
@@ -1198,7 +1196,7 @@ function layoutBoard() {
     const nav = els.navbar.getBoundingClientRect().height || 54;
     els.boardStage.classList.remove("stands-side");
     const standK = cellPerBs * 1.9; // matches --stand-w (fixed 2-column stands)
-    const fixedW = (state.opts.evalBar ? 12 : 0) + 3 * 12;
+    const fixedW = 2 * 12; // gaps between the two stands and board
     const bsW = (area.width - fixedW) / (1 + 2 * standK + coordK);
     const bsH = (area.height - nav - 14) / (1 + coordK);
     bs = Math.min(bsW, bsH);
@@ -2166,20 +2164,6 @@ function currentBest() {
   return (cur ? state.evals.get(cur) : null) || null;
 }
 
-function renderEvalBar() {
-  els.boardStage.classList.toggle("no-eval", !state.opts.evalBar);
-  const cur = node(state.game?.current_node_id);
-  const best = currentBest();
-  const cp = senteScore(best, sideToMoveOf(cur));
-  const wr = winRate(cp);
-  els.evalBarFill.style.height = `${(wr * 100).toFixed(1)}%`;
-  els.evalBar.classList.toggle("flipped", state.flip);
-  els.evalBar.classList.toggle("gote-ahead", (cp ?? 0) < 0 !== state.flip);
-  if (cp == null) els.evalBarText.textContent = "";
-  else if (Math.abs(cp) >= 30000) els.evalBarText.textContent = "詰";
-  else els.evalBarText.textContent = (Math.abs(cp) / 100).toFixed(1);
-}
-
 function verdict(cp) {
   if (cp == null) return "";
   const a = Math.abs(cp);
@@ -2302,12 +2286,14 @@ function renderAnalysis() {
       const mv = el("span", "pv-moves");
       if (moves.length) {
         mv.appendChild(el("b", null, moves[0].text));
-        mv.appendChild(document.createTextNode(moves.slice(1).map((m) => m.text).join(" ")));
+        mv.appendChild(el("span", "pv-continuation", moves.slice(1).map((m) => m.text).join(" ")));
       }
       mv.title = moves.map((m) => m.text).join(" ");
       li.appendChild(mv);
-      li.appendChild(el("span", "pv-depth", line.depth ? String(line.depth) : "-"));
-      li.appendChild(el("span", "pv-nodes", line.nodes ? fmtNum(line.nodes) : "-"));
+      const metrics = el("span", "pv-metrics");
+      metrics.append(el("span", "pv-depth", line.depth ? String(line.depth) : "-"),
+        el("span", "pv-nodes", line.nodes ? fmtNum(line.nodes) : "-"));
+      li.appendChild(metrics);
       const play = el("button", "pv-play");
       play.type = "button";
       play.title = "この手を指す";
@@ -2321,7 +2307,7 @@ function renderAnalysis() {
     }
   }
   renderEngineStatus();
-  renderEvalBar();
+
   renderOverlay();
 }
 
@@ -3709,7 +3695,7 @@ function syncOptControls() {
     b.classList.toggle("on", b.dataset.v === state.opts.coords);
     b.setAttribute("aria-checked", String(b.dataset.v === state.opts.coords));
   }
-  els.optEvalBar.checked = state.opts.evalBar;
+
   els.optLegal.checked = state.opts.legal;
   for (const [key, id] of [["lastMove", "optLastMove"], ["bestMove", "optBestMove"], ["nextMove", "optNextMove"], ["arrowLabels", "optArrowLabels"]]) {
     $(id).checked = state.opts[key];
@@ -3976,7 +3962,7 @@ function wire() {
     }
   };
   markCoords();
-  els.optEvalBar.checked = state.opts.evalBar;
+
   els.optLegal.checked = state.opts.legal;
   els.optCoordsSeg.addEventListener("click", (e) => {
     const b = e.target.closest("button[data-v]");
@@ -3986,12 +3972,6 @@ function wire() {
     saveOpts();
     layoutBoard();
     renderCoords();
-  });
-  els.optEvalBar.addEventListener("change", () => {
-    state.opts.evalBar = els.optEvalBar.checked;
-    saveOpts();
-    renderEvalBar();
-    layoutBoard();
   });
   for (const [key, id, fn] of [
     ["lastMove", "optLastMove", renderBoard],

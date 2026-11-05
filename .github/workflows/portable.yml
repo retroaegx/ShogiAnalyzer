@@ -104,5 +104,11 @@ jobs:
         if: always()
         with:
           name: ShogiAnalyzer-clean-linux-report
-          path: dist/cleanroom-results/
+          # Keep the disposable DB/auth secrets out of the report artifact.
+          path: |
+            dist/cleanroom-results/*.txt
+            dist/cleanroom-results/*.json
+            dist/cleanroom-results/*.log
+            dist/cleanroom-results/https/*.txt
+            dist/cleanroom-results/https/*.json
           if-no-files-found: error

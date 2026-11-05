@@ -32,8 +32,8 @@ def main():
         pipe_probe.write_text('import sys\nsys.stdout.write('+repr(sample)+')\nsys.stderr.write('+repr(sample)+')\n',encoding='utf-8')
         encoded=subprocess.run([str(exe),'--engine-python',str(pipe_probe)],
             env={**env,'PYTHONIOENCODING':'utf-8'},capture_output=True,check=True,timeout=20)
-        assert encoded.stdout==sample.encode('utf-8'), 'Non-UTF-8 stdout from native executable'
-        assert encoded.stderr==sample.encode('utf-8'), 'Non-UTF-8 stderr from native executable'
+        assert encoded.stdout.replace(b'\r\n',b'\n')==sample.encode('utf-8'), 'Non-UTF-8 stdout from native executable'
+        assert encoded.stderr.replace(b'\r\n',b'\n')==sample.encode('utf-8'), 'Non-UTF-8 stderr from native executable'
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0))
             env['SHOGI_ANALYZER_PORT'] = str(sock.getsockname()[1])

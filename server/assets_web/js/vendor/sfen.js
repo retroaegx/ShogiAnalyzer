@@ -115,3 +115,26 @@ export function countsToList(counts) {
   }
   return out;
 }
+
+/** Serialize the same board/hand representation used by parseSfen. */
+export function toSfen(position) {
+  const codes = {king:'K',rook:'R',bishop:'B',gold:'G',silver:'S',knight:'N',lance:'L',pawn:'P',
+    dragon:'+R',horse:'+B',promoted_silver:'+S',promoted_knight:'+N',promoted_lance:'+L',promoted_pawn:'+P'};
+  const ranks = position.board.map(row => {
+    let out = '', empty = 0;
+    for (const piece of row) {
+      if (!piece) { empty++; continue; }
+      if (empty) { out += empty; empty = 0; }
+      const code = codes[piece.piece];
+      if (!code) throw new Error('Unknown piece: '+piece.piece);
+      out += piece.owner === 'sente' ? code : code.toLowerCase();
+    }
+    return out + (empty || '');
+  });
+  let hand = '';
+  for (const owner of ['sente','gote']) for (const type of ['rook','bishop','gold','silver','knight','lance','pawn']) {
+    const count = position.capturedPieces[owner][type] || 0;
+    if (count > 0) hand += (count > 1 ? count : '') + (owner === 'sente' ? codes[type] : codes[type].toLowerCase());
+  }
+  return `${ranks.join('/')} ${position.currentPlayer === 'sente' ? 'b' : 'w'} ${hand || '-'} ${position.ply || 1}`;
+}

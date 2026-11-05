@@ -6,11 +6,12 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
-import shlex
 import time
 from collections import deque
 from typing import Any, Awaitable, Callable
 
+from app_paths import runtime_home
+from external_process import external_env, external_libraries, split_command
 from ..core.gametree import GameTree
 from ..core.legality import check_move
 from ..core.sfen_ops import normalize_usi_promotion, sfen_to_position_command
@@ -144,7 +145,7 @@ def parse_usi_option(line: str) -> dict[str, Any] | None:
 def _engine_cmd_from_env() -> list[str] | None:
     cmd = (os.environ.get("SHOGI_ANALYZER_ENGINE_CMD") or "").strip()
     if cmd:
-        return shlex.split(cmd, posix=(os.name != "nt"))
+        return split_command(cmd)
     path = (os.environ.get("SHOGI_ANALYZER_ENGINE_PATH") or "").strip()
     if path:
         return [path]
@@ -273,7 +274,7 @@ class AnalysisService:
         """Engine the saved options belong to (for reading the file); relative to the app folder when inside it."""
         parts = list(self._cmd or [])
         if parts:
-            app_dir = Path(__file__).resolve().parents[3]
+            app_dir = runtime_home()
             try:
                 parts[0] = Path(parts[0]).resolve().relative_to(app_dir).as_posix()
             except ValueError:
@@ -667,13 +668,15 @@ class AnalysisService:
                     cwd = str(p.parent)
 
             try:
-                self._proc = await asyncio.create_subprocess_exec(
-                    *self._cmd,
-                    stdin=asyncio.subprocess.PIPE,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.STDOUT,
-                    cwd=cwd,
-                )
+                with external_libraries():
+                    self._proc = await asyncio.create_subprocess_exec(
+                        *self._cmd,
+                        stdin=asyncio.subprocess.PIPE,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.STDOUT,
+                        cwd=cwd,
+                        env=external_env(),
+                    )
             except FileNotFoundError as exc:
                 raise RuntimeError(f"failed to start engine: {exc}") from exc
             self._reader_task = asyncio.create_task(self._reader_loop())

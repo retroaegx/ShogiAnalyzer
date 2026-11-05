@@ -1,7 +1,10 @@
 {
   "cloudflared": {
     "windows_amd64_url": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe",
-    "linux_amd64_url": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
+    "linux_amd64_url": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64",
+    "linux_arm64_url": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64",
+    "darwin_amd64_url": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64.tgz",
+    "darwin_arm64_url": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-arm64.tgz"
   },
   "engines": [
     {

@@ -22,8 +22,9 @@ from pathlib import Path
 from typing import Any
 
 from ..paths import data_dir
+from app_paths import resource_root
 
-ROOT_DIR = Path(__file__).resolve().parents[3]
+ROOT_DIR = resource_root()
 VERSION_FILE = ROOT_DIR / "VERSION"
 DEFAULT_REPO = "retroaegx/ShogiAnalyzer"
 DEFAULT_INTERVAL_HOURS = 24.0

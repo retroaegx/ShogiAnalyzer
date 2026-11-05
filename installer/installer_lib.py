@@ -11,13 +11,19 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import tarfile
 import time
 import urllib.request
 import zipfile
+import shlex
+
+from app_paths import resource_root, runtime_home, is_frozen
+from external_process import external_env, external_libraries
+from installer.cpu_variants import choose_engine
 
 
 def repo_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return resource_root()
 
 
 # ---------- console language ----------
@@ -60,37 +66,28 @@ def run_streamed(cmd: list[str], cwd: str | None = None, env: dict[str, str] | N
     Child processes write to the console directly, so without this their output
     would bypass the console log (sys.stdout is tee'd to console.log by run.py).
     """
-    if env is None:
-        env = dict(os.environ)
+    env = external_env(env)
     env.setdefault("PYTHONIOENCODING", "utf-8")  # read as UTF-8 below
-    proc = subprocess.Popen(
-        cmd,
-        cwd=cwd,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        bufsize=1,
-    )
+    with external_libraries():
+        proc = subprocess.Popen(
+            cmd,
+            cwd=cwd,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+        )
     assert proc.stdout is not None
     for line in proc.stdout:
         sys.stdout.write(line)
     return proc.wait()
 
 
-def runtime_home() -> Path:
-    """Folder the generated/downloaded files go under (.venv, engines/, tools/, server/data/, .env).
-
-    The repository folder itself, as in the original layout; everything generated is
-    listed in .gitignore.
-    """
-    return repo_root()
-
-
 def _server_data_dir(root: Path) -> Path:
-    return root / "server" / "data"
+    return runtime_home() / "server" / "data"
 
 
 # ---------- settings file (.env) ----------
@@ -257,11 +254,13 @@ def _log_installer_event(root: Path, *, kind: str, payload: dict) -> None:
         conn.close()
 
 
+def _arch_key() -> str:
+    arch = py_platform.machine().lower()
+    return {"x86_64": "amd64", "x64": "amd64", "aarch64": "arm64"}.get(arch, arch)
+
+
 def _platform_key() -> str:
-    # This repo is currently Windows/Linux amd64 only.
-    if os.name == "nt":
-        return "windows_amd64"
-    return "linux_amd64"
+    return f"{_os_key()}_{_arch_key()}"
 
 
 def ensure_requirements(root: Path) -> bool:
@@ -315,7 +314,20 @@ def ensure_cloudflared(root: Path) -> Path | None:
 
     print(tr("[installer] cloudflared をダウンロードしています ...", "[installer] Downloading cloudflared ..."))
     try:
-        _download(str(url), dst)
+        if str(url).endswith(".tgz"):
+            archive = bin_dir / "cloudflared.tgz"
+            _download(str(url), archive)
+            # Copy exactly the executable, never extract arbitrary archive paths.
+            with tarfile.open(archive, "r:gz") as package:
+                member = next((item for item in package.getmembers()
+                    if item.name.lstrip("./") == "cloudflared" and item.isfile()), None)
+                if member is None:
+                    raise RuntimeError("cloudflared missing from archive")
+                with package.extractfile(member) as source, dst.with_suffix(".tmp").open("wb") as target:
+                    shutil.copyfileobj(source, target)
+                dst.with_suffix(".tmp").replace(dst)
+        else:
+            _download(str(url), dst)
         if os.name != "nt":
             dst.chmod(dst.stat().st_mode | 0o111)
         _log_installer_event(root, kind="download", payload={"asset": "cloudflared", "url": url, "path": str(dst)})
@@ -329,13 +341,15 @@ def ensure_cloudflared(root: Path) -> Path | None:
 def list_existing_tunnels(cloudflared: Path) -> str | None:
     """Best-effort: list locally-managed tunnels (requires login)."""
     try:
-        res = subprocess.run(
-            [str(cloudflared), "tunnel", "list"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            timeout=6,
-        )
+        with external_libraries():
+            res = subprocess.run(
+                [str(cloudflared), "tunnel", "list"],
+                env=external_env(),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=6,
+            )
         if res.returncode != 0:
             return None
         out = (res.stdout or "").strip()
@@ -501,26 +515,18 @@ def _save_engine_config(root: Path, cfg: dict) -> None:
 
 
 def _os_key() -> str:
-    return "windows" if os.name == "nt" else ("darwin" if sys.platform == "darwin" else "linux")
+    return {"win32": "windows", "darwin": "darwin", "linux": "linux"}.get(sys.platform, sys.platform)
 
 
 def _has_os_variant(engine: dict) -> bool:
-    return any((v.get("os") or "").lower() == _os_key() for v in engine.get("platforms") or [])
+    return _pick_engine_variant(engine) is not None
 
 
 def _pick_engine_variant(engine: dict) -> dict | None:
-    platforms = engine.get("platforms") or []
-    os_key = _os_key()
-    arch = py_platform.machine().lower()
-    arch_key = "arm64" if arch in {"arm64", "aarch64"} else "amd64"
-    for v in platforms:
-        if (v.get("os") or "").lower() == os_key and (v.get("arch") or "").lower() == arch_key:
-            return v
-    # fallback: match os only
-    for v in platforms:
-        if (v.get("os") or "").lower() == os_key:
-            return v
-    return platforms[0] if platforms else None
+    for variant in engine.get("platforms") or []:
+        if (variant.get("os") or "").lower() == _os_key() and (variant.get("arch") or "").lower() == _arch_key():
+            return variant
+    return None
 
 
 def _sha256_verify_if_present(path: Path, sha256_hex: str) -> None:
@@ -577,39 +583,7 @@ def _cpu_flags() -> set[str]:
 
 
 def _choose_best_engine_exe(engine_root: Path, type_hint: str = "") -> Path | None:
-    flags = _cpu_flags()
-    # collect candidates
-    if os.name == "nt":
-        candidates = list(engine_root.rglob("*.exe"))
-    else:
-        candidates = [p for p in engine_root.rglob("*") if p.is_file() and os.access(p, os.X_OK)]
-
-    if type_hint:
-        filtered = [p for p in candidates if type_hint.lower() in p.name.lower()]
-        if filtered:
-            candidates = filtered
-
-    if not candidates:
-        return None
-
-    pref = [
-        ("avx512vnni", "avx512vnni" in flags),
-        ("avx512", "avx512" in flags),
-        ("avxvnni", "avxvnni" in flags),
-        ("avx2", "avx2" in flags),
-        ("sse42", "sse4_2" in flags or "sse42" in flags),
-        ("sse41", "sse4_1" in flags or "sse41" in flags),
-    ]
-
-    def score(p: Path) -> int:
-        n = p.name.lower()
-        for i, (tok, ok) in enumerate(pref):
-            if ok and tok in n:
-                return 1000 - i
-        return 0
-
-    candidates.sort(key=score, reverse=True)
-    return candidates[0]
+    return choose_engine(engine_root, _os_key(), _arch_key(), _cpu_flags(), type_hint)
 
 
 def guess_eval_dir_from_exe(exe_path: Path) -> Path | None:
@@ -825,12 +799,19 @@ def _download_engine_variant(root: Path, engine: dict) -> Path | None:
             source = src_dir / "source"
         # Follow upstream build guidance; choose CPU based on flags.
         flags = _cpu_flags()
-        target = "AVX2" if "avx2" in flags else "SSE42"
+        if "avx2" in flags:
+            target = "AVX2"
+        elif flags & {"sse4_2", "sse42"}:
+            target = "SSE42"
+        else:
+            print(tr("[installer] CPUの対応命令を確認できません。手動で対応エンジンを設定してください。",
+                     "[installer] CPU instruction support is unknown; configure a compatible engine manually."))
+            return None
         edition = (build.get("edition") or "").strip() or "YANEURAOU_ENGINE_NNUE"
         make_cmd = ["make", "-C", str(source), "clean", "tournament", f"TARGET_CPU={target}", f"YANEURAOU_EDITION={edition}"]
         if not shutil.which("clang++") and shutil.which("g++"):
             make_cmd.append("COMPILER=g++")  # the Makefile's default is clang++
-        make_cmd.append(f"PYTHON={sys.executable}")  # newer sources generate arch headers with "python", absent on Ubuntu
+        make_cmd.append("PYTHON=" + (shlex.quote(sys.executable) + " --engine-python" if is_frozen() else shlex.quote(sys.executable)))  # newer sources generate arch headers with "python", absent on Ubuntu
         print(tr("[installer] エンジンをビルドしています（時間がかかります）...", "[installer] Building engine (this may take a while)..."))
         rc = run_streamed(make_cmd)
         if rc != 0:
@@ -992,22 +973,23 @@ def run_quick_tunnel(cloudflared: Path, port: int) -> tuple[subprocess.Popen | N
     def _start(args: list[str]) -> subprocess.Popen:
         # Avoid ~/.cloudflared/config.yml interference by isolating HOME.
         tmp_home = Path(tempfile.mkdtemp(prefix="shogi_cf_"))
-        env = os.environ.copy()
+        env = external_env()
         env["HOME"] = str(tmp_home)
         env["USERPROFILE"] = str(tmp_home)
         # quiet colors
         env["NO_COLOR"] = "1"
-        return subprocess.Popen(
-            [str(cloudflared), *args],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            cwd=str(tmp_home),
-            env=env,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            bufsize=1,
-        )
+        with external_libraries():
+            return subprocess.Popen(
+                [str(cloudflared), *args],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                cwd=str(tmp_home),
+                env=env,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
+            )
 
     # Prefer 127.0.0.1 for Windows resolver edge cases.
     base_args = ["tunnel", "--no-autoupdate", "--url", f"http://127.0.0.1:{port}"]

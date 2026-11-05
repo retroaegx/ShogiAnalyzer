@@ -80,7 +80,7 @@
             <a class="btn primary" id="updateLink" href="#" target="_blank" rel="noopener">リリースを見る</a>
           </div>
         </div>
-        <span id="wsStatus" class="status" data-state="connecting"><i></i><span class="status-text">接続中</span></span>
+        <span id="wsStatus" class="status" data-state="connecting" hidden><i></i><span class="status-text">接続中</span></span>
         <span id="engineStatus" class="status engine" data-state="idle" title=""><svg class="ico"><use href="#i-cpu"/></svg><span class="status-text">エンジン</span></span>
       </div>
 
@@ -486,7 +486,7 @@ SOFTWARE.</pre>
   </div>
 
   <!-- shown while the WebSocket is down -->
-  <div class="conn-overlay" id="connOverlay" role="alertdialog" aria-live="assertive" hidden>
+  <div class="conn-overlay" id="connOverlay" role="status" aria-live="polite" hidden>
     <div class="conn-card">
       <div class="conn-anim" aria-hidden="true"><i></i><i></i><i></i></div>
       <b id="connTitle">接続が切れました</b>

@@ -12,6 +12,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from . import auth
 from .core.legality import check_move
+from .core.reconnect import check_step
 from .core.sfen_ops import SfenError
 
 
@@ -75,7 +76,7 @@ class SessionHub:
                 }
             old_owner = self._owner
             self._owner = ws
-            self._owner_tab = None
+            self._owner_tab = (ws.query_params.get("tab") or "").strip()[:64] or None
             self._owner_since = utc_now_iso()
             self._owner_token = secrets.token_urlsafe(12)
             self._session_id = secrets.token_urlsafe(12)
@@ -168,8 +169,11 @@ async def _send_granted(ws: WebSocket) -> None:
     await ws_send(ws, "session:granted", payload)
 
 
-async def _send_state(ws: WebSocket) -> None:
-    await ws_send(ws, "game:state", {"game": await _runtime_from_ws(ws).current_game_wire()})
+async def _send_state(ws: WebSocket, operation_id: str | None = None, error: str | None = None) -> None:
+    payload = {"game": await _runtime_from_ws(ws).current_game_wire()}
+    if operation_id:
+        payload.update(operation_id=operation_id, operation_error=error)
+    await ws_send(ws, "game:state", payload)
 
 
 async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
@@ -206,7 +210,7 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
         "analysis:set_multipv",
     }:
         await ws_send(ws, "toast", {"level": "warning", "message": "全解析中は棋譜を操作できません"})
-        await _send_state(ws)
+        await _send_state(ws, payload.get("operation_id"), "全解析中は棋譜を操作できません")
         return
 
     if msg_type == "game:new":
@@ -293,14 +297,16 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
             return
 
         def _jump(g):
+            check_step(g, msg_type, payload)
             g.jump(node_id)
 
         try:
             await runtime.mutate(_jump)
-            await _send_state(ws)
+            await _send_state(ws, payload.get("operation_id"))
             analysis.schedule_sync(_sync_analysis_to_current_game)
         except Exception as exc:
             await ws_send(ws, "toast", {"level": "error", "message": f"jump failed: {exc}"})
+            await _send_state(ws, payload.get("operation_id"), str(exc))
         return
 
     if msg_type == "node:play_move":
@@ -315,19 +321,21 @@ async def _handle_owner_message(ws: WebSocket, msg: dict[str, Any]) -> None:
             return
 
         def _play(g):
+            check_step(g, msg_type, payload)
             # moves from the board must be legal; an illegal position must never be analyzed
             check_move(g.get_node(from_node_id).position_sfen, move_usi)
             g.play_move(from_node_id, move_usi)
 
         try:
             await runtime.mutate(_play)
-            await _send_state(ws)
+            await _send_state(ws, payload.get("operation_id"))
             analysis.schedule_sync(_sync_analysis_to_current_game)
         except SfenError as exc:
             await ws_send(ws, "toast", {"level": "error", "message": f"指せない手です: {exc}"})
-            await _send_state(ws)
+            await _send_state(ws, payload.get("operation_id"), str(exc))
         except Exception as exc:
             await ws_send(ws, "toast", {"level": "error", "message": f"play_move failed: {exc}"})
+            await _send_state(ws, payload.get("operation_id"), str(exc))
         return
 
     if msg_type == "node:delete":

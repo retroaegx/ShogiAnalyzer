@@ -997,19 +997,25 @@ def run_quick_tunnel(cloudflared: Path, port: int) -> tuple[subprocess.Popen | N
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / "cloudflared_quick_tunnel.log"
 
-    proc = _start(base_args)
-    url = _read_tunnel_url(proc, timeout_s=60.0, tee_path=log_path)
-    if url:
-        return proc, url
-
-    # Fallback: some networks block UDP/QUIC; try http2.
-    try:
-        proc.terminate()
-    except Exception:
-        pass
-    proc2 = _start(["tunnel", "--no-autoupdate", "--protocol", "http2", "--url", f"http://127.0.0.1:{port}"])
-    url2 = _read_tunnel_url(proc2, timeout_s=60.0, tee_path=log_path)
-    return proc2, url2
+    attempts = [base_args, ["tunnel", "--no-autoupdate", "--protocol", "http2", "--url", f"http://127.0.0.1:{port}"]]
+    for args in attempts:
+        proc = _start(args)
+        keep = False
+        try:
+            url = _read_tunnel_url(proc, timeout_s=60.0, tee_path=log_path)
+            if url:
+                keep = True
+                return proc, url
+        finally:
+            # Also covers Ctrl+C before run_quick_tunnel returns to its caller.
+            if not keep and proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+    return None, None
 
 
 def _read_tunnel_url(proc: subprocess.Popen, timeout_s: float, tee_path: Path | None = None) -> str | None:

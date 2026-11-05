@@ -77,9 +77,12 @@ def main():
                 proc.wait(timeout=15)
                 _, alive = psutil.wait_procs(children, timeout=10)
                 if alive:
+                    log.seek(0)
+                    print(log.read(), flush=True)
+                    details = [(child.pid, child.ppid(), child.name(), child.status(), child.cmdline() if child.status()!=psutil.STATUS_ZOMBIE else []) for child in alive]
                     for child in alive: child.kill()
                     psutil.wait_procs(alive, timeout=5)
-                    raise RuntimeError('Launcher left a running child process')
+                    raise RuntimeError(f'Launcher left child processes: {details}')
 
 
 if __name__ == '__main__':

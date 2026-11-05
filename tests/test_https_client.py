@@ -41,7 +41,7 @@ class HTTPSClientTests(unittest.TestCase):
 
     def trusted_context(self):
         context=create_https_context()
-        context.load_verify_locations(cafile=str(FIXTURES/'localhost-test.pem'))
+        context.load_verify_locations(cafile=str(FIXTURES/'localhost-test-ca.pem'))
         return context
 
     def test_certificate_and_hostname_verification_required(self):

@@ -30,9 +30,9 @@ class PortableTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             with patch.object(sys,'frozen',True,create=True), patch.object(sys,'_MEIPASS',str(Path(temp)/'_internal'),create=True), patch.object(sys,'executable',str(Path(temp)/'ShogiAnalyzer.exe')), patch.dict(os.environ,{'SHOGI_ANALYZER_HOME':''}):
                 self.assertEqual(resource_root(),Path(temp)/'_internal')
-                self.assertEqual(runtime_home(),Path(temp))
+                self.assertEqual(runtime_home(),Path(temp).resolve())
             with patch.dict(os.environ,{'SHOGI_ANALYZER_HOME':temp}):
-                self.assertEqual(runtime_home(),Path(temp))
+                self.assertEqual(runtime_home(),Path(temp).resolve())
 
     def test_external_libraries_restore_original_environment(self):
         with patch.object(sys,'frozen',True,create=True), patch.object(sys,'_MEIPASS','/bundle',create=True):

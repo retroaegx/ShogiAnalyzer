@@ -381,49 +381,47 @@ def main() -> int:
 
     # 4) サーバ起動
     server = _run_server(env)
-    time.sleep(1.5)
-    if server.poll() is not None:
-        # the reason (bind error etc.) was printed just above by the server
-        print(tr("\n[installer] エラー: サーバーの起動に失敗しました（上のメッセージを確認してください）",
-                 "\n[installer] ERROR: the server failed to start (see the message above)"))
-        return 5
-
-    # 5) Quick Tunnel（固定アドレスが無く、SHOGI_ANALYZER_TUNNEL=TRUE のとき）
     tunnel_proc = None
-    tunnel_url = None
-    if want_tunnel and cloudflared:
-        tunnel_proc, tunnel_url = run_quick_tunnel(cloudflared, PORT)
-
-    print(tr("\n[installer] アドレス", "\n[installer] URLs"))
-    print(f"  local : {_red(f'http://localhost:{PORT}', ansi_ok)}")
-    if HOST in {"0.0.0.0", "::"}:
-        for ip in _lan_addresses():
-            print(f"  lan   : http://{ip}:{PORT}")
-    if public_url:
-        print(f"  public: {_red(public_url, ansi_ok)}  " + tr("（固定アドレス / .env の SHOGI_ANALYZER_PUBLIC_URL）", "(fixed address / SHOGI_ANALYZER_PUBLIC_URL in .env)"))
-    elif tunnel_url:
-        print(f"  public: {_red(tunnel_url, ansi_ok)}  " + tr("（Quick Tunnel: 起動ごとに変わります）", "(Quick Tunnel: changes on every start)"))
-    elif want_tunnel:
-        tunnel_log = runtime_home() / "server" / "data" / "cloudflared_quick_tunnel.log"
-        print(tr(
-            "  public: (失敗)  ※ cloudflared が失敗しました。\n"
-            f"          ログ: {tunnel_log}\n"
-            "          UDP禁止環境などでは --protocol http2 が必要なことがあります。\n"
-            "          また、既存の ~/.cloudflared/config.yml(config.yaml) がある環境では Quick Tunnel が動かないことがあります。",
-            "  public: (failed)  * cloudflared failed.\n"
-            f"          log: {tunnel_log}\n"
-            "          Networks that block UDP may need --protocol http2.\n"
-            "          Quick Tunnel may not work when ~/.cloudflared/config.yml (config.yaml) exists.",
-        ))
-    else:
-        print(tr("  public: (なし)  ※ .env で SHOGI_ANALYZER_TUNNEL=FALSE", "  public: (none)  * SHOGI_ANALYZER_TUNNEL=FALSE in .env"))
-    print(tr(f"  ログ  : {log_path}", f"  log   : {log_path}"))
-    print(tr(f"  設定  : {env_path}", f"  settings: {env_path}"))
-
-    # 6) keep
     try:
-        rc = server.wait()
-        return int(rc or 0)
+        time.sleep(1.5)
+        if server.poll() is not None:
+            # the reason (bind error etc.) was printed just above by the server
+            print(tr("\n[installer] エラー: サーバーの起動に失敗しました（上のメッセージを確認してください）",
+                     "\n[installer] ERROR: the server failed to start (see the message above)"))
+            return 5
+
+        # 5) Quick Tunnel（固定アドレスが無く、SHOGI_ANALYZER_TUNNEL=TRUE のとき）
+        tunnel_url = None
+        if want_tunnel and cloudflared:
+            tunnel_proc, tunnel_url = run_quick_tunnel(cloudflared, PORT)
+
+        print(tr("\n[installer] アドレス", "\n[installer] URLs"))
+        print(f"  local : {_red(f'http://localhost:{PORT}', ansi_ok)}")
+        if HOST in {"0.0.0.0", "::"}:
+            for ip in _lan_addresses():
+                print(f"  lan   : http://{ip}:{PORT}")
+        if public_url:
+            print(f"  public: {_red(public_url, ansi_ok)}  " + tr("（固定アドレス / .env の SHOGI_ANALYZER_PUBLIC_URL）", "(fixed address / SHOGI_ANALYZER_PUBLIC_URL in .env)"))
+        elif tunnel_url:
+            print(f"  public: {_red(tunnel_url, ansi_ok)}  " + tr("（Quick Tunnel: 起動ごとに変わります）", "(Quick Tunnel: changes on every start)"))
+        elif want_tunnel:
+            tunnel_log = runtime_home() / "server" / "data" / "cloudflared_quick_tunnel.log"
+            print(tr(
+                "  public: (失敗)  ※ cloudflared が失敗しました。\n"
+                f"          ログ: {tunnel_log}\n"
+                "          UDP禁止環境などでは --protocol http2 が必要なことがあります。\n"
+                "          また、既存の ~/.cloudflared/config.yml(config.yaml) がある環境では Quick Tunnel が動かないことがあります。",
+                "  public: (failed)  * cloudflared failed.\n"
+                f"          log: {tunnel_log}\n"
+                "          Networks that block UDP may need --protocol http2.\n"
+                "          Quick Tunnel may not work when ~/.cloudflared/config.yml (config.yaml) exists.",
+            ))
+        else:
+            print(tr("  public: (なし)  ※ .env で SHOGI_ANALYZER_TUNNEL=FALSE", "  public: (none)  * SHOGI_ANALYZER_TUNNEL=FALSE in .env"))
+        print(tr(f"  ログ  : {log_path}", f"  log   : {log_path}"))
+        print(tr(f"  設定  : {env_path}", f"  settings: {env_path}"))
+
+        return int(server.wait() or 0)
     except KeyboardInterrupt:
         print(tr("\n[installer] 停止しています ...", "\n[installer] stopping..."))
         return 0

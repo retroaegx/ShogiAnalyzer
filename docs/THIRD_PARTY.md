@@ -6,6 +6,10 @@ Python実行環境は同梱しています。アプリ側でCPythonのソース�
 
 著作権・ライセンス・免責事項は `_internal/third_party_notices/` に保存しています。Python本体のPSFライセンスと過去のライセンス群、組み込みソフトウェアの表示、OpenSSL、Pillowが同梱するライブラリの表示も含みます。`native-library-licenses.rst` は上流の参考文書で、今回使用していないコンポーネントも掲載されています。収集した実物はINVENTORY.jsonとNATIVE_FILES.txtを参照してください。Pillowを通じてFreeTypeを利用しています。関連部分の著作権はThe FreeType Projectに帰属します（https://freetype.org/）。
 
+## HTTPSの証明書検証
+
+HTTPSの証明書検証には、Windows/macOSではtruststore（MIT）を通じてOSの証明書ストアを使用します。LinuxでOS側にCA証明書がない場合はcertifiのMozilla CA証明書集（MPL-2.0）を使用します。証明書の改変や検証無効化は行いません。truststoreとcertifiのライセンス・著作権表示を同梱し、Linux版にはcertifiの同じ版のソース配布物もthird_party_sourcesへ保存します。MPLの対象はcertifiのファイルで、ShogiAnalyzer本体のMITライセンスを変更しません。
+
 ## LGPLの展開ライブラリ
 
 py7zr、pybcj（import名bcj）、inflate64、multivolumefile、pyppmdは、それぞれのライセンスに基づいて配布しています。これらのライブラリのソースコード自体は改変していません。PyInstallerの配置方法を変更し、PythonモジュールをPYZに埋め込まず、外部ファイルにしています。

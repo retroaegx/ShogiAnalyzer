@@ -24,6 +24,11 @@ def self_check() -> int:
     from app_paths import resource_root, runtime_home
     from server.app.core.gametree import GameTree
     from server.app.services.state_store import StateStore
+    from https_client import create_https_context
+    import ssl
+    https = create_https_context()
+    if https.verify_mode != ssl.CERT_REQUIRED or not https.check_hostname:
+        raise RuntimeError('HTTPS certificate / hostname verification is disabled')
     root = resource_root()
     import importlib
     library_paths = {}
@@ -62,7 +67,8 @@ def self_check() -> int:
             raise RuntimeError('7z roundtrip failed')
         flags = cpuinfo.get_cpu_info().get("flags", [])
     print(json.dumps({"ok": True, "version": (root / "VERSION").read_text().strip(),
-        "resources": str(root), "runtime": str(runtime_home()), "cpu_flags": len(flags), "replaceable_libraries":library_paths, "replacement_probes":probes}))
+        "resources": str(root), "runtime": str(runtime_home()), "cpu_flags": len(flags), "replaceable_libraries":library_paths, "replacement_probes":probes,
+        "https_verification":True}))
     return 0
 
 

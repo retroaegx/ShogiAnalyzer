@@ -31,7 +31,10 @@ def main():
         assert 'System32' not in (folder/'Start.bat').read_text(encoding='utf-8')
     assert all(item['name']!='python-shogi' for item in inventory['packages'])
     source_rows=json.loads((folder/'third_party_sources/SOURCES.json').read_text(encoding='utf-8'))
-    assert {row['name'] for row in source_rows} == set(LGPL_MODULES)
+    expected_sources=set(LGPL_MODULES)
+    if any(row['name']=='certifi' for row in inventory['packages']):
+        expected_sources.add('certifi')
+    assert {row['name'] for row in source_rows} == expected_sources
     for row in source_rows:
         path=folder/'third_party_sources'/row['source']['file']
         assert hashlib.sha256(path.read_bytes()).hexdigest()==row['source']['sha256']

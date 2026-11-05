@@ -44,6 +44,8 @@ def main() -> None:
         '--exclude-module', 'dbm', '--exclude-module', '_gdbm', '--exclude-module', '_dbm']
     for source, target in resources:
         cmd += ['--add-data', f'{ROOT / source}:{target}']
+    if sys.platform.startswith('linux'):
+        cmd += ['--collect-data', 'certifi']
     cmd += ['--add-data', f'{license_dir}:third_party_notices']
     for module in ['argparse', 'server.app.main', 'uvicorn.logging', 'uvicorn.loops.asyncio', 'uvicorn.protocols.http.h11_impl',
             'uvicorn.protocols.websockets.websockets_impl', 'uvicorn.lifespan.on']:

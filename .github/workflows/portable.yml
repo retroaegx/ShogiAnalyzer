@@ -9,6 +9,7 @@ on:
       - 'installer/**'
       - 'server/**'
       - 'tools/*portable*'
+      - 'tools/*cleanroom*'
       - 'tools/pyinstaller_hooks/**'
       - 'docs/THIRD_PARTY.md'
       - 'tests/**'
@@ -58,4 +59,35 @@ jobs:
             dist/portable/ShogiAnalyzer-v*.tar.gz
             dist/portable/build-report.json
             dist/portable/build-requirements.lock
+          if-no-files-found: error
+
+  clean-linux:
+    name: Clean Ubuntu without Python
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ShogiAnalyzer-linux-amd64
+          path: dist/cleanroom-input
+      - name: Test in fresh Ubuntu base container
+        run: |
+          mkdir -p dist/cleanroom-results
+          docker pull ubuntu:22.04
+          docker image inspect ubuntu:22.04 --format '{{json .RepoDigests}}' > dist/cleanroom-results/image-digest.json
+          docker run --rm --network none --read-only --memory 768m --cpus 2 --pids-limit 128 \
+            --tmpfs /tmp:rw,size=512m --tmpfs /test:rw,size=256m \
+            -v "$PWD/dist/cleanroom-input:/input:ro" \
+            -v "$PWD/dist/cleanroom-results:/results:rw" \
+            -v "$PWD/tools/cleanroom_probe.py:/probe.py:ro" \
+            -v "$PWD/tools/linux_cleanroom.sh:/run-test.sh:ro" \
+            -v "$PWD/tests/fake_usi.py:/peer.py:ro" \
+            -v "$PWD/tests/fixtures/promoted_silver.kif:/fixture.kif:ro" \
+            ubuntu:22.04 sh /run-test.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ShogiAnalyzer-clean-linux-report
+          path: dist/cleanroom-results/
           if-no-files-found: error

@@ -5,6 +5,7 @@ from pathlib import Path
 import ssl
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -15,6 +16,24 @@ if not getattr(sys,'frozen',False):
 from https_client import create_https_context, verified_urlopen
 from installer.installer_lib import _download
 from server.app.services.update_checker import _latest_release
+
+
+def probe_head(url):
+    # Shared CI gateways sometimes cache a transient 502/503/504 response.
+    # Retry HEAD only: do not download an engine or weaken TLS verification.
+    for attempt in range(3):
+        fresh=url if attempt==0 else url+('&' if '?' in url else '?')+'shogi_probe='+str(time.time_ns())
+        request=urllib.request.Request(fresh,method='HEAD',headers={
+            'User-Agent':'ShogiAnalyzer HTTPS check','Cache-Control':'no-cache'})
+        try:
+            with verified_urlopen(request,timeout=40) as response:
+                assert response.status==200
+                return {'status':response.status,'final_host':urllib.parse.urlsplit(response.url).hostname,
+                    'attempts':attempt+1}
+        except urllib.error.HTTPError as error:
+            if error.code not in (502,503,504) or attempt==2:raise
+            print(f'HTTPS HEAD {urllib.parse.urlsplit(url).hostname}: HTTP {error.code}; retrying',flush=True)
+            time.sleep(attempt+1)
 
 
 def main():
@@ -34,12 +53,8 @@ def main():
         if args.full:
             targets.append('https://drive.usercontent.google.com/download?id=1bf7GGGM8vM8kQ_icAwbiR7IM6uH3BJ4u&export=download&confirm=t')
         for url in targets:
-            request=urllib.request.Request(url,method='HEAD',headers={'User-Agent':'ShogiAnalyzer HTTPS check'})
-            with verified_urlopen(request,timeout=40) as response:
-                assert response.status==200
-                # Never persist signed redirect query strings.
-                report['checks'][urllib.parse.urlsplit(url).hostname]={'status':response.status,
-                    'final_host':urllib.parse.urlsplit(response.url).hostname}
+            # Never persist signed redirect query strings.
+            report['checks'][urllib.parse.urlsplit(url).hostname]=probe_head(url)
         with tempfile.TemporaryDirectory() as directory:
             target=Path(directory)/'LICENSE.txt'
             _download('https://raw.githubusercontent.com/python/cpython/v3.12.10/LICENSE',target)

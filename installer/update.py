@@ -432,6 +432,9 @@ def run_job(path: Path, **options):
 
 
 def main(argv=None) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and not stream.isatty() and hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='backslashreplace', write_through=True)
     args = list(sys.argv[1:] if argv is None else argv)
     try:
         if len(args) == 2 and args[0] == '--prepare-update': prepare_helper(Path(args[1]))

@@ -23,8 +23,9 @@ class UpdaterTests(unittest.TestCase):
         self.env = patch.dict(os.environ, {k: '' for k in ['SHOGI_ANALYZER_ENGINE_PATH',
             'SHOGI_ANALYZER_ENGINE_EVAL_DIR','SHOGI_ANALYZER_HOME','SHOGI_ANALYZER_UPDATE_REPO']})
         self.env.start(); self.port = patch.object(u, 'app_running', return_value=False); self.port.start()
+        self.output = patch('sys.stdout', new_callable=io.StringIO); self.output.start()
     def tearDown(self):
-        self.port.stop(); self.env.stop(); self.temp.cleanup()
+        self.output.stop(); self.port.stop(); self.env.stop(); self.temp.cleanup()
     def package(self, path, version='2.0.0', native=False):
         path.mkdir(parents=True)
         if native:
@@ -119,6 +120,11 @@ class UpdaterTests(unittest.TestCase):
             self.assertTrue((target/'.UpdateRecovery.json').exists())
             with installation_lock(job):
                 with self.assertRaises(InstallationBusy):u.cleanup_helper(job)
+            work=target/(u.WORK_PREFIX+'interrupted');work.mkdir()
+            u._journal(work/'transaction.json',{'status':'applying'})
+            with self.assertRaisesRegex(u.UpdateError,'復旧記録'):u.cleanup_helper(job)
+            self.assertTrue(job.exists());self.assertTrue((target/'.UpdateRecovery.json').exists())
+            u._journal(work/'transaction.json',{'status':'rolled_back'})
             u.cleanup_helper(job)
             self.assertFalse(job.exists());self.assertFalse((target/'.UpdateRecovery.json').exists())
     def test_tar_keeps_safe_links_and_rejects_escaping_chain(self):

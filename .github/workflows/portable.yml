@@ -108,6 +108,7 @@ jobs:
             -v "$PWD/tools/linux_cleanroom.sh:/run-test.sh:ro" \
             ubuntu:22.04 sh /run-test.sh https
       - name: Update in fresh Ubuntu without Python
+        if: ${{ !cancelled() }}
         run: |
           mkdir -p dist/cleanroom-results/updater
           docker run --rm --network none --read-only --memory 1536m --cpus 2 --pids-limit 128 \

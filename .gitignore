@@ -224,6 +224,11 @@ __marimo__/
 /server/data/engine_options.json
 /server/data/auth.json
 /server/data/update_status.json
+/.shogianalyzer-update.lock
+/.shogianalyzer-update-*/
+/.UpdateRecovery.bat
+/.UpdateRecovery.sh
+/.UpdateRecovery.json
 /server/data/share/
 
 # Local installer logs (CI/dev)

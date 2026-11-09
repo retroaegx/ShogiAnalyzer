@@ -1,0 +1,3 @@
+/Update.sh text eol=lf
+/Update.command text eol=lf
+/Update.bat text eol=crlf

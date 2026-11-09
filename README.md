@@ -67,11 +67,11 @@ sudo apt install build-essential git ca-certificates
 
 `build-essential`には[makeとg++等が含まれます](https://packages.ubuntu.com/jammy/build-essential)。`sudo`で求められるのはLinuxのログインパスワードです。入力中は文字が表示されません。すでに導入済みなら追加の作業は不要です。他のディストリビューションでは、そのOSのパッケージ管理で同等のツールを用意してください。Linuxの確認環境はUbuntu 22.04／24.04です。
 
-続いて、ダウンロードした`linux-amd64.tar.gz`を展開して起動します。以下はファイルを`~/Downloads`へ保存したv1.2.00の例です。保存先とファイル名は、実際に取得したものに合わせてください。
+続いて、ダウンロードした`linux-amd64.tar.gz`を展開して起動します。以下はファイルを`~/Downloads`へ保存したv1.2.1の例です。保存先とファイル名は、実際に取得したものに合わせてください。
 
 ```bash
 cd ~/Downloads
-tar -xzf ShogiAnalyzer-v1.2.00-linux-amd64.tar.gz
+tar -xzf ShogiAnalyzer-v1.2.1-linux-amd64.tar.gz
 cd ShogiAnalyzer
 ./ShogiAnalyzer
 ```
@@ -341,6 +341,10 @@ Cloudflare ダッシュボード →「Zero Trust」→「Access」→「アプ�
 - 確認しないようにするには `.env` で `SHOGI_ANALYZER_UPDATE_CHECK=FALSE` にします。
 
 ### 更新のしかた
+
+ネイティブ配布版では、アプリを終了してからWindowsの`Update.bat`、Linuxの`./Update.sh`、Macの`Update.command`を実行すると、対応する最新のネイティブ版へ更新できます。外部Pythonの導入は不要です。`.env`・棋譜等の`server/data/`・エンジン・cloudflaredは残し、更新後はShogiAnalyzerを起動し直します。更新の確認だけで自動的に上書きすることはありません。詳しくは[更新用スクリプト](docs/PORTABLE.md#更新用スクリプト)を参照してください。
+
+Updateが入っていない旧版や手動で更新する場合は、以下の手順を使います。
 
 1. アプリを止めます（コンソールで `Ctrl + C`、またはウィンドウを閉じる。Ubuntu などでサービスにしている場合は `sudo systemctl stop shogianalyzer`）。
 2. フォルダを新しいバージョンにします。

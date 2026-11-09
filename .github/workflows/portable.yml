@@ -7,13 +7,16 @@ on:
       - 'app_paths.py'
       - 'external_process.py'
       - 'https_client.py'
+      - 'Update.*'
       - 'installer/**'
       - 'server/**'
       - 'tools/*portable*'
       - 'tools/*cleanroom*'
       - 'tools/probe_https.py'
+      - 'tools/smoke_updater.py'
       - 'tools/pyinstaller_hooks/**'
       - 'docs/THIRD_PARTY.md'
+      - 'docs/PORTABLE.md'
       - 'tests/**'
       - '.github/workflows/portable.yml'
 
@@ -54,8 +57,10 @@ jobs:
       - run: python tools/build_portable.py
       - run: python tools/check_portable_licenses.py dist/portable/app/ShogiAnalyzer/${{ matrix.executable }}
       - run: python tools/smoke_portable.py dist/portable/app/ShogiAnalyzer/${{ matrix.executable }}
+      - run: python tools/smoke_updater.py dist/portable/app/ShogiAnalyzer/${{ matrix.executable }} --online-launcher
       - run: ./dist/portable/app/ShogiAnalyzer/${{ matrix.executable }} --engine-python tools/probe_https.py --output dist/portable/https-probe.json
       - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && hashFiles('dist/portable/build-report.json') != '' }}
         with:
           name: ShogiAnalyzer-${{ matrix.platform }}
           path: |
@@ -69,6 +74,8 @@ jobs:
   clean-linux:
     name: Clean Ubuntu without Python
     needs: build
+    # Test the Linux artifact even if an unrelated platform/network probe failed.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -100,6 +107,17 @@ jobs:
             -v "$PWD/tools/probe_https.py:/https-probe.py:ro" \
             -v "$PWD/tools/linux_cleanroom.sh:/run-test.sh:ro" \
             ubuntu:22.04 sh /run-test.sh https
+      - name: Update in fresh Ubuntu without Python
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p dist/cleanroom-results/updater
+          docker run --rm --network none --read-only --memory 1536m --cpus 2 --pids-limit 128 \
+            --tmpfs /tmp:rw,exec,size=1024m --tmpfs /test:rw,exec,size=256m \
+            -v "$PWD/dist/cleanroom-input:/input:ro" \
+            -v "$PWD/dist/cleanroom-results/updater:/results:rw" \
+            -v "$PWD/tools/smoke_updater.py:/update-probe.py:ro" \
+            -v "$PWD/tools/linux_cleanroom.sh:/run-test.sh:ro" \
+            ubuntu:22.04 sh /run-test.sh updater
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -111,4 +129,5 @@ jobs:
             dist/cleanroom-results/*.log
             dist/cleanroom-results/https/*.txt
             dist/cleanroom-results/https/*.json
+            dist/cleanroom-results/updater/*.txt
           if-no-files-found: error

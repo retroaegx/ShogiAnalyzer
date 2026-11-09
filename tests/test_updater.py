@@ -87,6 +87,16 @@ class UpdaterTests(unittest.TestCase):
         with self.assertRaisesRegex(u.UpdateError,'SHA256'):
             u.perform_update(target,target,native=False,confirm=lambda:True,fetch_release=lambda repo:{'tag_name':'v2.0.0','assets':[asset]},downloader=download)
         self.assertEqual((target/'VERSION').read_text(),'1.0.0');self.assertEqual(list(target.glob(u.WORK_PREFIX+'*')),[])
+    def test_failed_update_cleans_utf8_journal_in_non_ascii_installation(self):
+        target=self.package(self.root/'日本語のフォルダー','1.0.0');src=self.package(self.root/'pkg')
+        archive=self.root/'release.zip';digest=self.zip(src,archive)
+        asset={'name':'ShogiAnalyzer-v2.0.0.zip','browser_download_url':'https://example.invalid/release.zip','digest':'sha256:'+digest}
+        def download(url,dest,**kwargs):shutil.copyfile(archive,dest);return digest
+        with patch.object(u.shutil,'copy2',side_effect=OSError('disk full')):
+            with self.assertRaisesRegex(u.UpdateError,'元のアプリ'):
+                u.perform_update(target,target,native=False,confirm=lambda:True,
+                    fetch_release=lambda r:{'tag_name':'v2.0.0','assets':[asset]},downloader=download)
+        self.assertEqual((target/'VERSION').read_text(),'1.0.0');self.assertFalse(list(target.glob(u.WORK_PREFIX+'*')))
     def test_cancel_does_not_download_or_create_workspace(self):
         target=self.package(self.root/'target','1.0.0');asset={'name':'ShogiAnalyzer-v2.0.0.zip'}
         with patch.object(u,'download') as download:

@@ -60,6 +60,7 @@ jobs:
       - run: python tools/smoke_updater.py dist/portable/app/ShogiAnalyzer/${{ matrix.executable }} --online-launcher
       - run: ./dist/portable/app/ShogiAnalyzer/${{ matrix.executable }} --engine-python tools/probe_https.py --output dist/portable/https-probe.json
       - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && hashFiles('dist/portable/build-report.json') != '' }}
         with:
           name: ShogiAnalyzer-${{ matrix.platform }}
           path: |
@@ -73,6 +74,8 @@ jobs:
   clean-linux:
     name: Clean Ubuntu without Python
     needs: build
+    # Test the Linux artifact even if an unrelated platform/network probe failed.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

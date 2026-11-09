@@ -14,7 +14,8 @@ import venv
 # run.bat calls this file directly; the frozen entry imports it as a package.
 if not getattr(sys, "frozen", False):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app_paths import is_frozen
+from app_paths import is_frozen, installation_root
+from installer.update_lock import installation_lock, InstallationBusy
 from installer.installer_lib import (
     ensure_cloudflared,
     ensure_engine_config,
@@ -259,7 +260,7 @@ def _run_server(env: dict[str, str]) -> subprocess.Popen:
     return proc
 
 
-def main() -> int:
+def _main() -> int:
     global PORT, HOST
     if os.name == 'nt':
         import signal
@@ -434,6 +435,15 @@ def main() -> int:
                 except subprocess.TimeoutExpired:
                     proc.kill()
                     proc.wait()
+
+
+def main() -> int:
+    try:
+        with installation_lock(installation_root(), shared=True):
+            return _main()
+    except InstallationBusy as exc:
+        print(f'[installer] {exc}', file=sys.stderr, flush=True)
+        return 2
 
 
 if __name__ == "__main__":

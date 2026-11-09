@@ -342,6 +342,10 @@ Cloudflare ダッシュボード →「Zero Trust」→「Access」→「アプ�
 
 ### 更新のしかた
 
+ネイティブ配布版では、アプリを終了してからWindowsの`Update.bat`、Linuxの`./Update.sh`、Macの`Update.command`を実行すると、対応する最新のネイティブ版へ更新できます。外部Pythonの導入は不要です。`.env`・棋譜等の`server/data/`・エンジン・cloudflaredは残し、更新後はShogiAnalyzerを起動し直します。更新の確認だけで自動的に上書きすることはありません。詳しくは[更新用スクリプト](docs/PORTABLE.md#更新用スクリプト)を参照してください。
+
+Updateが入っていない旧版や手動で更新する場合は、以下の手順を使います。
+
 1. アプリを止めます（コンソールで `Ctrl + C`、またはウィンドウを閉じる。Ubuntu などでサービスにしている場合は `sudo systemctl stop shogianalyzer`）。
 2. フォルダを新しいバージョンにします。
    - `git clone` で取得した場合: フォルダで `git pull`

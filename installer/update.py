@@ -368,7 +368,7 @@ def _prepare_helper(job: Path):
         shutil.copytree(target/'_internal', job/'_internal', symlinks=True)
         info = {'schema': 1, 'target': str(target), 'home': str(runtime_home().resolve())}
         (job/'job.json').write_text(json.dumps(info, ensure_ascii=False), encoding='utf-8'); (job/'job.json').chmod(0o600)
-        (job/'RunUpdate.bat').write_text('@echo off\n"%~dp0ShogiAnalyzer.exe" --update-job "%~dp0job.json"\nset "SA_UPDATE_RESULT=%ERRORLEVEL%"\n"%SA_UPDATE_INSTALL%ShogiAnalyzer.exe" --cleanup-update "%~dp0." & pause & exit /b %SA_UPDATE_RESULT%\n', encoding='utf-8', newline='\r\n')
+        (job/'RunUpdate.bat').write_text('@echo off\n"%~dp0ShogiAnalyzer.exe" --update-job "%~dp0job.json"\nset "SA_UPDATE_RESULT=%ERRORLEVEL%"\n"%SA_UPDATE_INSTALL%ShogiAnalyzer.exe" --cleanup-update "%~dp0." & pause & exit %SA_UPDATE_RESULT%\n', encoding='utf-8', newline='\r\n')
         # This small launcher survives a power loss while _internal is being swapped.
         # Its helper and runtime live outside the installation, including on Windows.
         _journal(target/'.UpdateRecovery.json', {'job': str(job.resolve())})

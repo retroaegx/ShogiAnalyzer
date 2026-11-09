@@ -14,10 +14,10 @@ python "%~dp0installer\update.py" & pause & exit /b
 set "SA_UPDATE_JOB=%TEMP%\ShogiAnalyzer-update-%RANDOM%-%RANDOM%"
 "%~dp0ShogiAnalyzer.exe" --prepare-update "%SA_UPDATE_JOB%"
 if errorlevel 1 goto failed
-rem Transfer execution outside this installation before it is replaced.
-"%SA_UPDATE_JOB%\RunUpdate.bat"
+rem The child command shell can exit after its own batch file is removed.
+"%COMSPEC%" /d /s /c ""%SA_UPDATE_JOB%\RunUpdate.bat"" & exit /b
 :recovery
-"%~dp0.UpdateRecovery.bat"
+"%COMSPEC%" /d /s /c ""%~dp0.UpdateRecovery.bat"" & exit /b
 :failed
 pause
 exit /b 1

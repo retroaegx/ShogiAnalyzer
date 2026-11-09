@@ -60,6 +60,10 @@ def main():
                 else:
                     log.seek(0)
                     raise RuntimeError('Server startup timed out\n' + log.read())
+                blocked_job=Path(temp)/'ShogiAnalyzer-update-blocked'
+                blocked=subprocess.run([str(exe),'--prepare-update',str(blocked_job)],env=env,
+                    capture_output=True,timeout=30)
+                assert blocked.returncode!=0 and not blocked_job.exists(), 'Updater did not block a running app'
                 for path in ['/', '/js/reconnect.js', '/app.css', '/manifest.webmanifest']:
                     with urllib.request.urlopen(url + path, timeout=3) as response:
                         assert response.status == 200 and response.read()
@@ -79,7 +83,7 @@ def main():
                 assert (Path(temp) / 'server/data/app.db').is_file()
                 assert not (Path(temp) / '.venv').exists()
                 assert not (Path(temp) / 'engines').exists()
-                print(json.dumps({'ok':True, 'normal_launcher':True, 'http_assets':True, 'no_python_on_path':True, 'no_engine_download':True, 'external_usi':True}))
+                print(json.dumps({'ok':True, 'normal_launcher':True, 'http_assets':True, 'no_python_on_path':True, 'no_engine_download':True, 'external_usi':True, 'updater_blocks_running_app':True}))
             finally:
                 children = psutil.Process(proc.pid).children(recursive=True)
                 proc.send_signal(signal.CTRL_BREAK_EVENT if os.name == 'nt' else signal.SIGINT)

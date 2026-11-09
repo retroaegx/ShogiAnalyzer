@@ -15,6 +15,8 @@ import tempfile
 import zipfile
 
 from portable_licenses import collect, audit_bundle, bundle_windows_runtime
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from installer.update_launchers import write_launchers
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -64,6 +66,7 @@ def main() -> None:
         start = folder / 'Start.command'
         start.write_text('#!/bin/sh\ncd -- "$(dirname -- "$0")" || exit 1\nexec ./ShogiAnalyzer\n', encoding='utf-8')
         start.chmod(0o755)
+    write_launchers(folder, sys.platform)
     build_info = {'version': (ROOT/'VERSION').read_text().strip(),
         'commit': subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         'worktree_dirty': bool(subprocess.check_output(['git','status','--porcelain'],cwd=ROOT,text=True).strip()),

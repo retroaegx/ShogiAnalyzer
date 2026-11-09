@@ -93,7 +93,7 @@ def run(exe: Path, archive: Path, *, online_launcher=False):
                 command=['/bin/sh',str(target/('Update.command' if sys.platform=='darwin' else 'Update.sh'))]
             with external_libraries():
                 result=subprocess.run(command,env=launcher_env,input=b'n\n\n',capture_output=True,timeout=180)
-            print(result.stdout.decode('utf-8',errors='replace'),flush=True)
+            print(json.dumps({'launcher_output':result.stdout.decode('utf-8',errors='replace')},ensure_ascii=True),flush=True)
             assert result.returncode==0,result.stderr.decode('utf-8',errors='replace')
             assert b'[update]' in result.stdout and not any(target.glob('.UpdateRecovery.*'))
         print(json.dumps({'ok':True,'native_replacement':True,'no_python_on_path':True,

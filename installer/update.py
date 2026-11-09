@@ -255,7 +255,7 @@ def self_check(root: Path):
 def apply_package(package: Path, target: Path, work: Path, *, native: bool, home: Path, version: str):
     from server.app.services.update_checker import compare_versions
     version_file = package / ('_internal/VERSION' if native else 'VERSION')
-    if not version_file.is_file() or compare_versions(version_file.read_text().strip(), version) != 0:
+    if not version_file.is_file() or compare_versions(version_file.read_text(encoding='utf-8').strip(), version) != 0:
         raise UpdateError('配布物内のバージョンが一致しません。')
     if native:
         names = {p.name for p in package.iterdir()}
@@ -325,7 +325,7 @@ def perform_update(target: Path, home: Path, *, native: bool, confirm=None, fetc
         recover_pending(target)
         if not current_file.is_file(): raise UpdateError('更新対象のアプリが見つかりません。')
         release = (fetch_release or _latest_release)(_repo())
-        current = current_file.read_text().strip(); latest = str(release.get('tag_name') or '')
+        current = current_file.read_text(encoding='utf-8').strip(); latest = str(release.get('tag_name') or '')
         if not re.fullmatch(r'v?\d+(?:\.\d+){1,3}(?:-[A-Za-z0-9.-]+)?', latest):
             raise UpdateError('最新リリースのバージョン情報を確認できません。')
         print(f'[update] 現在: v{current} / 最新: {latest}', flush=True)
@@ -345,7 +345,7 @@ def perform_update(target: Path, home: Path, *, native: bool, confirm=None, fetc
             apply_package(package, target, work, native=native, home=home, version=latest)
         except BaseException:
             journal = work/'transaction.json'
-            if not journal.exists() or json.loads(journal.read_text())['status'] == 'rolled_back': _remove(work, target)
+            if not journal.exists() or json.loads(journal.read_text(encoding='utf-8'))['status'] == 'rolled_back': _remove(work, target)
             raise
         try: _remove(work, target)
         except OSError:

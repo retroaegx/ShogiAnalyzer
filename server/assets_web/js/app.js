@@ -2634,7 +2634,8 @@ function labelShadow(ctx, g, on) {
 }
 
 /**
- * Branch pins for the line shown: at every move that has other moves beside it, a short gold stem
+ * Branch pins mark the position where the next move can be chosen, before entering a variation.
+ * At every position with multiple next moves, a short gold stem
  * rises from just above the evaluation line to a small round badge with a fork glyph (and the
  * number of other moves when more than one). The stem starts a little off the line, so nothing
  * covers it; with no room above, the pin hangs below the line instead. Pins at nearby moves are
@@ -2642,7 +2643,7 @@ function labelShadow(ctx, g, on) {
  */
 function drawGraphBranches(ctx, g) {
   const line = state.mainLine;
-  if (!state.game || line.length < 2) return;
+  if (!state.game || !line.length) return;
   const R = g.compact ? 6 : 8.5; // badge radius
   const gap = 3; // between the line and the stem
   const stem0 = g.compact ? 5 : 8;
@@ -2675,9 +2676,8 @@ function drawGraphBranches(ctx, g) {
   const pins = [];
   const placed = [];
   const hits = (bx, cy) => [...placed, ...caps].some((b) => bx + R > b.x0 && bx - R < b.x1 && cy + R > b.y0 && cy - R < b.y1);
-  for (let i = 1; i < line.length; i++) {
-    const parent = node(line[i])?.parent_id;
-    const others = (state.game.children_index?.[parent] || []).length - 1;
+  for (let i = 0; i < line.length; i++) {
+    const others = (state.game.children_index?.[line[i]] || []).length - 1;
     if (others < 1) continue;
     const bx = g.x(i);
     // the line's extent across the badge's width
@@ -2874,8 +2874,7 @@ function renderMoveList() {
       li.appendChild(el("span", "mv-text", nodeLabel(n)));
     }
     li.appendChild(el("span", "mv-eval"));
-    const sibs = n.parent_id ? children(n.parent_id) : [];
-    if (sibs.length > 1) {
+    if (children(id).length > 1) {
       const b = icon("branch");
       b.classList.add("mv-branch");
       li.appendChild(b);

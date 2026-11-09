@@ -80,6 +80,9 @@ def main() -> int:
         if stream is not None and not stream.isatty() and hasattr(stream, 'reconfigure'):
             stream.reconfigure(encoding='utf-8', errors='backslashreplace', write_through=True)
     args = sys.argv[1:]
+    if args and args[0] in ('--prepare-update', '--update-job', '--cleanup-update'):
+        from installer.update import main as update_main
+        return update_main(args)
     if args == ["--self-check"]:
         return self_check()
     if args and args[0] == "--engine-python":
@@ -98,10 +101,16 @@ def main() -> int:
         runtime_home().mkdir(parents=True, exist_ok=True)
         os.chdir(runtime_home())
         import uvicorn
-        uvicorn.run("server.app.main:app", host=os.environ.get("SHOGI_ANALYZER_HOST", "127.0.0.1"),
-            port=int(os.environ.get("SHOGI_ANALYZER_PORT", "31145")),
-            log_level=os.environ.get("SHOGI_ANALYZER_SERVER_LOGLEVEL", "warning"),
-            access_log=False, use_colors=False, loop="asyncio", http="h11", ws="websockets")
+        from app_paths import installation_root
+        from installer.update_lock import installation_lock, InstallationBusy
+        try:
+            with installation_lock(installation_root(), shared=True):
+                uvicorn.run("server.app.main:app", host=os.environ.get("SHOGI_ANALYZER_HOST", "127.0.0.1"),
+                    port=int(os.environ.get("SHOGI_ANALYZER_PORT", "31145")),
+                    log_level=os.environ.get("SHOGI_ANALYZER_SERVER_LOGLEVEL", "warning"),
+                    access_log=False, use_colors=False, loop="asyncio", http="h11", ws="websockets")
+        except InstallationBusy as exc:
+            print(str(exc), file=sys.stderr); return 2
         return 0
     if args:
         raise SystemExit("Usage: ShogiAnalyzer [--serve | --self-check]")

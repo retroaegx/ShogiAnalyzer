@@ -15,7 +15,12 @@ mkdir -p /results
 } > /results/baseline.txt
 mkdir -p /test
 tar -xzf /input/ShogiAnalyzer-v*-linux-amd64.tar.gz -C /test
-if [ "${1:-}" = https ]; then
+if [ "${1:-}" = updater ]; then
+  env -i HOME=/tmp PATH=/usr/sbin:/usr/bin:/sbin:/bin LANG=C.UTF-8 \
+    /test/ShogiAnalyzer/ShogiAnalyzer --engine-python /update-probe.py \
+    /test/ShogiAnalyzer/ShogiAnalyzer /input/ShogiAnalyzer-v*-linux-amd64.tar.gz \
+    > /results/updater.txt 2>&1
+elif [ "${1:-}" = https ]; then
   env -i HOME=/tmp PATH=/usr/sbin:/usr/bin:/sbin:/bin LANG=C.UTF-8 \
     /test/ShogiAnalyzer/ShogiAnalyzer --engine-python /https-probe.py --output /results/https-probe.json
 else

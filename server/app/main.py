@@ -78,9 +78,16 @@ def create_app() -> FastAPI:
 
     def _asset_token() -> str:
         """Changes whenever a script or the stylesheet changes (cache busting for app.js / app.css)."""
-        files = [assets_dir / "app.css", *sorted((assets_dir / "js").rglob("*.js"))]
-        stamp = "|".join(f"{f.name}:{f.stat().st_mtime_ns}:{f.stat().st_size}" for f in files if f.exists())
-        return hashlib.sha1(stamp.encode()).hexdigest()[:10]
+        files = [
+            assets_dir / "app.css",
+            *sorted((assets_dir / "css").rglob("*.css")),
+            *sorted((assets_dir / "js").rglob("*.js")),
+        ]
+        stamps = []
+        for path in files:
+            stat = path.stat()
+            stamps.append(f"{path.relative_to(assets_dir).as_posix()}:{stat.st_mtime_ns}:{stat.st_size}")
+        return hashlib.sha1("|".join(stamps).encode()).hexdigest()[:10]
 
     @app.get("/", include_in_schema=False)
     @app.get("/index.html", include_in_schema=False)
@@ -100,7 +107,9 @@ def create_app() -> FastAPI:
         response = await call_next(request)
         path = request.url.path
         if not path.startswith("/api/") and "cache-control" not in response.headers:
-            if path.startswith(("/board-theme/images/", "/icons/", "/img/")):
+            if path == "/icons/ui.svg":
+                response.headers["Cache-Control"] = "no-cache"
+            elif path.startswith(("/board-theme/images/", "/icons/", "/img/")):
                 response.headers["Cache-Control"] = "public, max-age=86400"
             elif path.endswith((".js", ".css", ".html", ".webmanifest")) or path == "/":
                 # scripts / styles must always match the page: not stored by browsers or CDNs

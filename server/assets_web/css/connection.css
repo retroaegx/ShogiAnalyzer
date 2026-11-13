@@ -1,0 +1,40 @@
+/* ============================================================
+   Connection lost overlay
+   ============================================================ */
+.conn-overlay {
+  position: fixed; inset: 0; z-index: 120;
+  display: grid; place-items: center;
+  padding: 20px;
+  background: rgba(4, 5, 7, .72);
+  backdrop-filter: blur(3px);
+  animation: fade .2s ease-out;
+  transition: opacity .25s ease;
+}
+.conn-overlay[data-state="hide"] { opacity: 0; }
+.conn-card {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  min-width: 250px; padding: 26px 30px 24px;
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 30px 70px -20px rgba(0, 0, 0, .85);
+  text-align: center;
+  animation: pop .2s ease-out;
+}
+.conn-card b { font-size: 17px; font-weight: 800; letter-spacing: .04em; }
+.conn-card span { font-size: 13px; color: var(--muted); }
+.conn-anim { display: flex; align-items: center; gap: 8px; height: 30px; }
+.conn-anim i { width: 11px; height: 11px; border-radius: 50%; background: var(--accent); animation: conn-dot 1.05s ease-in-out infinite; }
+.conn-anim i:nth-child(2) { animation-delay: .15s; }
+.conn-anim i:nth-child(3) { animation-delay: .3s; }
+@keyframes conn-dot { 0%, 80%, 100% { transform: scale(.55); opacity: .35; } 40% { transform: scale(1); opacity: 1; } }
+.conn-overlay[data-state="ok"] .conn-anim i { display: none; }
+.conn-overlay[data-state="ok"] .conn-anim::after {
+  content: "✓";
+  display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--good); color: #062014;
+  font-size: 18px; font-weight: 900;
+  animation: pop .2s ease-out;
+}
+.conn-overlay[data-state="ok"] .conn-card { border-color: rgba(90, 209, 154, .45); }

@@ -1,3 +1,11 @@
+import { createPreferences, LS_BATCH_SECONDS } from "/js/preferences.js";
+import { lsGet, lsSet } from "/js/storage.js";
+import { UI_THEMES, THEME_NAMES } from "/js/theme_catalog.js";
+import { createDialogs } from "/js/dialogs.js";
+import { HANDICAPS } from "/js/handicaps.js";
+import { icon } from "/js/icons.js";
+import { wireShareDialog } from "/js/share_dialog.js";
+import { setupInstallSuggestion } from "/js/install_suggestion.js";
 import { coalesceFrame } from '/js/render_schedule.js';
 import { StepOutbox, graceIndicator, previewStep } from "/js/reconnect.js";
 import { parseSfen } from "/js/vendor/sfen.js";
@@ -30,40 +38,6 @@ import {
  */
 
 const $ = (id) => document.getElementById(id);
-
-// UI themes (表示設定 → テーマ): colours / background of the whole screen, defined in app.css
-// under [data-theme]. The first one is the default. themeColor: the browser / app bar colour.
-const UI_THEMES = [
-  { id: "sumikin", name: "墨金", themeColor: "#070a11" },
-  { id: "aurora", name: "極光", themeColor: "#0d0a26" },
-  { id: "emerald", name: "翠苑", themeColor: "#05150f" },
-  { id: "sakura", name: "暁桜", themeColor: "#f6e2d6" },
-  { id: "pearl", name: "白金", themeColor: "#f5f1e8" },
-  { id: "frost", name: "蒼雪", themeColor: "#e8f1fb" },
-];
-
-const THEME_NAMES = {
-  "theme.bg.wood": "木目",
-  "theme.bg.sansui": "山水",
-  "theme.bg.fujitsuki": "藤月",
-  "theme.bg.neon_night": "ネオン\u200bナイト", // \u200b: where the name may wrap in a small tile
-  "theme.bg.white_gold": "ホワイト\u200bゴールド",
-  "theme.piece.tsuge": "黄楊",
-  "theme.piece.mokume": "杢目",
-  "theme.piece.urushi": "漆黒",
-  "theme.piece.black": "黒文字",
-  "theme.piece.white": "白地",
-};
-
-const LS_OPTS = "shogi_analyzer_view_opts";
-
-// Chrome / Edge (Android) announce that the app can be installed; keep the event for our own button.
-// Registered at load time: the event can fire before the rest of the page is set up.
-let installEvent = null;
-window.addEventListener("beforeinstallprompt", (e) => {
-  e.preventDefault();
-  installEvent = e;
-});
 
 const els = {
   wsStatus: $("wsStatus"),
@@ -218,13 +192,16 @@ const els = {
   toastHost: $("toastHost"),
 };
 
+const preferences = createPreferences();
+const { loadViewOptions, saveViewOptions, batchSeconds, currentSettings, pushSettings, fetchServerSettings } = preferences;
+
 const state = {
   ws: null,
   isOwner: false,
   sessionId: null,
   ownerToken: null,
   flip: false,
-  opts: { theme: UI_THEMES[0].id, coords: "overlay", legal: true, lastMove: true, bestMove: true, nextMove: true, arrowLabels: true },
+  opts: preferences.options,
 
   theme: null,
   geom: null, // {natW, natH, rx, ry, rw, rh} in image px
@@ -265,15 +242,6 @@ function el(tag, cls, text) {
   return e;
 }
 
-function icon(name) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("class", "ico");
-  const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
-  use.setAttribute("href", `#i-${name}`);
-  svg.appendChild(use);
-  return svg;
-}
-
 function toast(level, message, timeoutMs = 3000) {
   const div = el("div", `toast ${level || "info"}`, String(message || ""));
   els.toastHost.appendChild(div);
@@ -281,42 +249,6 @@ function toast(level, message, timeoutMs = 3000) {
     div.classList.add("out");
     setTimeout(() => div.remove(), 220);
   }, timeoutMs);
-}
-
-function lsGet(key) {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-function lsSet(key, value) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // storage unavailable: settings just won't persist
-  }
-}
-
-function loadOpts() {
-  try {
-    const raw = JSON.parse(lsGet(LS_OPTS) || "{}");
-    Object.assign(state.opts, raw || {});
-  } catch {
-    // ignore
-  }
-  normalizeOpts();
-}
-
-function normalizeOpts() {
-  // The board-side evaluation bar has been removed; discard older saved preferences.
-  delete state.opts.evalBar;
-  // coordinates used to be on/off: on -> the new default (on the board frame), off -> hidden
-  if (state.opts.coords === true) state.opts.coords = "overlay";
-  if (state.opts.coords === false) state.opts.coords = "off";
-  if (!["overlay", "outside", "off"].includes(state.opts.coords)) state.opts.coords = "overlay";
-  // a theme that no longer exists: the default one
-  if (!UI_THEMES.some((t) => t.id === state.opts.theme)) state.opts.theme = UI_THEMES[0].id;
 }
 
 /** Put the chosen UI theme on the page (the graph is drawn on a canvas, so it is redrawn). */
@@ -343,78 +275,7 @@ function fmtDate(iso) {
   return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// ---------- dialogs ----------
-let openDialogEl = null;
-let dialogResolve = null;
-
-function showDialog(dlg) {
-  closeDialog(null);
-  els.dialogHost.hidden = false;
-  dlg.hidden = false;
-  openDialogEl = dlg;
-  const focusable = dlg.querySelector("input:not([hidden]), textarea, .btn.primary, button");
-  if (focusable) setTimeout(() => focusable.focus(), 30);
-}
-
-function closeDialog(value) {
-  if (openDialogEl) openDialogEl.hidden = true;
-  openDialogEl = null;
-  els.dialogHost.hidden = true;
-  if (dialogResolve) {
-    const r = dialogResolve;
-    dialogResolve = null;
-    r(value);
-  }
-}
-
-/** actions: [{label, value, primary?, img?}] -> resolves with value (null on dismiss). */
-// 新規 → 手合割 (same positions as HANDICAP_SFEN in server/app/core/kifu_common.py, which names the
-// handicap again from the start position on export); 平手 is the server's default start
-const HANDICAP_TAIL = "/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1";
-const HANDICAPS = [
-  ["平手", null],
-  ["香落ち", "lnsgkgsn1/1r5b1"],
-  ["右香落ち", "1nsgkgsnl/1r5b1"],
-  ["角落ち", "lnsgkgsnl/1r7"],
-  ["飛車落ち", "lnsgkgsnl/7b1"],
-  ["飛香落ち", "lnsgkgsn1/7b1"],
-  ["二枚落ち", "lnsgkgsnl/9"],
-  ["三枚落ち", "lnsgkgsn1/9"],
-  ["四枚落ち", "1nsgkgsn1/9"],
-  ["五枚落ち", "2sgkgsn1/9"],
-  ["左五枚落ち", "1nsgkgs2/9"],
-  ["六枚落ち", "2sgkgs2/9"],
-  ["左七枚落ち", "2sgkg3/9"],
-  ["右七枚落ち", "3gkgs2/9"],
-  ["八枚落ち", "3gkg3/9"],
-  ["十枚落ち", "4k4/9"],
-].map(([name, top]) => [name, top && top + HANDICAP_TAIL]);
-
-function confirmDialog({ title, message, extra, actions }) {
-  els.dlgConfirmTitle.textContent = title || "";
-  els.dlgConfirmMsg.textContent = message || "";
-  els.dlgConfirmMsg.hidden = !message;
-  els.dlgConfirmExtra.replaceChildren(...(extra ? [extra] : []));
-  els.dlgConfirmExtra.hidden = !extra;
-  els.dlgConfirmActions.innerHTML = "";
-  for (const a of actions || [{ label: "OK", value: true, primary: true }]) {
-    const b = el("button", `btn${a.primary ? " primary" : ""}${a.danger ? " danger" : ""}${a.img ? " piece-choice" : ""}`);
-    b.type = "button";
-    if (a.img) {
-      const img = el("img");
-      img.src = a.img;
-      img.alt = "";
-      b.appendChild(img);
-    }
-    b.appendChild(el("span", null, a.label));
-    b.addEventListener("click", () => closeDialog(a.value));
-    els.dlgConfirmActions.appendChild(b);
-  }
-  showDialog(els.dlgConfirm);
-  return new Promise((resolve) => {
-    dialogResolve = resolve;
-  });
-}
+const { showDialog, closeDialog, confirmDialog, isDialogOpen } = createDialogs(els, el);
 
 // ---------- websocket ----------
 // one id per browser tab: when this tab reconnects, the server hands the session straight back
@@ -960,11 +821,7 @@ function nodeLabel(n) {
   return shownMarks(kifMove(parent.position_sfen, n.move_usi, prevTo));
 }
 
-// ---------- share (X / Bluesky): a picture of the shown position, drawn by the server ----------
-let shareBlob = null;
-let shareUrl = ""; // the link X / Bluesky show as a card with the picture ("" = no public address)
-let shareSeq = 0;
-
+// ---------- share image payload ----------
 /** What the board shows, as data for /api/share/image. */
 function sharePayload() {
   const cur = node(state.game.current_node_id);
@@ -1018,143 +875,6 @@ function shareTheme(v) {
     stand_top: stand(els.standTop),
     stand_bottom: stand(els.standBottom),
   };
-}
-
-function shareDefaultText() {
-  const p = sharePayload();
-  return [p.title, p.eval].filter(Boolean).join("　");
-}
-
-const canShareFiles = () => {
-  try {
-    return Boolean(navigator.canShare?.({ files: [new File([""], "a.webp", { type: "image/webp" })] }));
-  } catch {
-    return false;
-  }
-};
-
-async function openShare() {
-  if (!state.game) return;
-  const seq = ++shareSeq;
-  shareBlob = null;
-  shareUrl = "";
-  els.shareImg.hidden = true;
-  els.shareStatus.hidden = false;
-  els.shareStatus.textContent = "画像を作成しています…";
-  els.shareText.value = shareDefaultText();
-  els.shareNative.hidden = !canShareFiles();
-  els.shareCopy.hidden = !canCopyImage();
-  els.shareNote.hidden = true;
-  for (const b of [els.shareSave, els.shareCopy, els.shareNative, els.shareX, els.shareBsky]) b.disabled = true;
-  showDialog(els.dlgShare);
-  try {
-    const res = await fetch("/api/share", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(sharePayload()),
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const made = await res.json();
-    const img = await fetch(made.image, { cache: "no-store" });
-    if (!img.ok) throw new Error(`HTTP ${img.status}`);
-    const blob = await img.blob();
-    if (seq !== shareSeq) return;
-    shareBlob = blob;
-    // X / Bluesky read the card from the address they are given: the https address this page was
-    // opened at, else the fixed public address (.env); from http://localhost or the LAN there is none
-    const base = location.protocol === "https:" ? location.origin : made.public_url || "";
-    shareUrl = base ? `${base}${made.path}` : "";
-    const old = els.shareImg.src;
-    els.shareImg.src = URL.createObjectURL(blob);
-    if (old.startsWith("blob:")) URL.revokeObjectURL(old);
-    els.shareImg.hidden = false;
-    els.shareStatus.hidden = true;
-    // without password protection the picture can only be saved, not posted
-    els.shareSave.disabled = false;
-    els.shareCopy.disabled = false;
-    for (const b of [els.shareNative, els.shareX, els.shareBsky]) b.disabled = !made.protected;
-    els.shareNote.classList.toggle("off", !made.protected);
-    els.shareNote.textContent = made.protected
-      ? "URL を公開したくない場合は、X・Bluesky に投稿するときに URL リンクを消してください。画像は「画像をコピー」後に貼り付けられます。"
-      : `パスワード保護が無効のため共有できません（画像の${canCopyImage() ? "保存・コピー" : "保存"}のみ）。`;
-    els.shareNote.hidden = false;
-  } catch (e) {
-    if (seq === shareSeq) els.shareStatus.textContent = `画像を作成できませんでした（${e.message || e}）`;
-  }
-}
-
-function shareFileName() {
-  const d = new Date();
-  const p = (n) => String(n).padStart(2, "0");
-  return `shogi_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.webp`;
-}
-
-function saveShareImage() {
-  if (!shareBlob) return;
-  const a = el("a");
-  a.href = URL.createObjectURL(shareBlob);
-  a.download = shareFileName();
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-}
-
-async function pngOf(blob) {
-  const bmp = await createImageBitmap(blob);
-  const canvas = el("canvas");
-  canvas.width = bmp.width;
-  canvas.height = bmp.height;
-  canvas.getContext("2d").drawImage(bmp, 0, 0);
-  bmp.close();
-  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("png"))), "image/png"));
-}
-
-// writing a picture to the clipboard: https or localhost only
-const canCopyImage = () => window.isSecureContext && Boolean(navigator.clipboard?.write) && typeof ClipboardItem !== "undefined";
-
-async function copyShareImage() {
-  if (!canCopyImage()) return false;
-  try {
-    // the clipboard takes PNG only: the WebP is converted in the browser (given as a promise, so
-    // Safari still sees the write inside the click)
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": pngOf(shareBlob) })]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Open the site's post screen with the text and the share link; the site shows the picture as the
- * link's card. Without a public address the picture goes in through the clipboard (or a saved file).
- */
-async function postShare(site) {
-  if (!shareBlob) return;
-  const text = els.shareText.value.trim();
-  if (shareUrl) {
-    const url = site === "x"
-      ? `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`
-      : `https://bsky.app/intent/compose?text=${encodeURIComponent(`${text}\n${shareUrl}`)}`;
-    window.open(url, "_blank", "noopener");
-    return;
-  }
-  const copied = await copyShareImage();
-  if (!copied) saveShareImage();
-  const url = site === "x" ? `https://x.com/intent/post?text=${encodeURIComponent(text)}` : `https://bsky.app/intent/compose?text=${encodeURIComponent(text)}`;
-  window.open(url, "_blank", "noopener");
-  toast("info", `公開アドレスがないため画像をリンクにできません。${copied ? "画像をコピーしました。投稿画面に貼り付けてください" : "画像を保存しました。投稿画面で添付してください"}`, 7000);
-}
-
-/** Phone / tablet: the system share sheet, with the picture attached (X / Bluesky apps). */
-async function shareNatively() {
-  if (!shareBlob) return;
-  try {
-    await navigator.share({ files: [new File([shareBlob], shareFileName(), { type: "image/webp" })], text: els.shareText.value.trim() });
-  } catch (e) {
-    if (e?.name !== "AbortError") toast("error", "共有できませんでした");
-  }
 }
 
 // ---------- theme / geometry ----------
@@ -3264,7 +2984,7 @@ function setupOutsideImport() {
   const editable = (t) => t instanceof Element && t.closest("input, textarea, select, [contenteditable]");
   // Ctrl+V anywhere but a text field (and not over a dialog)
   window.addEventListener("paste", (e) => {
-    if (openDialogEl || editable(e.target)) return;
+    if (isDialogOpen() || editable(e.target)) return;
     const file = [...(e.clipboardData?.files || [])].find((f) => KIFU_FILE.test(f.name));
     const text = e.clipboardData?.getData("text/plain") || "";
     if (!file && !looksLikeKifu(text)) return;
@@ -3274,12 +2994,12 @@ function setupOutsideImport() {
   // a .kif / .ki2 / .usi file dropped anywhere (the browser would otherwise open it)
   const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
   window.addEventListener("dragover", (e) => {
-    if (openDialogEl || !hasFiles(e)) return;
+    if (isDialogOpen() || !hasFiles(e)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
   });
   window.addEventListener("drop", (e) => {
-    if (openDialogEl || !hasFiles(e)) return;
+    if (isDialogOpen() || !hasFiles(e)) return;
     e.preventDefault();
     const file = [...e.dataTransfer.files].find((f) => KIFU_FILE.test(f.name));
     if (file) importFromOutside({ file });
@@ -3358,7 +3078,7 @@ async function setupThemeChoices() {
       b.append(th, el("span", null, t.name));
       b.addEventListener("click", () => {
         state.opts.theme = t.id;
-        saveOpts();
+        saveViewOptions();
         applyUiTheme();
         draw();
       });
@@ -3430,12 +3150,6 @@ async function setAnalysisEnabled(on) {
   // turning OFF keeps the last lines on screen (score, candidates, arrows)
   renderAnalysis();
   sendWs("analysis:set_enabled", { enabled: on });
-}
-
-const LS_BATCH_SECONDS = "shogi_analyzer_batch_seconds";
-function batchSeconds() {
-  const v = Number(lsGet(LS_BATCH_SECONDS));
-  return Number.isFinite(v) && v >= 0.5 ? clamp(v, 0.5, 120) : 3;
 }
 
 // ---------- engine settings dialog ----------
@@ -3661,7 +3375,7 @@ function wireDrawerSwipe() {
   document.addEventListener(
     "touchstart",
     (e) => {
-      if (!isMobile() || e.touches.length !== 1 || openDialogEl) return;
+      if (!isMobile() || e.touches.length !== 1 || isDialogOpen()) return;
       const t = e.touches[0];
       const open = document.body.classList.contains("kifu-open");
       // (not on the graph: dragging there seeks through the moves)
@@ -3704,82 +3418,6 @@ function showConnLost() {
   els.connOverlay.dataset.state = 'lost';
   els.connTitle.textContent = '接続を確認しています';
   els.connMsg.textContent = outbox.pending ? '表示中の1手を再接続後に同期します' : outbox.wasOwner ? '再接続中です。1手だけ仮操作できます' : '再接続を待っています';
-}
-
-function saveOpts() {
-  lsSet(LS_OPTS, JSON.stringify(state.opts));
-  pushSettings({ view: { ...state.opts } });
-}
-
-// ---------- settings kept on the server ----------
-// Display options, board / piece set and the 全解析 time live on the server, so every browser and
-// device shows the same. localStorage keeps a copy only for the first paint before the fetch.
-let serverSettingsJson = "";
-let settingsPending = {};
-let settingsTimer = null;
-
-function currentSettings() {
-  const out = { view: { ...state.opts }, batch_seconds: batchSeconds() };
-  const board = lsGet(THEME_LS_KEYS.backgroundSet);
-  const pieces = lsGet(THEME_LS_KEYS.pieceSet);
-  if (board) out.board_set = board;
-  if (pieces) out.piece_set = pieces;
-  return out;
-}
-
-/** This browser has settings of its own (not just the defaults). */
-function hasLocalSettings() {
-  return [LS_OPTS, LS_BATCH_SECONDS, THEME_LS_KEYS.backgroundSet, THEME_LS_KEYS.pieceSet].some((k) => lsGet(k));
-}
-
-function pushSettings(patch) {
-  Object.assign(settingsPending, patch);
-  clearTimeout(settingsTimer);
-  settingsTimer = setTimeout(async () => {
-    const body = settingsPending;
-    settingsPending = {};
-    try {
-      const res = await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ settings: body }) });
-      if (res.ok) serverSettingsJson = JSON.stringify((await res.json()).settings || {});
-    } catch {
-      // offline: the change stays in this browser and is sent with the next one
-      Object.assign(settingsPending, body);
-    }
-  }, 250);
-}
-
-/** Take the server's settings into this page. Returns true when something changed. */
-function applySettings(s) {
-  const before = JSON.stringify(currentSettings());
-  if (s.view && typeof s.view === "object") {
-    Object.assign(state.opts, s.view);
-    normalizeOpts();
-    lsSet(LS_OPTS, JSON.stringify(state.opts));
-  }
-  if (Number(s.batch_seconds) >= 0.5) lsSet(LS_BATCH_SECONDS, String(s.batch_seconds));
-  if (s.board_set) lsSet(THEME_LS_KEYS.backgroundSet, s.board_set);
-  if (s.piece_set) lsSet(THEME_LS_KEYS.pieceSet, s.piece_set);
-  return JSON.stringify(currentSettings()) !== before;
-}
-
-/** Read the shared settings. The very first time (nothing stored yet) this browser's become the shared ones. */
-async function fetchServerSettings() {
-  try {
-    const res = await fetch("/api/settings", { cache: "no-store" });
-    if (!res.ok) return false;
-    const json = await res.json();
-    if (!json.exists) {
-      // nothing shared yet: a browser with its own settings (e.g. the one used so far) provides them
-      if (hasLocalSettings()) pushSettings(currentSettings());
-      return false;
-    }
-    const text = JSON.stringify(json.settings || {});
-    if (text === serverSettingsJson) return false;
-    serverSettingsJson = text;
-    return applySettings(json.settings || {});
-  } catch {
-    return false; // server unreachable: keep this browser's copy
-  }
 }
 
 /** After a reconnect: pick up changes made on another device. */
@@ -3949,16 +3587,7 @@ function wire() {
   els.pasteTarget.addEventListener("beforeinput", (e) => {
     if (e.inputType !== "insertFromPaste") e.preventDefault(); // nothing can be typed here
   });
-  els.shareBtn.addEventListener("click", openShare);
-  els.shareSave.addEventListener("click", saveShareImage);
-  els.shareCopy.addEventListener("click", async () => {
-    if (!shareBlob) return;
-    if (await copyShareImage()) toast("info", "画像をコピーしました");
-    else toast("error", "画像をコピーできませんでした");
-  });
-  els.shareNative.addEventListener("click", shareNatively);
-  els.shareX.addEventListener("click", () => postShare("x"));
-  els.shareBsky.addEventListener("click", () => postShare("bsky"));
+  wireShareDialog({ els, getPayload: () => state.game ? sharePayload() : null, showDialog, toast });
   els.exportBtn.addEventListener("click", () => {
     showDialog(els.dlgExport);
     refreshExport();
@@ -4019,10 +3648,6 @@ function wire() {
   wireDrawerSwipe();
   els.engineResetAll.addEventListener("click", () => renderEngineForm(true));
 
-  // dialogs
-  els.dialogHost.addEventListener("click", (e) => {
-    if (e.target.closest("[data-close]")) closeDialog(null);
-  });
   els.importFile.addEventListener("change", async () => {
     const f = els.importFile.files?.[0];
     els.importFile.value = "";
@@ -4073,7 +3698,7 @@ function wire() {
     if (!b) return;
     state.opts.coords = b.dataset.v;
     markCoords();
-    saveOpts();
+    saveViewOptions();
     layoutBoard();
     renderCoords();
   });
@@ -4087,19 +3712,19 @@ function wire() {
     box.checked = state.opts[key];
     box.addEventListener("change", () => {
       state.opts[key] = box.checked;
-      saveOpts();
+      saveViewOptions();
       if (state.game) fn();
     });
   }
   els.optLegal.addEventListener("change", () => {
     state.opts.legal = els.optLegal.checked;
-    saveOpts();
+    saveViewOptions();
     applyHighlights();
   });
 
   // keyboard
   window.addEventListener("keydown", (e) => {
-    if (openDialogEl) {
+    if (isDialogOpen()) {
       if (e.key === "Escape") closeDialog(null);
       return;
     }
@@ -4215,7 +3840,7 @@ function versionAtLeast(v, min) {
 }
 let appNoticeShown = false;
 async function showAppNotices() {
-  if (appNoticeShown || openDialogEl) return;
+  if (appNoticeShown || isDialogOpen()) return;
   const installed = window.matchMedia("(display-mode: standalone)").matches;
   if (!installed || !/Android/i.test(navigator.userAgent)) return;
   let current = "";
@@ -4226,7 +3851,7 @@ async function showAppNotices() {
   }
   const seen = (lsGet(APP_NOTICE_KEY) || "").split(",").filter(Boolean);
   const due = APP_NOTICES.filter((n) => !seen.includes(n.version) && versionAtLeast(current, n.version));
-  if (!due.length || openDialogEl) return;
+  if (!due.length || isDialogOpen()) return;
   appNoticeShown = true;
   lsSet(APP_NOTICE_KEY, [...seen, ...due.map((n) => n.version)].join(","));
   const last = due[due.length - 1];
@@ -4324,65 +3949,8 @@ async function setupUpdateNotice() {
   setInterval(load, 60 * 60 * 1000);
 }
 
-// ---------- "add to home screen" suggestion (phones / tablets only) ----------
-const LS_INSTALL = "shogi_analyzer_install_prompt"; // "never" or the time (ms) until which it stays hidden
-const SHARE_ICON = '<svg class="share-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11v9h12v-9"/></svg>';
-
-function installHelp() {
-  const ua = navigator.userAgent;
-  const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  const android = /Android/.test(ua);
-  if (ios) {
-    if (/CriOS/.test(ua)) return `アドレスバー右の <b>共有ボタン</b> ${SHARE_ICON} →「<b>ホーム画面に追加</b>」で、アイコンからアプリのように開けます。`;
-    if (/FxiOS|EdgiOS/.test(ua)) return `メニューの <b>共有</b> ${SHARE_ICON} →「<b>ホーム画面に追加</b>」で、アイコンからアプリのように開けます。`;
-    return `<b>共有ボタン</b> ${SHARE_ICON}（「…」の中にある場合も）→「<b>ホーム画面に追加</b>」で、アイコンからアプリのように開けます。`;
-  }
-  if (android && /Firefox/.test(ua)) return "メニュー <b>⋮</b> →「<b>インストール</b>」（または「ホーム画面に追加」）で、アイコンからアプリのように開けます。";
-  return null; // Android Chrome / Edge: handled with the install button
-}
-
-function setupInstallSuggestion() {
-  const card = $("installCard");
-  const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-  const phoneLike = window.matchMedia("(pointer: coarse)").matches && /Android|iPhone|iPad|iPod/.test(navigator.userAgent + (navigator.maxTouchPoints > 1 ? " iPad" : ""));
-  const saved = lsGet(LS_INSTALL);
-  if (standalone || !phoneLike || !window.isSecureContext || saved === "never" || Number(saved) > Date.now()) return;
-  const hide = () => (card.hidden = true);
-  $("installLater").addEventListener("click", () => {
-    lsSet(LS_INSTALL, String(Date.now() + 14 * 24 * 3600 * 1000));
-    hide();
-  });
-  $("installNever").addEventListener("click", () => {
-    lsSet(LS_INSTALL, "never");
-    hide();
-  });
-  $("installGo").addEventListener("click", async () => {
-    if (!installEvent) return hide();
-    installEvent.prompt();
-    const choice = await installEvent.userChoice.catch(() => null);
-    installEvent = null;
-    if (choice?.outcome !== "accepted") lsSet(LS_INSTALL, String(Date.now() + 14 * 24 * 3600 * 1000));
-    hide();
-  });
-  window.addEventListener("appinstalled", hide);
-  // a few seconds after opening, so it does not get in the way right away; never on top of a dialog
-  const show = () => {
-    if (openDialogEl) return void setTimeout(show, 3000);
-    if (installEvent) {
-      $("installBody").textContent = "ホーム画面に追加すると、アイコンからアプリのように開けます。";
-      $("installGo").hidden = false;
-    } else {
-      const help = installHelp();
-      if (!help) return; // the browser does not offer installing (yet): say nothing
-      $("installBody").innerHTML = help;
-    }
-    card.hidden = false;
-  };
-  setTimeout(show, 6000);
-}
-
 async function main() {
-  loadOpts();
+  loadViewOptions();
   applyUiTheme();
   await fetchServerSettings();
   applyUiTheme();
@@ -4393,7 +3961,7 @@ async function main() {
   setupUpdateNotice();
   // installable as an app (PWA): needs https (public address) or localhost
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
-  setupInstallSuggestion();
+  setupInstallSuggestion({ isDialogOpen, lsGet, lsSet });
   setupOutsideImport();
   const themeBefore = [lsGet(THEME_LS_KEYS.backgroundSet), lsGet(THEME_LS_KEYS.pieceSet)].join();
   await loadTheme();

@@ -13,7 +13,13 @@ PC で起動しておけば、同じ PC のブラウザやスマートフォン�
 ShogiAnalyzer 本体は **MIT ライセンス**です（[LICENSE](LICENSE)）。  
 ネイティブ配布版に含むPython・実行ライブラリー・Windows用VC++ DLLなどには、個別の条件が適用されます。[同梱物のライセンスと対応ソース](docs/THIRD_PARTY.md)を参照してください。アプリの「ライセンス表記」からも、実際の配布物の一覧・原文を開けます。MPLのcertifiはLinuxでCA証明書がない場合のために同梱し、LGPLの展開ライブラリー5件とともに対応ソースを添付します。Microsoft製DLLをMIT/PSFで再許諾するものではありません。
 
-WebフォントのBarlow Semi Condensed（The Barlow Project Authors）とShippori Mincho B1（The Shippori Mincho Project Authors）はSIL OFL 1.1で、Google Fontsから読み込みます。フォント本体は同梱せず、原文を[Webフォントのライセンス](docs/third_party_fonts/)に記載しています。画像共有用フォントは本プロジェクトで生成した別のフォントです。
+Web画面の文字はOSにあるフォントで表示します。画像共有用フォントは本プロジェクトで生成したものです。
+
+### 画面を修正する場合
+
+画面のマークアップは `server/assets_web/index.html` にあります。アイコンの図形は `icons/ui.svg` のシンボルで管理します。HTMLでは `<use href="/icons/ui.svg#i-名前">`、JavaScriptでは `js/icons.js` の `icon("名前")` で参照します。盤上の候補手や分岐の矢印は、局面に合わせて座標を計算する描画です。
+
+スタイルの読み込み順は `app.css` にあります。色や背景は `css/themes.css`、画面幅に応じた配置は `css/responsive.css` を確認してください。後から適用される操作欄・棋譜欄などの調整は `css/components.css` にあります。共有ダイアログ、共通ダイアログ、ホーム画面への追加案内は、それぞれ `js/share_dialog.js`、`js/dialogs.js`、`js/install_suggestion.js` で管理します。表示設定の既定値、旧設定の読み替え、サーバーとの同期は `js/preferences.js` にあります。
 
 解析エンジン・評価関数・cloudflared は同梱していません。解析エンジンと評価関数は、初回起動時に利用者の同意を得てそれぞれの配布元からダウンロード（Linux ではビルド）します。cloudflared は、外部公開に Quick Tunnel を使うとき（固定アドレス未設定で `SHOGI_ANALYZER_TUNNEL` が TRUE のとき）に配布元から `tools/cloudflared/` へダウンロードします。
 

@@ -14,47 +14,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="ShogiAnalyzer">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Shippori+Mincho+B1:wght@600;700;800&display=swap">
   <link rel="stylesheet" href="/app.css">
   <!-- the chosen UI theme before the first paint (no flash of the default colours) -->
   <script>try { var t = JSON.parse(localStorage.getItem("shogi_analyzer_view_opts") || "{}").theme; if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
 </head>
 <body>
-  <!-- icon sprite -->
-  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
-    <symbol id="i-first" viewBox="0 0 24 24"><path d="M6 5v14M18 6l-8 6 8 6z"/></symbol>
-    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
-    <symbol id="i-next" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
-    <symbol id="i-last" viewBox="0 0 24 24"><path d="M18 5v14M6 6l8 6-8 6z"/></symbol>
-    <symbol id="i-flip" viewBox="0 0 24 24"><path d="M7 4v13M3 13l4 4 4-4M17 20V7M13 11l4-4 4 4"/></symbol>
-    <symbol id="i-new" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
-    <symbol id="i-open" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
-    <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 19h16"/></symbol>
-    <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M4 19h16"/></symbol>
-    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.6M8.2 13.2l7.6 4.6"/></symbol>
-    <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8 3v5h7V3M8 21v-7h8v7"/></symbol>
-    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></symbol>
-    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
-    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
-    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></symbol>
-    <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="8" r="2"/><path d="M6 7v10M18 10c0 4-6 3-11 7"/></symbol>
-    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
-    <!-- flip: two pieces facing each other + rotation arrows -->
-    <symbol id="i-flipboard" viewBox="0 0 24 24"><path d="M3.5 21v-6.2L6.7 12l3.2 2.8V21z"/><path d="M20.5 3v6.2L17.3 12l-3.2-2.8V3z"/><path d="M13 21.5c3.6 0 6.4-2.1 7.2-5.3"/><path d="M18.3 17.4l1.9-1.6 1.6 1.9"/><path d="M11 2.5c-3.6 0-6.4 2.1-7.2 5.3"/><path d="M5.7 6.6L3.8 8.2 2.2 6.3"/></symbol>
-    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2"/><circle cx="4.5" cy="12" r="1.2"/><circle cx="4.5" cy="18" r="1.2"/></symbol>
-    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></symbol>
-    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/></symbol>
-    <symbol id="i-paste" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 4.5V3.5h6v1M9 4.5h6v2.5H9z"/><path d="M9 12h6M9 16h4"/></symbol>
-    <symbol id="i-load" viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M5 12V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2h-6"/><path d="M2 18h8M7 15l3 3-3 3"/></symbol>
-    <symbol id="i-caret" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
-    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
-    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
-    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-4 3 3 6-6"/></symbol>
-    <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></symbol>
-  </svg>
-
   <div id="app" class="app">
     <!-- ===== Top bar ===== -->
     <header class="topbar">
@@ -64,7 +28,7 @@
       </div>
 
       <div class="title-field">
-        <button id="titleEditBtn" class="title-edit" type="button" title="棋譜名を変更" aria-label="棋譜名を変更"><svg class="ico"><use href="#i-edit"/></svg></button>
+        <button id="titleEditBtn" class="title-edit" type="button" title="棋譜名を変更" aria-label="棋譜名を変更"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-edit"/></svg></button>
         <span id="titleLabel" class="title-label">無題の棋譜</span>
       </div>
 
@@ -81,26 +45,26 @@
           </div>
         </div>
         <span id="wsStatus" class="status" data-state="connecting" hidden><i></i><span class="status-text">接続中</span></span>
-        <span id="engineStatus" class="status engine" data-state="idle" title=""><svg class="ico"><use href="#i-cpu"/></svg><span class="status-text">エンジン</span></span>
+        <span id="engineStatus" class="status engine" data-state="idle" title=""><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-cpu"/></svg><span class="status-text">エンジン</span></span>
       </div>
 
       <nav class="actions" aria-label="棋譜操作">
-        <button id="newGameBtn" class="tb-btn" type="button" title="新規 (初期局面)"><svg class="ico"><use href="#i-new"/></svg><span>新規</span></button>
-        <button id="openBtn" class="tb-btn" type="button" title="サーバーに保存した棋譜から開く"><svg class="ico"><use href="#i-open"/></svg><span>棋譜一覧</span></button>
+        <button id="newGameBtn" class="tb-btn" type="button" title="新規 (初期局面)"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-new"/></svg><span>新規</span></button>
+        <button id="openBtn" class="tb-btn" type="button" title="サーバーに保存した棋譜から開く"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-open"/></svg><span>棋譜一覧</span></button>
         <div class="load-menu" id="loadMenu">
-          <button id="loadBtn" class="tb-btn" type="button" title="棋譜ファイル・クリップボードから読み込む" aria-haspopup="menu" aria-expanded="false"><svg class="ico"><use href="#i-load"/></svg><span>読み込み</span><svg class="ico caret"><use href="#i-caret"/></svg></button>
+          <button id="loadBtn" class="tb-btn" type="button" title="棋譜ファイル・クリップボードから読み込む" aria-haspopup="menu" aria-expanded="false"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-load"/></svg><span>読み込み</span><svg aria-hidden="true" class="ico caret"><use href="/icons/ui.svg#i-caret"/></svg></button>
           <div class="load-pop" id="loadPop" role="menu" hidden>
-            <button id="loadOpenItem" class="load-item phone-only" type="button" role="menuitem" title="サーバーに保存した棋譜から開く"><svg class="ico"><use href="#i-open"/></svg><span>棋譜一覧</span></button>
-            <button id="importBtn" class="load-item" type="button" role="menuitem" title="棋譜ファイル（KIF / KI2 / USI）を読み込み"><svg class="ico"><use href="#i-import"/></svg><span>ファイルアップロード</span></button>
-            <button id="pasteBtn" class="load-item" type="button" role="menuitem" title="クリップボードの棋譜を新しい棋譜として読み込み"><svg class="ico"><use href="#i-paste"/></svg><span>クリップボードから読み込み</span></button>
+            <button id="loadOpenItem" class="load-item phone-only" type="button" role="menuitem" title="サーバーに保存した棋譜から開く"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-open"/></svg><span>棋譜一覧</span></button>
+            <button id="importBtn" class="load-item" type="button" role="menuitem" title="棋譜ファイル（KIF / KI2 / USI）を読み込み"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-import"/></svg><span>ファイルアップロード</span></button>
+            <button id="pasteBtn" class="load-item" type="button" role="menuitem" title="クリップボードの棋譜を新しい棋譜として読み込み"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-paste"/></svg><span>クリップボードから読み込み</span></button>
           </div>
         </div>
-        <button id="exportBtn" class="tb-btn" type="button" title="KIF / KI2 / USI で書き出し"><svg class="ico"><use href="#i-export"/></svg><span>エクスポート</span></button>
-        <button id="shareBtn" class="tb-btn" type="button" title="この局面の画像を X / Bluesky に投稿"><svg class="ico"><use href="#i-share"/></svg><span>共有</span></button>
-        <button id="saveBtn" class="tb-btn primary" type="button" title="サーバーに保存 (Ctrl+S)"><svg class="ico"><use href="#i-save"/></svg><span>保存</span></button>
-        <button id="settingsBtn" class="tb-btn icon-only" type="button" title="表示設定" aria-label="表示設定"><svg class="ico"><use href="#i-settings"/></svg></button>
-        <button id="licenseBtn" class="tb-btn icon-only" type="button" title="ライセンス表記" aria-label="ライセンス表記"><svg class="ico"><use href="#i-info"/></svg></button>
-        <button id="menuBtn" class="tb-btn icon-only menu-btn" type="button" title="メニュー" aria-label="メニュー"><svg class="ico"><use href="#i-menu"/></svg></button>
+        <button id="exportBtn" class="tb-btn" type="button" title="KIF / KI2 / USI で書き出し"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-export"/></svg><span>エクスポート</span></button>
+        <button id="shareBtn" class="tb-btn" type="button" title="この局面の画像を X / Bluesky に投稿"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-share"/></svg><span>共有</span></button>
+        <button id="saveBtn" class="tb-btn primary" type="button" title="サーバーに保存 (Ctrl+S)"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-save"/></svg><span>保存</span></button>
+        <button id="settingsBtn" class="tb-btn icon-only" type="button" title="表示設定" aria-label="表示設定"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-settings"/></svg></button>
+        <button id="licenseBtn" class="tb-btn icon-only" type="button" title="ライセンス表記" aria-label="ライセンス表記"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-info"/></svg></button>
+        <button id="menuBtn" class="tb-btn icon-only menu-btn" type="button" title="メニュー" aria-label="メニュー"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-menu"/></svg></button>
       </nav>
     </header>
 
@@ -132,19 +96,19 @@
 
         <div class="navbar" aria-label="局面移動">
           <div class="nav-group">
-            <button id="btnStart" class="nav-btn" type="button" title="最初へ (Home)" aria-label="最初へ"><svg class="ico"><use href="#i-first"/></svg><span class="nav-label" aria-hidden="true">最初</span></button>
-            <button id="btnPrev" class="nav-btn" type="button" title="1手戻る (←)" aria-label="1手戻る"><svg class="ico"><use href="#i-prev"/></svg><span class="nav-label" aria-hidden="true">戻る</span></button>
+            <button id="btnStart" class="nav-btn" type="button" title="最初へ (Home)" aria-label="最初へ"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-first"/></svg><span class="nav-label" aria-hidden="true">最初</span></button>
+            <button id="btnPrev" class="nav-btn" type="button" title="1手戻る (←)" aria-label="1手戻る"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-prev"/></svg><span class="nav-label" aria-hidden="true">戻る</span></button>
           </div>
           <div class="ply-display">
             <input id="plySlider" class="ply-slider" type="range" min="0" max="0" value="0" aria-label="手数">
             <div class="ply-text"><b id="plyNow">0</b><span>/</span><span id="plyMax">0</span><span class="ply-unit">手</span><span class="turn-chip" id="turnChip">▲先手番</span></div>
           </div>
           <div class="nav-group">
-            <button id="btnNext" class="nav-btn" type="button" title="1手進む (→)" aria-label="1手進む"><svg class="ico"><use href="#i-next"/></svg><span class="nav-label" aria-hidden="true">進む</span></button>
-            <button id="btnEnd" class="nav-btn" type="button" title="最後へ (End)" aria-label="最後へ"><svg class="ico"><use href="#i-last"/></svg><span class="nav-label" aria-hidden="true">最後</span></button>
+            <button id="btnNext" class="nav-btn" type="button" title="1手進む (→)" aria-label="1手進む"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-next"/></svg><span class="nav-label" aria-hidden="true">進む</span></button>
+            <button id="btnEnd" class="nav-btn" type="button" title="最後へ (End)" aria-label="最後へ"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-last"/></svg><span class="nav-label" aria-hidden="true">最後</span></button>
           </div>
-          <button id="kifuDrawerBtn" class="nav-btn kifu-btn" type="button" title="棋譜" aria-label="棋譜を開く"><svg class="ico"><use href="#i-list"/></svg><span>棋譜</span></button>
-          <button id="flipBtn" class="nav-btn flip-btn" type="button" title="盤を反転（先手・後手の向きを入れ替え） (F)" aria-label="盤を反転"><svg class="ico"><use href="#i-flipboard"/></svg><span>反転</span></button>
+          <button id="kifuDrawerBtn" class="nav-btn kifu-btn" type="button" title="棋譜" aria-label="棋譜を開く"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-list"/></svg><span>棋譜</span></button>
+          <button id="flipBtn" class="nav-btn flip-btn" type="button" title="盤を反転（先手・後手の向きを入れ替え） (F)" aria-label="盤を反転"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-flipboard"/></svg><span>反転</span></button>
           <!-- phone: always-visible analysis summary -->
           <div class="mini-eval" id="miniEval">
             <button id="miniOnOff" class="mini-onoff" type="button" aria-label="常時解析 ON/OFF"><i></i><span>解析</span><b>OFF</b></button>
@@ -162,7 +126,7 @@
           <header class="card-head">
             <div class="head-title">
               <h2>解析<span class="en">ANALYSIS</span></h2>
-              <button id="engineSettingsBtn" class="icon-btn gear" type="button" title="エンジン設定（スレッド数・ハッシュなど）" aria-label="エンジン設定"><svg class="ico"><use href="#i-gear"/></svg></button>
+              <button id="engineSettingsBtn" class="icon-btn gear" type="button" title="エンジン設定（スレッド数・ハッシュなど）" aria-label="エンジン設定"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-gear"/></svg></button>
             </div>
             <div class="onoff-wrap">
               <span class="onoff-label">常時解析</span>
@@ -178,7 +142,7 @@
             </div>
             <!-- short phones: a pull-down instead of the 1-5 buttons, and the 解析 summary moves in here -->
             <select id="multipvSel" class="field mpv-sel" aria-label="候補手数"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
-            <button id="analyzeAllBtn" class="btn-batch" type="button" title="棋譜の全局面を順に解析して評価値グラフを作ります"><svg class="ico"><use href="#i-chart"/></svg><span>全解析</span></button>
+            <button id="analyzeAllBtn" class="btn-batch" type="button" title="棋譜の全局面を順に解析して評価値グラフを作ります"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-chart"/></svg><span>全解析</span></button>
           </div>
           <div class="batch-progress" id="batchProgress" hidden>
             <div class="batch-bar"><i id="batchBar"></i></div>
@@ -213,14 +177,14 @@
         <section class="card kifu-card" id="kifuCard" aria-label="棋譜">
           <header class="card-head">
             <h2>棋譜</h2>
-            <button id="kifuCopyBtn" class="kifu-copy" type="button" title="棋譜を KIF 形式でクリップボードにコピー" aria-label="棋譜を KIF 形式でコピー"><svg class="ico"><use href="#i-copy"/></svg><span>KIFコピー</span></button>
+            <button id="kifuCopyBtn" class="kifu-copy" type="button" title="棋譜を KIF 形式でクリップボードにコピー" aria-label="棋譜を KIF 形式でコピー"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-copy"/></svg><span>KIFコピー</span></button>
             <span class="card-sub" id="kifuSub"></span>
-            <button id="kifuDrawerClose" class="icon-btn drawer-close" type="button" aria-label="棋譜を閉じる"><svg class="ico"><use href="#i-close"/></svg></button>
+            <button id="kifuDrawerClose" class="icon-btn drawer-close" type="button" aria-label="棋譜を閉じる"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-close"/></svg></button>
           </header>
           <div class="kifu-columns" aria-hidden="true"><span>手数</span><span>指し手</span><span>評価値</span><span></span></div>
           <ol class="move-list" id="moveList"></ol>
           <div class="variations" id="variations" hidden>
-            <div class="var-head"><svg class="ico"><use href="#i-branch"/></svg><span id="varTitle">変化</span></div>
+            <div class="var-head"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-branch"/></svg><span id="varTitle">変化</span></div>
             <div class="var-chips" id="varChips"></div>
           </div>
           <div class="comment-box">
@@ -236,7 +200,7 @@
     <div class="dialog-backdrop" data-close></div>
 
     <div class="dialog" id="dlgOpen" role="dialog" aria-modal="true" aria-labelledby="dlgOpenTitle" hidden>
-      <header class="dialog-head"><h3 id="dlgOpenTitle">保存した棋譜を開く</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <header class="dialog-head"><h3 id="dlgOpenTitle">保存した棋譜を開く</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-close"/></svg></button></header>
       <div class="dialog-body">
         <input id="gameFilter" class="field" type="search" placeholder="タイトルで絞り込み">
         <ul class="game-list" id="gameList"></ul>
@@ -244,7 +208,7 @@
     </div>
 
     <div class="dialog small" id="dlgTitle" role="dialog" aria-modal="true" aria-labelledby="dlgTitleTitle" hidden>
-      <header class="dialog-head"><h3 id="dlgTitleTitle">棋譜名を変更</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <header class="dialog-head"><h3 id="dlgTitleTitle">棋譜名を変更</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-close"/></svg></button></header>
       <div class="dialog-body">
         <input id="titleInput" class="field" type="text" maxlength="120" placeholder="無題の棋譜" spellcheck="false" autocomplete="off" aria-label="棋譜名" />
       </div>
@@ -252,11 +216,11 @@
     </div>
 
     <div class="dialog" id="dlgImport" role="dialog" aria-modal="true" aria-labelledby="dlgImportTitle" hidden>
-      <header class="dialog-head"><h3 id="dlgImportTitle">棋譜ファイルを読み込む</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <header class="dialog-head"><h3 id="dlgImportTitle">棋譜ファイルを読み込む</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-close"/></svg></button></header>
       <div class="dialog-body">
         <label class="dropzone" id="dropzone">
           <input id="importFile" type="file" accept=".kif,.kifu,.ki2,.ki2u,.usi,.txt" hidden>
-          <svg class="ico big"><use href="#i-import"/></svg>
+          <svg aria-hidden="true" class="ico big"><use href="/icons/ui.svg#i-import"/></svg>
           <span><b>ファイルを選択</b> またはここにドロップ</span>
           <small>KIF / KI2 / USI ・ 新しい棋譜として開きます</small>
         </label>
@@ -265,7 +229,7 @@
 
     <!-- only when the browser does not let the 貼付 button read the clipboard (e.g. http on the LAN) -->
     <div class="dialog small" id="dlgPaste" role="dialog" aria-modal="true" aria-labelledby="dlgPasteTitle" hidden>
-      <header class="dialog-head"><h3 id="dlgPasteTitle">棋譜を貼り付け</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <header class="dialog-head"><h3 id="dlgPasteTitle">棋譜を貼り付け</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-close"/></svg></button></header>
       <div class="dialog-body">
         <p class="muted">このアドレスではボタンからクリップボードを読めません。下の枠を長押しして「貼り付け」（PC は Ctrl+V）してください。</p>
         <div id="pasteTarget" class="paste-target" contenteditable="true" role="textbox" aria-label="ここに貼り付け">ここに貼り付け</div>
@@ -273,7 +237,7 @@
     </div>
 
     <div class="dialog" id="dlgExport" role="dialog" aria-modal="true" aria-labelledby="dlgExportTitle" hidden>
-      <header class="dialog-head"><h3 id="dlgExportTitle">棋譜を書き出す</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <header class="dialog-head"><h3 id="dlgExportTitle">棋譜を書き出す</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-close"/></svg></button></header>
       <div class="dialog-body">
         <div class="seg wide" id="exportSeg" role="radiogroup" aria-label="形式">
           <button type="button" data-v="kif" class="on">KIF</button><button type="button" data-v="kif2">KI2</button><button type="button" data-v="usi">USI</button>
@@ -284,7 +248,7 @@
     </div>
 
     <div class="dialog" id="dlgShare" role="dialog" aria-modal="true" aria-labelledby="dlgShareTitle" hidden>
-      <header class="dialog-head"><h3 id="dlgShareTitle">局面を共有</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <header class="dialog-head"><h3 id="dlgShareTitle">局面を共有</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-close"/></svg></button></header>
       <div class="dialog-body">
         <div class="share-preview"><img id="shareImg" alt="投稿する局面の画像" hidden><span id="shareStatus" class="muted"></span></div>
         <textarea id="shareText" class="field" rows="2" aria-label="投稿する文"></textarea>
@@ -300,7 +264,7 @@
     </div>
 
     <div class="dialog wide" id="dlgSettings" role="dialog" aria-modal="true" aria-labelledby="dlgSettingsTitle" hidden>
-      <header class="dialog-head"><h3 id="dlgSettingsTitle">表示設定</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <header class="dialog-head"><h3 id="dlgSettingsTitle">表示設定</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-close"/></svg></button></header>
       <div class="dialog-body">
         <div class="set-title">テーマ</div>
         <div class="theme-grid ui-themes" id="uiThemeChoices"></div>
@@ -330,7 +294,7 @@
     </div>
 
     <div class="dialog wide" id="dlgLicense" role="dialog" aria-modal="true" aria-labelledby="dlgLicenseTitle" hidden>
-      <header class="dialog-head"><h3 id="dlgLicenseTitle">ライセンス表記</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button></header>
+      <header class="dialog-head"><h3 id="dlgLicenseTitle">ライセンス表記</h3><button class="icon-btn" type="button" data-close aria-label="閉じる"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-close"/></svg></button></header>
       <div class="dialog-body lic">
         <div class="set-title">ShogiAnalyzer（本アプリ）</div>
         <p>MIT License で公開しています。</p>
@@ -398,7 +362,7 @@ SOFTWARE.</pre>
     <div class="dialog wide engine-dlg" id="dlgEngine" role="dialog" aria-modal="true" aria-labelledby="dlgEngineTitle" hidden>
       <header class="dialog-head">
         <div><h3 id="dlgEngineTitle">エンジン設定</h3><div class="dlg-sub" id="engineName">—</div></div>
-        <button class="icon-btn" type="button" data-close aria-label="閉じる"><svg class="ico"><use href="#i-close"/></svg></button>
+        <button class="icon-btn" type="button" data-close aria-label="閉じる"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-close"/></svg></button>
       </header>
       <div class="dialog-body" id="engineBody">
         <div class="eng-loading" id="engineLoading">エンジンから設定項目を読み込んでいます…</div>
@@ -445,15 +409,15 @@ SOFTWARE.</pre>
     <div class="dialog small sheet" id="dlgMenu" role="dialog" aria-modal="true" aria-label="メニュー" hidden>
       <div class="sheet-grip" data-close></div>
       <div class="menu-grid">
-        <button type="button" data-act="newGameBtn"><svg class="ico"><use href="#i-new"/></svg><span>新規</span></button>
-        <button type="button" data-act="openBtn"><svg class="ico"><use href="#i-open"/></svg><span>棋譜一覧</span></button>
-        <button type="button" id="menuLoad"><svg class="ico"><use href="#i-load"/></svg><span>読み込み</span></button>
-        <button type="button" data-act="saveBtn"><svg class="ico"><use href="#i-save"/></svg><span>保存</span></button>
-        <button type="button" data-act="exportBtn"><svg class="ico"><use href="#i-export"/></svg><span>エクスポート</span></button>
-        <button type="button" data-act="shareBtn"><svg class="ico"><use href="#i-share"/></svg><span>共有</span></button>
-        <button type="button" data-act="settingsBtn"><svg class="ico"><use href="#i-settings"/></svg><span>表示設定</span></button>
-        <button type="button" data-act="engineSettingsBtn"><svg class="ico"><use href="#i-gear"/></svg><span>エンジン設定</span></button>
-        <button type="button" data-act="licenseBtn"><svg class="ico"><use href="#i-info"/></svg><span>ライセンス</span></button>
+        <button type="button" data-act="newGameBtn"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-new"/></svg><span>新規</span></button>
+        <button type="button" data-act="openBtn"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-open"/></svg><span>棋譜一覧</span></button>
+        <button type="button" id="menuLoad"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-load"/></svg><span>読み込み</span></button>
+        <button type="button" data-act="saveBtn"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-save"/></svg><span>保存</span></button>
+        <button type="button" data-act="exportBtn"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-export"/></svg><span>エクスポート</span></button>
+        <button type="button" data-act="shareBtn"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-share"/></svg><span>共有</span></button>
+        <button type="button" data-act="settingsBtn"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-settings"/></svg><span>表示設定</span></button>
+        <button type="button" data-act="engineSettingsBtn"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-gear"/></svg><span>エンジン設定</span></button>
+        <button type="button" data-act="licenseBtn"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-info"/></svg><span>ライセンス</span></button>
       </div>
     </div>
 
@@ -467,8 +431,8 @@ SOFTWARE.</pre>
   <!-- phone: 読み込み in the ⋯ menu — its two choices on a layer above the menu (a tap outside closes it) -->
   <div class="menu-pop-layer" id="menuLoadLayer" hidden>
     <div class="load-pop" id="menuLoadPop" role="menu">
-      <button type="button" class="load-item" role="menuitem" data-act="importBtn"><svg class="ico"><use href="#i-import"/></svg><span>ファイルアップロード</span></button>
-      <button type="button" class="load-item" role="menuitem" data-act="pasteBtn"><svg class="ico"><use href="#i-paste"/></svg><span>クリップボードから読み込み</span></button>
+      <button type="button" class="load-item" role="menuitem" data-act="importBtn"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-import"/></svg><span>ファイルアップロード</span></button>
+      <button type="button" class="load-item" role="menuitem" data-act="pasteBtn"><svg aria-hidden="true" class="ico"><use href="/icons/ui.svg#i-paste"/></svg><span>クリップボードから読み込み</span></button>
     </div>
   </div>
 

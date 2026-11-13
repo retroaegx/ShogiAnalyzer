@@ -158,12 +158,6 @@ def collect(output: Path) -> tuple[Path, Path]:
     references.append({'component':'Unmodified PyInstaller bootloader licensing exception reference',
         'url':f'https://github.com/pyinstaller/pyinstaller/blob/v{bootloader.version}/COPYING.txt',
         'file':'PyInstaller-COPYING.txt','sha256':hashlib.sha256(copying.read_bytes()).hexdigest()})
-    for name,directory in [('Barlow-Semi-Condensed','barlowsemicondensed'),('Shippori-Mincho-B1','shipporiminchob1')]:
-        source=ROOT/'docs/third_party_fonts'/(name+'-OFL.txt')
-        shutil.copyfile(source,licenses/source.name)
-        references.append({'component':name+' external web font (font binary not bundled)',
-            'url':f'https://github.com/google/fonts/blob/main/ofl/{directory}/OFL.txt',
-            'file':source.name,'sha256':hashlib.sha256(source.read_bytes()).hexdigest()})
     version = platform.python_version()
     url = f'https://docs.python.org/release/{version}/license.html'
     references.append({'component':'CPython incorporated software', 'url':url,
